@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 
-import { EmptyTable, MemberLayout, MemberPanel } from "@/components/member-chrome";
+import { DataTable, MemberLayout, MemberPanel } from "@/components/member-chrome";
 import { plans } from "@/lib/member-data";
 
 export const Route = createFileRoute("/_authenticated/my-deposits")({
@@ -20,7 +20,7 @@ function MyDepositsPage() {
   return (
     <MemberLayout title="My Deposits" crumb="Active and completed deposits">
       <MemberPanel title="Deposit History" action={<Link to="/deposit" className="member-link">New deposit</Link>}>
-        <EmptyTable columns={["Plan", "Amount", "Daily Yield", "Start Date", "End Date", "Status"]} message="No deposits found" />
+        <DataTable columns={["Plan", "Amount", "Daily Yield", "Start Date", "End Date", "Status"]} rows={[]} empty="No deposits found" />
       </MemberPanel>
       <MemberPanel title="Available Plans">
         <ul className="member-plan-list">

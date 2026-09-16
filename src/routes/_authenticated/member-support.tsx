@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { FormEvent, useState } from "react";
 import { Mail, Send } from "lucide-react";
 
-import { EmptyTable, MemberLayout, MemberPanel } from "@/components/member-chrome";
+import { DataTable, MemberLayout, MemberPanel } from "@/components/member-chrome";
 
 export const Route = createFileRoute("/_authenticated/member-support")({
   head: () => ({ meta: [
@@ -48,7 +48,7 @@ function MemberSupportPage() {
       </div>
 
       <MemberPanel title="My Tickets">
-        <EmptyTable columns={["Subject", "Category", "Date", "Status"]} message="No tickets found" />
+        <DataTable columns={["Subject", "Category", "Date", "Status"]} rows={[]} empty="No tickets found" />
       </MemberPanel>
     </MemberLayout>
   );
