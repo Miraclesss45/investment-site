@@ -157,12 +157,12 @@
     margin: 0;
     min-width: 320px;
     font-family: Arial, "Helvetica Neue", sans-serif;
-    color: var(--color-foreground);
+  }
 
   html { scroll-behavior: smooth; }
 
   a { color: inherit; text-decoration: none; }
-  }
+}
 
 .site-shell { min-height: 100vh; overflow: clip; background: var(--deep); }
 .site-width { width: min(1160px, calc(100% - 80px)); margin-inline: auto; }

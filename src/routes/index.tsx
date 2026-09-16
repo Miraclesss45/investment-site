@@ -125,6 +125,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function Index() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [testimonial, setTestimonial] = useState(1);
+  const activeTestimonial = testimonials[testimonial] ?? testimonials[0];
 
   const moveTestimonial = (direction: number) => {
     setTestimonial((current) => (current + direction + testimonials.length) % testimonials.length);
@@ -246,8 +247,8 @@ function Index() {
             <h2>Our Members Investments &amp;<br />Profits Experience</h2>
             <div className="quote-stage" aria-live="polite">
               <div className="quote-mark">”</div>
-              <blockquote>“{testimonials[testimonial].quote}”</blockquote>
-              <cite>{testimonials[testimonial].name}</cite>
+              <blockquote>“{activeTestimonial?.quote}”</blockquote>
+              <cite>{activeTestimonial?.name}</cite>
             </div>
             <div className="testimonial-controls">
               <Button type="button" size="icon" variant="outline" aria-label="Previous testimonial" onClick={() => moveTestimonial(-1)}><ArrowLeft /></Button>
