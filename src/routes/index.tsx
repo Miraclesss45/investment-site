@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -166,7 +166,7 @@ function Index() {
           <div className="site-width hero-content">
             <h1 id="hero-title">Experience The<br />Convenience<br />Of Stable Profits</h1>
             <p>Providing long-term solutions for reliable income possibilities!</p>
-            <Button asChild className="blue-action"><a href="#packages">Choose Bond <ArrowRight /></a></Button>
+            <Button asChild className="blue-action"><Link to="/bonds">Choose Bond <ArrowRight /></Link></Button>
           </div>
         </section>
 
@@ -184,7 +184,7 @@ function Index() {
                 <li>Monitor your earnings with clear, real-time insights.</li>
                 <li>Our platform seamlessly integrates advanced technological tools, making sophisticated crypto management strategies accessible to all.</li>
               </ul>
-              <Button asChild className="blue-action"><a href="#features">Get More Info <ArrowRight /></a></Button>
+              <Button asChild className="blue-action"><Link to="/about">Get More Info <ArrowRight /></Link></Button>
             </div>
             <img src={tradingDesk.url} alt="Investment professionals reviewing live market charts" />
           </div>
@@ -208,9 +208,9 @@ function Index() {
                     <h3>{feature.title}</h3>
                     <p>{feature.copy}</p>
                   </div>
-                  <a href={feature.action === "Contact Us" ? "#contact" : "#signup"} className="feature-link">
+                  <Link to={feature.action === "Our Packages" ? "/bonds" : feature.action === "Contact Us" ? "/support" : feature.action === "Login To Account" ? "/login" : "/signup"} className="feature-link">
                     {feature.action} <ArrowRight />
-                  </a>
+                  </Link>
                 </article>
               ))}
             </div>
@@ -230,7 +230,7 @@ function Index() {
               ))}
             </div>
             <p className="guide-copy">Begin your journey with our crypto management platform today.<br />It's simple and straightforward.</p>
-            <Button className="yellow-action">Sign Me Up <ArrowRight /></Button>
+            <Button asChild className="yellow-action"><Link to="/signup">Sign Me Up <ArrowRight /></Link></Button>
           </div>
         </section>
 
@@ -254,7 +254,7 @@ function Index() {
           <div className="site-width cta-banner">
             <div className="cta-pattern" />
             <h2>Start Investing Now!</h2>
-            <Button asChild className="yellow-action"><a href="#signup">Sign Me Up <ArrowRight /></a></Button>
+            <Button asChild className="yellow-action"><Link to="/signup">Sign Me Up <ArrowRight /></Link></Button>
           </div>
         </section>
       </main>
