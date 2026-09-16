@@ -10,24 +10,30 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as BondsRouteImport } from './routes/bonds'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as DepositRouteImport } from './routes/deposit'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as MemberSupportRouteImport } from './routes/member-support'
-import { Route as MyDepositsRouteImport } from './routes/my-deposits'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as ReferralRouteImport } from './routes/referral'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SupportRouteImport } from './routes/support'
-import { Route as TransactionsRouteImport } from './routes/transactions'
-import { Route as WithdrawRouteImport } from './routes/withdraw'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedDepositRouteImport } from './routes/_authenticated/deposit'
+import { Route as AuthenticatedMemberSupportRouteImport } from './routes/_authenticated/member-support'
+import { Route as AuthenticatedMyDepositsRouteImport } from './routes/_authenticated/my-deposits'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedReferralRouteImport } from './routes/_authenticated/referral'
+import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authenticated/transactions'
+import { Route as AuthenticatedWithdrawRouteImport } from './routes/_authenticated/withdraw'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AboutRoute = AboutRouteImport.update({
@@ -40,16 +46,6 @@ const BondsRoute = BondsRouteImport.update({
   path: '/bonds',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DepositRoute = DepositRouteImport.update({
-  id: '/deposit',
-  path: '/deposit',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const FaqRoute = FaqRouteImport.update({
   id: '/faq',
   path: '/faq',
@@ -60,24 +56,9 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MemberSupportRoute = MemberSupportRouteImport.update({
-  id: '/member-support',
-  path: '/member-support',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MyDepositsRoute = MyDepositsRouteImport.update({
-  id: '/my-deposits',
-  path: '/my-deposits',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReferralRoute = ReferralRouteImport.update({
-  id: '/referral',
-  path: '/referral',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -90,68 +71,104 @@ const SupportRoute = SupportRouteImport.update({
   path: '/support',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TransactionsRoute = TransactionsRouteImport.update({
-  id: '/transactions',
-  path: '/transactions',
-  getParentRoute: () => rootRouteImport,
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const WithdrawRoute = WithdrawRouteImport.update({
+const AuthenticatedDepositRoute = AuthenticatedDepositRouteImport.update({
+  id: '/deposit',
+  path: '/deposit',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMemberSupportRoute =
+  AuthenticatedMemberSupportRouteImport.update({
+    id: '/member-support',
+    path: '/member-support',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMyDepositsRoute = AuthenticatedMyDepositsRouteImport.update({
+  id: '/my-deposits',
+  path: '/my-deposits',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedReferralRoute = AuthenticatedReferralRouteImport.update({
+  id: '/referral',
+  path: '/referral',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTransactionsRoute =
+  AuthenticatedTransactionsRouteImport.update({
+    id: '/transactions',
+    path: '/transactions',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWithdrawRoute = AuthenticatedWithdrawRouteImport.update({
   id: '/withdraw',
   path: '/withdraw',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/bonds': typeof BondsRoute
-  '/dashboard': typeof DashboardRoute
-  '/deposit': typeof DepositRoute
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
-  '/member-support': typeof MemberSupportRoute
-  '/my-deposits': typeof MyDepositsRoute
-  '/profile': typeof ProfileRoute
-  '/referral': typeof ReferralRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/support': typeof SupportRoute
-  '/transactions': typeof TransactionsRoute
-  '/withdraw': typeof WithdrawRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/deposit': typeof AuthenticatedDepositRoute
+  '/member-support': typeof AuthenticatedMemberSupportRoute
+  '/my-deposits': typeof AuthenticatedMyDepositsRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/referral': typeof AuthenticatedReferralRoute
+  '/transactions': typeof AuthenticatedTransactionsRoute
+  '/withdraw': typeof AuthenticatedWithdrawRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/bonds': typeof BondsRoute
-  '/dashboard': typeof DashboardRoute
-  '/deposit': typeof DepositRoute
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
-  '/member-support': typeof MemberSupportRoute
-  '/my-deposits': typeof MyDepositsRoute
-  '/profile': typeof ProfileRoute
-  '/referral': typeof ReferralRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/support': typeof SupportRoute
-  '/transactions': typeof TransactionsRoute
-  '/withdraw': typeof WithdrawRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/deposit': typeof AuthenticatedDepositRoute
+  '/member-support': typeof AuthenticatedMemberSupportRoute
+  '/my-deposits': typeof AuthenticatedMyDepositsRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/referral': typeof AuthenticatedReferralRoute
+  '/transactions': typeof AuthenticatedTransactionsRoute
+  '/withdraw': typeof AuthenticatedWithdrawRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/about': typeof AboutRoute
   '/bonds': typeof BondsRoute
-  '/dashboard': typeof DashboardRoute
-  '/deposit': typeof DepositRoute
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
-  '/member-support': typeof MemberSupportRoute
-  '/my-deposits': typeof MyDepositsRoute
-  '/profile': typeof ProfileRoute
-  '/referral': typeof ReferralRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/support': typeof SupportRoute
-  '/transactions': typeof TransactionsRoute
-  '/withdraw': typeof WithdrawRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/deposit': typeof AuthenticatedDepositRoute
+  '/_authenticated/member-support': typeof AuthenticatedMemberSupportRoute
+  '/_authenticated/my-deposits': typeof AuthenticatedMyDepositsRoute
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/referral': typeof AuthenticatedReferralRoute
+  '/_authenticated/transactions': typeof AuthenticatedTransactionsRoute
+  '/_authenticated/withdraw': typeof AuthenticatedWithdrawRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -159,16 +176,17 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/bonds'
-    | '/dashboard'
-    | '/deposit'
     | '/faq'
     | '/login'
+    | '/reset-password'
+    | '/signup'
+    | '/support'
+    | '/dashboard'
+    | '/deposit'
     | '/member-support'
     | '/my-deposits'
     | '/profile'
     | '/referral'
-    | '/signup'
-    | '/support'
     | '/transactions'
     | '/withdraw'
   fileRoutesByTo: FileRoutesByTo
@@ -176,53 +194,50 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/bonds'
-    | '/dashboard'
-    | '/deposit'
     | '/faq'
     | '/login'
+    | '/reset-password'
+    | '/signup'
+    | '/support'
+    | '/dashboard'
+    | '/deposit'
     | '/member-support'
     | '/my-deposits'
     | '/profile'
     | '/referral'
-    | '/signup'
-    | '/support'
     | '/transactions'
     | '/withdraw'
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/about'
     | '/bonds'
-    | '/dashboard'
-    | '/deposit'
     | '/faq'
     | '/login'
-    | '/member-support'
-    | '/my-deposits'
-    | '/profile'
-    | '/referral'
+    | '/reset-password'
     | '/signup'
     | '/support'
-    | '/transactions'
-    | '/withdraw'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/deposit'
+    | '/_authenticated/member-support'
+    | '/_authenticated/my-deposits'
+    | '/_authenticated/profile'
+    | '/_authenticated/referral'
+    | '/_authenticated/transactions'
+    | '/_authenticated/withdraw'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AboutRoute: typeof AboutRoute
   BondsRoute: typeof BondsRoute
-  DashboardRoute: typeof DashboardRoute
-  DepositRoute: typeof DepositRoute
   FaqRoute: typeof FaqRoute
   LoginRoute: typeof LoginRoute
-  MemberSupportRoute: typeof MemberSupportRoute
-  MyDepositsRoute: typeof MyDepositsRoute
-  ProfileRoute: typeof ProfileRoute
-  ReferralRoute: typeof ReferralRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   SupportRoute: typeof SupportRoute
-  TransactionsRoute: typeof TransactionsRoute
-  WithdrawRoute: typeof WithdrawRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -232,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -248,20 +270,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BondsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/deposit': {
-      id: '/deposit'
-      path: '/deposit'
-      fullPath: '/deposit'
-      preLoaderRoute: typeof DepositRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/faq': {
       id: '/faq'
       path: '/faq'
@@ -276,32 +284,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/member-support': {
-      id: '/member-support'
-      path: '/member-support'
-      fullPath: '/member-support'
-      preLoaderRoute: typeof MemberSupportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/my-deposits': {
-      id: '/my-deposits'
-      path: '/my-deposits'
-      fullPath: '/my-deposits'
-      preLoaderRoute: typeof MyDepositsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/referral': {
-      id: '/referral'
-      path: '/referral'
-      fullPath: '/referral'
-      preLoaderRoute: typeof ReferralRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -318,39 +305,100 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SupportRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/transactions': {
-      id: '/transactions'
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/deposit': {
+      id: '/_authenticated/deposit'
+      path: '/deposit'
+      fullPath: '/deposit'
+      preLoaderRoute: typeof AuthenticatedDepositRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/member-support': {
+      id: '/_authenticated/member-support'
+      path: '/member-support'
+      fullPath: '/member-support'
+      preLoaderRoute: typeof AuthenticatedMemberSupportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/my-deposits': {
+      id: '/_authenticated/my-deposits'
+      path: '/my-deposits'
+      fullPath: '/my-deposits'
+      preLoaderRoute: typeof AuthenticatedMyDepositsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/referral': {
+      id: '/_authenticated/referral'
+      path: '/referral'
+      fullPath: '/referral'
+      preLoaderRoute: typeof AuthenticatedReferralRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/transactions': {
+      id: '/_authenticated/transactions'
       path: '/transactions'
       fullPath: '/transactions'
-      preLoaderRoute: typeof TransactionsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedTransactionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/withdraw': {
-      id: '/withdraw'
+    '/_authenticated/withdraw': {
+      id: '/_authenticated/withdraw'
       path: '/withdraw'
       fullPath: '/withdraw'
-      preLoaderRoute: typeof WithdrawRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedWithdrawRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDepositRoute: typeof AuthenticatedDepositRoute
+  AuthenticatedMemberSupportRoute: typeof AuthenticatedMemberSupportRoute
+  AuthenticatedMyDepositsRoute: typeof AuthenticatedMyDepositsRoute
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedReferralRoute: typeof AuthenticatedReferralRoute
+  AuthenticatedTransactionsRoute: typeof AuthenticatedTransactionsRoute
+  AuthenticatedWithdrawRoute: typeof AuthenticatedWithdrawRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDepositRoute: AuthenticatedDepositRoute,
+  AuthenticatedMemberSupportRoute: AuthenticatedMemberSupportRoute,
+  AuthenticatedMyDepositsRoute: AuthenticatedMyDepositsRoute,
+  AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedReferralRoute: AuthenticatedReferralRoute,
+  AuthenticatedTransactionsRoute: AuthenticatedTransactionsRoute,
+  AuthenticatedWithdrawRoute: AuthenticatedWithdrawRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AboutRoute: AboutRoute,
   BondsRoute: BondsRoute,
-  DashboardRoute: DashboardRoute,
-  DepositRoute: DepositRoute,
   FaqRoute: FaqRoute,
   LoginRoute: LoginRoute,
-  MemberSupportRoute: MemberSupportRoute,
-  MyDepositsRoute: MyDepositsRoute,
-  ProfileRoute: ProfileRoute,
-  ReferralRoute: ReferralRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   SupportRoute: SupportRoute,
-  TransactionsRoute: TransactionsRoute,
-  WithdrawRoute: WithdrawRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
