@@ -117,7 +117,7 @@ export function MemberLayout({ title, crumb, children }: { title: string; crumb?
     <div className={`member-shell${open ? " is-open" : ""}`}>
       <aside className="member-sidebar">
         <div className="member-brand">
-          <Link to="/" className="member-logo"><strong>LEGACY</strong><span>PRO ALLIANCE</span></Link>
+          <Link to="/" className="member-logo"><strong>MERIDIAN</strong><span>VEST</span></Link>
           <button type="button" className="member-close" aria-label="Close menu" onClick={() => setOpen(false)}><X /></button>
         </div>
         <div className="member-card-user">
