@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Logo } from "@/components/site-chrome";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSelect } from "@/lib/i18n";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
@@ -87,6 +88,7 @@ function SignupPage() {
 
   return (
     <main className="signup-page">
+      <ThemeToggle className="auth-theme-toggle signup-theme-toggle" />
       <div className="signup-login-prompt">Already have an account? <Button asChild variant="outline"><Link to="/login">Sign In</Link></Button></div>
       <div className="signup-shell">
         <div className="account-logo"><Logo /></div>

@@ -443,6 +443,10 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
 .login-links a { margin-left: 3px; color: var(--brand-yellow); font-weight: 800; }
 .login-page > footer { width: calc(100% - 96px); margin: 90px auto 0; padding: 30px 25px 21px; border-top: 1px solid oklch(1 0 0 / 20%); background: transparent; color: var(--foreground); text-align: center; font-size: 10px; }
 .login-page > footer span { color: var(--brand-yellow); }
+.auth-theme-toggle { width: 38px; height: 38px; margin-left: auto; border: 1px solid color-mix(in oklab, var(--foreground) 24%, transparent); border-radius: 999px; color: var(--foreground); background: color-mix(in oklab, var(--foreground) 7%, transparent); }
+.auth-theme-toggle:hover { border-color: var(--brand-blue); background: color-mix(in oklab, var(--brand-blue) 14%, transparent); }
+.auth-theme-toggle svg { width: 18px; height: 18px; }
+.signup-theme-toggle { position: absolute; top: 23px; left: 32px; z-index: 2; }
 
 @media (max-width: 900px) {
   .site-width { width: min(100% - 36px, 700px); }
@@ -520,6 +524,7 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
   .support-form { padding: 32px 24px; }
   .signup-page { padding: 88px 18px 40px; }
   .signup-login-prompt { top: 20px; right: 18px; gap: 10px; font-size: 11px; }
+  .signup-theme-toggle { top: 18px; left: 18px; }
   .signup-login-prompt a { min-width: 76px; height: 34px; }
   .account-logo { margin-bottom: 20px; }
   .signup-form h1 { font-size: 22px; }
@@ -762,6 +767,18 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .theme-light .member-stat, .theme-light .member-panel { box-shadow: 0 6px 18px oklch(0.2 0.02 255 / 7%); }
 .theme-light body:has(.member-shell) { background: oklch(0.975 0.004 255); }
 .theme-light .member-footer { background: oklch(1 0 0); color: oklch(0.42 0.012 255); }
+.theme-light .signup-page, .theme-light .login-page { background: oklch(0.965 0.01 205); color: var(--foreground); }
+.theme-light .login-top { border-bottom-color: var(--border); background: color-mix(in oklab, var(--header) 96%, transparent); }
+.theme-light .login-input, .theme-light .account-field > div { border-color: var(--border); background: var(--card); }
+.theme-light .login-input input, .theme-light .account-field input { color: var(--foreground); }
+.theme-light .login-input input::placeholder, .theme-light .account-field input::placeholder { color: var(--muted-foreground); }
+.theme-light .account-field input { border-left-color: var(--border); }
+.theme-light .signup-login-prompt a { border-color: var(--border); color: var(--foreground); }
+.theme-light .signup-footer { border-top-color: var(--border); color: var(--muted-foreground); }
+.theme-light .signup-footer a { color: var(--primary); }
+.theme-light .signup-footer select { border-color: var(--border); background: var(--card); color: var(--foreground); }
+.theme-light .login-page > footer { border-top-color: var(--border); }
+.theme-light .auth-theme-toggle { border-color: var(--border); background: var(--card); color: var(--foreground); box-shadow: 0 5px 16px oklch(0.22 0.02 230 / 8%); }
 
 /* ---------- Refined scroll reveals ---------- */
 .feature-card,

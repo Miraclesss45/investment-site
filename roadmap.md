@@ -15,3 +15,4 @@
 
 ## Done
 - Refined only the public site's light-mode colors; preserved layout, text, fonts, animations, and dark mode exactly.
+- Added the persistent dark/light control to public, account, password reset, and authenticated member pages with harmonized light-mode colors.

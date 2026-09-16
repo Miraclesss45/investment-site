@@ -3,7 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell, CircleUserRound, Gauge, HeadphonesIcon, LayoutList, LogOut, Menu,
-  MessageCircle, Moon, PiggyBank, Share2, Sun, Upload, Wallet, X,
+  MessageCircle, PiggyBank, Share2, Upload, Wallet, X,
 } from "lucide-react";
 
 import {
@@ -11,10 +11,10 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useNotifications, useProfile, useUnread } from "@/lib/account";
 import { shortDate } from "@/lib/member-data";
-import { useTheme } from "@/lib/theme";
 import { LanguageSelect } from "@/lib/i18n";
 
 const navItems = [
@@ -37,23 +37,6 @@ export function useSignOut() {
     await supabase.auth.signOut();
     navigate({ to: "/login", replace: true });
   };
-}
-
-export function ThemeToggle({ className }: { className?: string }) {
-  const { theme, toggleTheme } = useTheme();
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className={className ?? "member-icon-button"}
-      onClick={toggleTheme}
-      aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
-      title={theme === "light" ? "Dark mode" : "Light mode"}
-    >
-      {theme === "light" ? <Moon /> : <Sun />}
-    </Button>
-  );
 }
 
 function NotificationBell() {
@@ -144,7 +127,7 @@ export function MemberLayout({ title, crumb, children }: { title: string; crumb?
           <div className="member-title"><h1>{title}</h1>{crumb && <p>{crumb}</p>}</div>
           <div className="member-topbar-actions">
             <LanguageSelect />
-            <ThemeToggle />
+            <ThemeToggle className="member-icon-button" />
             <NotificationBell />
             <AccountMenu initial={initial} name={name} username={username} />
           </div>
