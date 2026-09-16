@@ -216,7 +216,7 @@ function Index() {
           <div className="site-width">
             <SectionLabel>Our Features</SectionLabel>
             <h2>Maximize Your Earnings With<br />Legacyproalliance.Org Today</h2>
-            <div className="feature-grid" id="packages">
+            <div className={`feature-grid ${featuresInView ? "is-visible" : ""}`} id="packages" ref={featuresRef}>
               {features.map((feature) => (
                 <article className="feature-card" key={feature.title}>
                   <div className="feature-top">
