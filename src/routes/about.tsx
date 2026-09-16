@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ArrowUp, Bot, Coins, Rocket } from "lucide-react";
 
 import tradingDesk from "@/assets/uploads/image-1.png.asset.json";
-import certificate from "@/assets/uploads/aboutusimage.png.asset.json";
+import certificate from "@/assets/uploads/aboutusimage-2.png.asset.json";
 import { InnerHero, PublicCta, SiteFooter, SiteHeader } from "@/components/site-chrome";
 
 export const Route = createFileRoute("/about")({
