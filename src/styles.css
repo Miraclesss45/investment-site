@@ -304,4 +304,3 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
 }
 
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-}
