@@ -717,3 +717,5 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .theme-light .member-shell { --background: oklch(0.975 0.004 255); --foreground: oklch(0.20 0.015 255); --card: oklch(1 0 0); --panel: oklch(0.94 0.006 255); --header: oklch(1 0 0); --border: oklch(0.88 0.008 255); --muted-foreground: oklch(0.48 0.012 255); }
 .theme-light .member-sidebar, .theme-light .member-topbar, .theme-light .member-menu { background: oklch(1 0 0); }
 .theme-light .member-stat, .theme-light .member-panel { box-shadow: 0 6px 18px oklch(0.2 0.02 255 / 7%); }
+.theme-light body:has(.member-shell) { background: oklch(0.975 0.004 255); }
+.theme-light .member-footer { background: oklch(1 0 0); color: oklch(0.42 0.012 255); }

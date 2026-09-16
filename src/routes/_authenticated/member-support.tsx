@@ -4,7 +4,7 @@ import { Mail, Send } from "lucide-react";
 
 import { EmptyTable, MemberLayout, MemberPanel } from "@/components/member-chrome";
 
-export const Route = createFileRoute("/member-support")({
+export const Route = createFileRoute("/_authenticated/member-support")({
   head: () => ({ meta: [
     { title: "Get Support | Legacy Pro Alliance" },
     { name: "description", content: "Open a support ticket or reach the Legacy Pro Alliance team by e-mail or Telegram from your member area." },
