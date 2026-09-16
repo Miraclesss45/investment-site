@@ -5,3 +5,5 @@
 - [x] Recreate Bonds, FAQ, Support, Sign Up, and Login at stable local routes
 - [x] Update shared navigation and styles without regressing Home or About
 - [x] Validate all routes, interactions, assets, desktop, and mobile behavior
+- [x] Place the supplied feature, certificate, and login images in their matching sections
+- [x] Verify the updated Home, About Us, and Login pages on desktop and mobile
