@@ -172,6 +172,22 @@ function Index() {
     setTick((t) => t + 1);
   };
 
+  useEffect(() => {
+    const grid = stepsRef.current;
+    if (!grid) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setStepsInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.25 }
+    );
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, []);
+
   const closeMenu = () => setMenuOpen(false);
 
   return (
@@ -269,7 +285,7 @@ function Index() {
           <div className="site-width">
             <SectionLabel>Member's Guide</SectionLabel>
             <h2>A Few Simple Steps<br />To Start Earning</h2>
-            <div className="steps-grid">
+            <div className={`steps-grid ${stepsInView ? "is-visible" : ""}`} ref={stepsRef}>
               {steps.map((step) => (
                 <article className="step-card" key={step.title}>
                   {step.image ? <img src={step.image} alt="" /> : <span className="step-symbol" aria-hidden="true">{step.symbol}</span>}
