@@ -498,6 +498,8 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
   .about-story h2 { font-size: 34px; }
   .about-story img { min-height: 300px; }
   .certificate-section { padding-bottom: 50px; }
+  .registry-plaque { padding: 42px 26px 36px; }
+  .registry-details { grid-template-columns: 1fr; gap: 0; }
   .plans-section, .faq-section, .support-section { padding-block: 68px; }
   .plans-section > .site-width > h2, .faq-intro h2, .support-copy h2 { font-size: 31px; }
   .plans-grid, .signup-grid { grid-template-columns: 1fr; }
