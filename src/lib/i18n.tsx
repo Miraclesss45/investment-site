@@ -54,14 +54,17 @@ const translatable = (value: string) => {
 
 type Original = { node: Node; kind: "text" | "attr"; attr?: string; value: string };
 
-function collect(): Original[] {
+function collect(originals?: WeakMap<Node, Map<string, string>>): Original[] {
   const found: Original[] = [];
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
       if (!parent || SKIP_TAGS.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
       if (parent.closest("[data-no-translate]")) return NodeFilter.FILTER_REJECT;
-      return translatable(node.nodeValue ?? "") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      const wasTranslated = originals?.get(node)?.has("#text") ?? false;
+      return wasTranslated || translatable(node.nodeValue ?? "")
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT;
     },
   });
   let current = walker.nextNode();
@@ -73,7 +76,10 @@ function collect(): Original[] {
     if (el.closest("[data-no-translate]")) return;
     (["placeholder", "aria-label", "title"] as const).forEach((attr) => {
       const value = el.getAttribute(attr);
-      if (value && translatable(value)) found.push({ node: el, kind: "attr", attr, value });
+      const wasTranslated = originals?.get(el)?.has(attr) ?? false;
+      if (value && (wasTranslated || translatable(value))) {
+        found.push({ node: el, kind: "attr", attr, value });
+      }
     });
   });
   return found;
@@ -112,15 +118,19 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const run = useCallback(
     async (code: string) => {
       if (typeof document === "undefined") return;
-      const entries = collect();
+      const entries = collect(originals.current);
+
+      // Always return the current DOM to its English source before applying
+      // another language. This makes direct switches (for example Arabic to
+      // French) reliable instead of attempting to translate translated text.
+      entries.forEach((entry) => {
+        const map = originals.current.get(entry.node);
+        const slot = entry.kind === "text" ? "#text" : entry.attr!;
+        const original = map?.get(slot);
+        if (original) apply(entry, original);
+      });
 
       if (code === "en") {
-        entries.forEach((entry) => {
-          const map = originals.current.get(entry.node);
-          const slot = entry.kind === "text" ? "#text" : entry.attr!;
-          const original = map?.get(slot);
-          if (original) apply(entry, original);
-        });
         return;
       }
 
@@ -147,7 +157,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
           });
           Object.assign(dict, result);
           if (languageRef.current !== code) return;
-          collect().forEach((entry) => {
+          collect(originals.current).forEach((entry) => {
             const source = remember(entry).trim();
             const hit = dict[source];
             if (hit) apply(entry, entry.value.replace(entry.value.trim(), hit));
@@ -169,6 +179,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLanguage = useCallback(
     (code: string) => {
+      if (!languages.some((item) => item.code === code)) return;
       languageRef.current = code;
       setLanguageState(code);
       try {
@@ -183,7 +194,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   // restore saved language + cached dictionary
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved || saved === "en") return;
+    if (!saved || saved === "en" || !languages.some((item) => item.code === saved)) return;
     try {
       const cached = localStorage.getItem(cacheKey(saved));
       if (cached) dictionary.current[saved] = JSON.parse(cached) as Record<string, string>;
@@ -224,7 +235,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
     schedule();
     const observer = new MutationObserver(schedule);
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    // Child additions cover route changes and dynamic panels. Avoid observing
+    // characterData because our own translations would otherwise reschedule
+    // the translator continuously.
+    observer.observe(document.body, { childList: true, subtree: true });
     return () => {
       observer.disconnect();
       clearTimeout(timer);
