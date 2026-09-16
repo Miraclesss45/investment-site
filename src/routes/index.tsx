@@ -161,6 +161,22 @@ function Index() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const grid = featuresRef.current;
+    if (!grid) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setFeaturesInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="site-shell" id="home">
       <SiteHeader />
