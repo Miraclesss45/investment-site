@@ -8,6 +8,10 @@ import banner from "@/assets/uploads/banner-5.jpg.asset.json";
 import tradingDesk from "@/assets/uploads/image-1.png.asset.json";
 import rocket from "@/assets/uploads/why1.png.asset.json";
 import portfolio from "@/assets/uploads/why2.png.asset.json";
+import featureOne from "@/assets/uploads/feature1.png.asset.json";
+import featureTwo from "@/assets/uploads/feature2.png.asset.json";
+import featureThree from "@/assets/uploads/feature3.png.asset.json";
+import featureFour from "@/assets/uploads/feature4.png.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -34,25 +38,25 @@ const features = [
     title: "Advanced Technology",
     copy: "Utilize our advanced technological tools to effortlessly earn stable long-term profits.",
     action: "Our Packages",
-    position: "22% center",
+    image: featureOne.url,
   },
   {
     title: "Seamless Investments",
     copy: "Purchase our plans with ease, and start earning without the hassle of setting up complex software.",
     action: "Register Now",
-    position: "46% center",
+    image: featureTwo.url,
   },
   {
     title: "Comprehensive Support",
     copy: "Our dedicated support team is here to assist you 24/7/365 to give you the premium investing experience.",
     action: "Contact Us",
-    position: "61% center",
+    image: featureThree.url,
   },
   {
     title: "Real-Time Earning Insights",
     copy: "Stay updated with real-time insights on your daily earnings and investment performance.",
     action: "Login To Account",
-    position: "86% center",
+    image: featureFour.url,
   },
 ];
 
@@ -199,9 +203,8 @@ function Index() {
                 <article className="feature-card" key={feature.title}>
                   <div className="feature-top">
                     <img
-                      src={tradingDesk.url}
+                      src={feature.image}
                       alt=""
-                      style={{ objectPosition: feature.position }}
                     />
                   </div>
                   <div className="feature-body">

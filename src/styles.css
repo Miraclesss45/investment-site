@@ -371,6 +371,7 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
 .login-top { height: 72px; padding: 0 40px; display: flex; align-items: center; gap: 25px; border-bottom: 1px solid oklch(1 0 0 / 12%); font-size: 17px; }
 .login-top a { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid oklch(1 0 0 / 20%); border-radius: 999px; }
 .login-panel { width: min(470px, calc(100% - 32px)); margin: auto; padding: 58px 52px; border: 1px solid oklch(1 0 0 / 12%); background: oklch(0.11 0.022 255); box-shadow: 0 25px 80px oklch(0.01 0 0 / 45%); }
+.login-icon { display: block; width: 132px; height: 99px; margin: 0 auto 24px; object-fit: cover; object-position: center; }
 .login-panel h1 { margin-bottom: 8px; text-align: center; font-size: 34px; }
 .login-panel > p { margin-bottom: 36px; color: oklch(0.7 0.01 250); text-align: center; font-size: 13px; }
 .login-panel label { display: block; margin-bottom: 23px; }
