@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Rocket, Settings, UserRoundCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,24 @@ export const Route = createFileRoute("/")({
   }),
   component: Index,
 });
+
+const highlights = [
+  {
+    icon: Rocket,
+    title: "It's Free To Start",
+    copy: "Unlock your earning potential: open your free account",
+  },
+  {
+    icon: Settings,
+    title: "Automated Strategies",
+    copy: "Secure your future: smart strategies to make your money grow",
+  },
+  {
+    icon: UserRoundCheck,
+    title: "Stable Profits",
+    copy: "Competitive returns with our sophisticated AI-driven bots.",
+  },
+];
 
 const features = [
   {
@@ -188,9 +206,26 @@ function Index() {
           <div className="site-width hero-content">
             <h1 id="hero-title">Experience The<br />Convenience<br />Of Stable Profits</h1>
             <p>Providing long-term solutions for reliable income possibilities!</p>
-            <Button asChild className="blue-action"><Link to="/bonds">Choose Bond <ArrowRight /></Link></Button>
+            <div className="hero-actions">
+              <Button asChild className="blue-action"><Link to="/signup">Sign Me Up <ArrowRight /></Link></Button>
+              <Button asChild className="yellow-action hero-yellow"><Link to="/login">Member Login <ArrowRight /></Link></Button>
+            </div>
+          </div>
+          <div className="site-width hero-highlights-wrap">
+            <div className="hero-highlights">
+              {highlights.map(({ icon: Icon, title, copy }) => (
+                <div className="hero-highlight" key={title}>
+                  <Icon aria-hidden="true" />
+                  <div>
+                    <h2>{title}</h2>
+                    <p>{copy}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
+
 
         <section className="about section-dark" id="about">
           <div className="site-width about-grid">
