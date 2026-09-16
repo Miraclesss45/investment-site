@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { ArrowUp, Bot, Coins, Rocket } from "lucide-react";
 
 import tradingDesk from "@/assets/uploads/image-1.png.asset.json";
