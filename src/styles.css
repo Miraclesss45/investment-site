@@ -427,9 +427,26 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
 
 @media (max-width: 560px) {
   .site-width { width: calc(100% - 28px); }
-  .hero { min-height: 530px; }
+  .hero { min-height: 530px; padding-bottom: 84px; }
   .hero-content { padding-block: 55px; }
   .hero h1 { font-size: 44px; }
+  .hero-highlights-wrap { margin-top: 18px; margin-bottom: 0; }
+  .hero-highlights { gap: 24px; padding: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  .hero-highlight {
+    min-height: 305px;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: 20px;
+    align-items: center;
+    padding: 52px 44px 45px;
+    border-radius: 27px;
+    background: color-mix(in oklab, var(--header) 97%, transparent);
+  }
+  .hero-highlight > div { display: contents; }
+  .hero-highlight svg { width: 48px; height: 48px; margin: 0; stroke-width: 2.8; }
+  .hero-highlight h2 { grid-column: 2; margin: 0; font-size: 28px; line-height: 1.85; }
+  .hero-highlight p { grid-column: 1 / -1; align-self: start; margin-top: 17px; font-size: 23px; line-height: 1.7; }
   .about, .features, .guide, .testimonials { padding-block: 68px; }
   .about h2, .features h2, .guide h2, .testimonials h2 { font-size: 29px; }
   .about-grid > img { height: 260px; }

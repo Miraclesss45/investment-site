@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Rocket, Settings, UserRoundCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Coins, Rocket, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ const highlights = [
     copy: "Secure your future: smart strategies to make your money grow",
   },
   {
-    icon: UserRoundCheck,
+    icon: Coins,
     title: "Stable Profits",
     copy: "Competitive returns with our sophisticated AI-driven bots.",
   },
