@@ -10,6 +10,8 @@
 - Dark / light mode toggle in the member area.
 
 ## Open
-- Refine only the public site's light-mode colors; preserve layout, text, fonts, animations, and dark mode exactly.
 - Admin dashboard where the admin can oversee all users, deposits, withdrawals, transactions and support tickets. Blocker: choose between Lovable Cloud Supabase (managed, app-level admin panel only) or own/external Supabase (full DB/dashboard control).
 - Nothing blocking. Daily earnings are credited once the user's own payment/earning process is connected.
+
+## Done
+- Refined only the public site's light-mode colors; preserved layout, text, fonts, animations, and dark mode exactly.
