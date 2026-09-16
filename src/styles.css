@@ -88,6 +88,9 @@
   --header: oklch(0.175 0.009 190);
   --panel: oklch(0.22 0.006 250);
   --deep: oklch(0.028 0.007 160);
+  --plan-surface: oklch(0.985 0 0);
+  --plan-ink: oklch(0.19 0.018 235);
+  --plan-premium: oklch(0.84 0.11 183);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -109,6 +112,9 @@
   --color-header: var(--header);
   --color-panel: var(--panel);
   --color-deep: var(--deep);
+  --color-plan-surface: var(--plan-surface);
+  --color-plan-ink: var(--plan-ink);
+  --color-plan-premium: var(--plan-premium);
 }
 
 .dark {
@@ -322,17 +328,19 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
 
 .plans-section, .faq-section, .support-section { padding: 94px 0 105px; background: var(--background); }
 .plans-section > .site-width > h2 { margin: 28px 0 55px; text-align: center; font-size: 39px; }
-.plans-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
-.plan-card { padding: 31px 22px 27px; border: 1px solid var(--border); border-top: 4px solid var(--brand-blue); border-radius: 6px; background: var(--deep); text-align: center; transition: transform .25s ease, border-color .25s ease; }
-.plan-card:hover { transform: translateY(-8px); border-color: var(--brand-blue); }
-.plan-name { margin-bottom: 23px; color: var(--muted-foreground); font-size: 11px; font-weight: 800; text-transform: uppercase; }
-.plan-rate { font-size: 48px; font-weight: 800; color: var(--brand-blue); }
-.plan-period { margin: 4px 0 29px; color: var(--muted-foreground); font-size: 11px; text-transform: uppercase; }
-.plan-card ul { margin: 0 0 12px; padding: 0; list-style: none; text-align: left; }
-.plan-card li { min-height: 43px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); color: var(--muted-foreground); font-size: 11px; }
-.plan-card li svg { width: 14px; color: var(--brand-blue); }
-.plan-card li b { margin-left: auto; color: var(--foreground); }
-.plan-card .blue-action { width: 100%; margin-top: 22px; }
+.plans-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 23px; }
+.plan-card { min-height: 422px; padding: 22px 28px 25px; border: 0; border-radius: 8px; background: var(--plan-surface); color: var(--plan-ink); text-align: center; transition: transform .25s ease, box-shadow .25s ease; }
+.plan-card-premium { background: var(--plan-premium); }
+.plan-card:hover { transform: translateY(-8px); box-shadow: 0 14px 30px color-mix(in oklab, var(--deep) 55%, transparent); }
+.plan-name { width: max-content; margin: 0 auto 13px; padding: 8px 14px; border-radius: 999px; background: linear-gradient(90deg, var(--primary), var(--brand-blue)); color: var(--primary-foreground); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.plan-rate { position: relative; display: inline-block; font-size: 56px; line-height: 1.1; font-weight: 800; color: var(--plan-ink); }
+.plan-rate::after { content: "%"; position: absolute; top: 7px; left: 100%; font-size: 14px; line-height: 1; }
+.plan-period { display: none; }
+.plan-card ul { margin: 24px 0 25px; padding: 0; list-style: none; text-align: left; }
+.plan-card li { min-height: 35px; display: flex; align-items: center; gap: 12px; color: var(--plan-ink); font-size: 11px; white-space: nowrap; }
+.plan-card li svg { width: 18px; height: 18px; flex: none; padding: 3px; border-radius: 999px; background: var(--plan-ink); color: var(--plan-surface); stroke-width: 4; }
+.plan-card li b { margin-left: -8px; color: var(--plan-ink); }
+.plan-card .blue-action { width: min(150px, 100%); height: 48px; margin-top: 0; border: 1px solid var(--brand-blue); border-radius: 8px; background: var(--plan-ink); box-shadow: 0 8px 18px color-mix(in oklab, var(--plan-ink) 30%, transparent); color: var(--primary-foreground); }
 
 .faq-tabs { display: flex; justify-content: center; gap: 12px; margin-bottom: 58px; }
 .faq-tabs button { min-width: 120px; height: 42px; border-radius: 999px; text-transform: uppercase; font-size: 11px; }

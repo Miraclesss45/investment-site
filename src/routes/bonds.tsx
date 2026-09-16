@@ -17,10 +17,10 @@ export const Route = createFileRoute("/bonds")({
 });
 
 const plans = [
-  { name: "Starter Plan", rate: "2.5%", minimum: "$35", maximum: "$3,000" },
-  { name: "Regular Plan", rate: "10%", minimum: "$3,001", maximum: "$10,000" },
-  { name: "Pro Plan", rate: "20%", minimum: "$10,000", maximum: "$20,000" },
-  { name: "Premium Plan", rate: "35%", minimum: "$20,001", maximum: "Unlimited" },
+  { name: "Starter Plan", rate: "2.5", minimum: "$35", maximum: "$3,000" },
+  { name: "Regular Plan", rate: "10", minimum: "$3,001", maximum: "$10,000" },
+  { name: "Pro Plan", rate: "20", minimum: "$10,000", maximum: "$20,000" },
+  { name: "Premium Plan", rate: "35", minimum: "$20,001", maximum: "$UNLIMITED", premium: true },
 ];
 
 function BondsPage() {
@@ -31,9 +31,9 @@ function BondsPage() {
       <section className="plans-section"><div className="site-width">
         <div className="section-label"><span />Investment Bonds</div>
         <h2>Choose The Plan That Works For You</h2>
-        <div className="plans-grid">{plans.map((plan) => <article className="plan-card" key={plan.name}>
+        <div className="plans-grid">{plans.map((plan) => <article className={plan.premium ? "plan-card plan-card-premium" : "plan-card"} key={plan.name}>
           <p className="plan-name">{plan.name}</p><div className="plan-rate">{plan.rate}</div><p className="plan-period">Daily Yield</p>
-          <ul><li><Check />Minimum Deposit <b>{plan.minimum}</b></li><li><Check />Maximum Deposit <b>{plan.maximum}</b></li><li><Check />Daily Yield <b>{plan.rate}</b></li><li><Check />Duration <b>14 Days</b></li><li><Check />Deposit Return <b>Yes</b></li></ul>
+          <ul><li><Check />Minimum Deposit: <b>{plan.minimum}</b></li><li><Check />Maximum Deposit: <b>{plan.maximum}</b></li><li><Check />Daily Yield: <b>{plan.rate}%</b></li><li><Check />Duration: <b>14 Calendar Days</b></li><li><Check />Deposit Return: <b>YES</b></li></ul>
           <Button asChild className="blue-action"><Link to="/signup">Get Started</Link></Button>
         </article>)}</div>
       </div></section>
