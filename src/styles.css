@@ -19,7 +19,9 @@
  */
 
 @theme inline {
-  --font-sans: "Arial", "Helvetica Neue", sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Sora", "Plus Jakarta Sans", system-ui, sans-serif;
+  --ease-reveal: cubic-bezier(0.22, 1, 0.36, 1);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -162,7 +164,13 @@
     color: var(--color-foreground);
     margin: 0;
     min-width: 320px;
-    font-family: Arial, "Helvetica Neue", sans-serif;
+    font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+    letter-spacing: -0.005em;
+  }
+
+  h1, h2, h3, h4, h5, .brand, .plan-name, .member-logo {
+    font-family: "Sora", "Plus Jakarta Sans", system-ui, sans-serif;
+    letter-spacing: -0.02em;
   }
 
   html { scroll-behavior: smooth; }
