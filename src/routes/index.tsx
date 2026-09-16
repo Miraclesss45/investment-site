@@ -1,24 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Mail, Menu, X } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import banner from "@/assets/uploads/banner-5.jpg.asset.json";
 import tradingDesk from "@/assets/uploads/image-1.png.asset.json";
 import rocket from "@/assets/uploads/why1.png.asset.json";
 import portfolio from "@/assets/uploads/why2.png.asset.json";
-import btc from "@/assets/coins/btc.png.asset.json";
-import usdt from "@/assets/coins/usdt.png.asset.json";
-import usdtb from "@/assets/coins/usdtb.png.asset.json";
-import usdttr from "@/assets/coins/usdttr.png.asset.json";
-import ltc from "@/assets/coins/ltc.png.asset.json";
-import eth from "@/assets/coins/eth.png.asset.json";
-import bnb from "@/assets/coins/bnb.png.asset.json";
-import doge from "@/assets/uploads/doge.png.asset.json";
-import dash from "@/assets/uploads/dash.png.asset.json";
-import xrp from "@/assets/uploads/xrp.png.asset.json";
-import xlm from "@/assets/uploads/xlm.png.asset.json";
-import trx from "@/assets/uploads/trx.png.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -92,27 +81,6 @@ const testimonials = [
   },
 ];
 
-const coinIcons = [btc, usdt, usdtb, usdttr, ltc, eth, bnb, trx, doge, dash, xrp, xlm];
-
-function Mark() {
-  return (
-    <span className="brand-mark" aria-hidden="true">
-      <span className="brand-bar brand-bar-one" />
-      <span className="brand-bar brand-bar-two" />
-      <span className="brand-cut" />
-    </span>
-  );
-}
-
-function Logo() {
-  return (
-    <a href="#home" className="brand" aria-label="Legacy Pro Alliance home">
-      <Mark />
-      <span>LEGACY PRO <b>ALLIANCE</b></span>
-    </a>
-  );
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="section-label">
@@ -123,7 +91,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function Index() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [testimonial, setTestimonial] = useState(1);
   const [isExiting, setIsExiting] = useState(false);
   const [isBlank, setIsBlank] = useState(false);
@@ -188,49 +155,18 @@ function Index() {
     return () => observer.disconnect();
   }, []);
 
-  const closeMenu = () => setMenuOpen(false);
-
   return (
     <div className="site-shell" id="home">
-      <header className="site-header">
-        <div className="site-width header-inner">
-          <Logo />
-          <nav className={menuOpen ? "main-nav is-open" : "main-nav"} aria-label="Main navigation">
-            <a href="#home" onClick={closeMenu}>Home</a>
-            <a href="#about" onClick={closeMenu}>About Us</a>
-            <a href="#packages" onClick={closeMenu}>Our Packages</a>
-            <a href="#faq" onClick={closeMenu}>FAQ</a>
-            <a href="#contact" onClick={closeMenu}>Contact Us</a>
-          </nav>
-          <div className="header-actions">
-            <Button asChild className="header-signup"><a href="#signup">Sign Up</a></Button>
-            <Button asChild variant="outline" className="header-login"><a href="#contact">Log In</a></Button>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="menu-toggle"
-            aria-label={menuOpen ? "Close menu" : "Open menu"}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? <X /> : <Menu />}
-          </Button>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main>
         <section className="hero" aria-labelledby="hero-title">
           <img className="hero-image" src={banner.url} alt="Modern glass financial district buildings" />
           <div className="hero-shade" />
           <div className="site-width hero-content">
-            <SectionLabel>Welcome To Legacy Pro Alliance</SectionLabel>
-            <h1 id="hero-title">Invest Today.<br />Secure Tomorrow.</h1>
-            <p>
-              Build a stronger financial future through smart, accessible cryptocurrency management
-              plans designed around steady long-term growth.
-            </p>
-            <Button asChild className="blue-action"><a href="#packages">Our Packages <ArrowRight /></a></Button>
+            <h1 id="hero-title">Experience The<br />Convenience<br />Of Stable Profits</h1>
+            <p>Providing long-term solutions for reliable income possibilities!</p>
+            <Button asChild className="blue-action"><a href="#packages">Choose Bond <ArrowRight /></a></Button>
           </div>
         </section>
 
@@ -323,25 +259,7 @@ function Index() {
         </section>
       </main>
 
-      <footer id="contact">
-        <div className="site-width footer-grid">
-          <a href="mailto:support@legacyproalliance.org" className="email-link"><Mail /> Email Us</a>
-          <div><h3>Details</h3><a href="#about">About us</a><a href="#">Terms</a></div>
-          <div><h3>Opportunity</h3><a href="#packages">Our Packages</a><a href="#signup">Registration</a></div>
-          <div><h3>Support</h3><a href="#faq">FAQ</a><a href="#contact">Contact Us</a><a href="#contact">Login</a></div>
-          <address>
-            Legacyproalliance.Org<br />CRYPTO MANAGEMENT GROUP<br />The Mount, 47 Castle Bank,<br />Stafford, United Kingdom,<br />ST16 1DP
-          </address>
-        </div>
-        <div className="footer-bottom">
-          <div className="site-width footer-bottom-inner">
-            <p>Copyright © 2026 All Right Reserved.</p>
-            <div className="coin-strip" aria-label="Supported cryptocurrencies">
-              {coinIcons.map((coin, index) => <img key={`${coin.asset_id}-${index}`} src={coin.url} alt="" />)}
-            </div>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
