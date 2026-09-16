@@ -33,6 +33,24 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+const highlights = [
+  {
+    icon: Rocket,
+    title: "It's Free To Start",
+    copy: "Unlock your earning potential: open your free account",
+  },
+  {
+    icon: Settings,
+    title: "Automated Strategies",
+    copy: "Secure your future: smart strategies to make your money grow",
+  },
+  {
+    icon: UserRoundCheck,
+    title: "Stable Profits",
+    copy: "Competitive returns with our sophisticated AI-driven bots.",
+  },
+];
+
 const features = [
   {
     title: "Advanced Technology",
