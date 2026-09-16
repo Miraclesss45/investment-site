@@ -369,24 +369,34 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
 .support-form .blue-action { margin-top: 2px; }
 .form-note, .account-message { margin-top: 17px; color: var(--brand-yellow); font-size: 12px; line-height: 1.5; }
 
-.signup-page { min-height: 100vh; padding: 55px 24px; display: grid; place-items: center; background: oklch(0.16 0.004 260); color: oklch(0.72 0 0); }
-.signup-shell { width: min(920px, 100%); }
-.account-logo { display: flex; justify-content: center; margin-bottom: 28px; color: var(--foreground); }
-.signup-form { padding: 42px 48px; border: 1px solid oklch(0.28 0.004 260); background: oklch(0.19 0.004 260); box-shadow: 0 15px 45px color-mix(in oklab, var(--deep) 65%, transparent); }
-.signup-form h1 { margin-bottom: 8px; color: var(--foreground); text-align: center; font-size: 26px; font-weight: 500; }
-.signup-form > p { margin-bottom: 35px; text-align: center; font-size: 13px; }
-.signup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 24px; }
-.account-field > span { display: block; margin-bottom: 8px; font-size: 12px; }
-.account-field > div { display: flex; align-items: center; border: 1px solid oklch(0.31 0.004 260); background: oklch(0.145 0.004 260); }
-.account-field svg { width: 42px; height: 42px; flex: none; padding: 12px; color: oklch(0.64 0 0); }
-.account-field input { min-width: 0; height: 44px; border: 0; border-left: 1px solid oklch(0.31 0.004 260); border-radius: 0; box-shadow: none; color: var(--foreground); }
-.terms-check { display: flex; align-items: center; gap: 10px; margin: 27px 0 20px; font-size: 12px; }
-.terms-check a, .account-switch a { color: oklch(0.82 0.16 83); }
-.terms-check button { border-color: oklch(0.82 0.16 83); }
-.account-submit { width: 100%; height: 46px; border-radius: 1px; background: oklch(0.82 0.16 83); color: oklch(0.17 0.004 260); font-weight: 800; text-transform: uppercase; }
-.account-submit:hover { background: oklch(0.87 0.14 83); }
-.account-submit svg { width: 16px; }
-.account-switch { margin: 24px 0 0 !important; }
+.signup-page { position: relative; min-height: 100vh; padding: 86px 24px 52px; background: oklch(0.16 0.004 260); color: oklch(0.72 0 0); }
+.signup-login-prompt { position: absolute; top: 18px; right: 24px; display: flex; align-items: center; gap: 16px; font-size: 13px; font-weight: 600; }
+.signup-login-prompt a { min-width: 78px; height: 32px; border-color: oklch(0.78 0 0); border-radius: 999px; color: var(--foreground); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.signup-shell { width: min(650px, 100%); margin: 0 auto; }
+.account-logo { justify-content: flex-start; margin-bottom: 14px; color: var(--foreground); }
+.account-logo .brand { font-size: 14px; }
+.signup-form { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.signup-form h1 { margin-bottom: 8px; color: var(--foreground); font-size: 18px; font-weight: 800; }
+.signup-form > p { margin-bottom: 18px; font-size: 15px; font-weight: 600; }
+.signup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 4px; }
+.account-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.account-field > div { height: 52px; display: flex; align-items: center; border: 1px solid oklch(0.66 0.005 260); border-radius: 5px; background: oklch(0.145 0.004 260); overflow: hidden; }
+.account-field svg { width: 56px; height: 52px; flex: none; padding: 18px; background: var(--brand-yellow); color: var(--primary-foreground); stroke-width: 3; }
+.account-field input { min-width: 0; height: 50px; border: 0; border-left: 1px solid oklch(0.66 0.005 260); border-radius: 0; background: transparent; box-shadow: none; color: var(--foreground); font-size: 13px; }
+.account-field input::placeholder { color: oklch(0.48 0.008 260); }
+.signup-upline { margin: 34px 0 0 !important; font-size: 14px !important; font-weight: 700 !important; }
+.signup-upline b { color: var(--foreground); }
+.terms-check { display: flex; align-items: center; gap: 8px; margin: 17px 0 25px; font-size: 13px; font-weight: 600; }
+.terms-check a { color: var(--brand-blue); }
+.terms-check button { width: 14px; height: 14px; border-color: var(--foreground); border-radius: 1px; background: var(--foreground); }
+.account-submit { width: 100%; height: 50px; border-radius: 2px; background: var(--brand-yellow); color: var(--deep); font-size: 14px; font-weight: 900; text-transform: uppercase; }
+.account-submit:hover { background: color-mix(in oklab, var(--brand-yellow) 90%, var(--foreground)); }
+.account-submit svg { width: 17px; }
+.signup-footer { margin-top: 52px; padding: 0; background: transparent; color: oklch(0.65 0.005 260); font-size: 12px; font-weight: 600; }
+.signup-footer p { margin-bottom: 8px; }
+.signup-footer nav { display: flex; gap: 9px; margin-bottom: 20px; }
+.signup-footer a { color: oklch(0.75 0.09 245); font-weight: 800; }
+.signup-footer select { width: 128px; height: 34px; border: 1px solid oklch(0.28 0.004 260); background: oklch(0.13 0.004 260); color: oklch(0.55 0.004 260); font-size: 8px; font-weight: 700; }
 
 .login-page { min-height: 100vh; display: flex; flex-direction: column; background: oklch(0.115 0.012 255); color: var(--foreground); }
 .login-top { position: relative; height: 64px; padding: 0 30px; display: flex; align-items: center; border-bottom: 4px solid oklch(0.145 0.012 255); font-size: 20px; font-weight: 800; }
@@ -482,7 +492,13 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
   .plans-section > .site-width > h2, .faq-intro h2, .support-copy h2 { font-size: 31px; }
   .plans-grid, .signup-grid { grid-template-columns: 1fr; }
   .faq-tabs { display: grid; grid-template-columns: 1fr 1fr; }
-  .support-form, .signup-form { padding: 32px 24px; }
+  .support-form { padding: 32px 24px; }
+  .signup-page { padding: 92px 18px 40px; }
+  .signup-login-prompt { top: 22px; right: 18px; font-size: 11px; }
+  .signup-grid { gap: 14px; }
+  .account-field > div { height: 56px; }
+  .account-field svg { height: 56px; }
+  .account-field input { height: 54px; font-size: 14px; }
   .login-top { height: 60px; padding-inline: 18px; font-size: 17px; }
   .login-panel { width: calc(100% - 36px); margin-top: 34px; }
   .login-icon { width: 88px; height: 88px; }
