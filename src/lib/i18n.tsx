@@ -235,7 +235,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
     schedule();
     const observer = new MutationObserver(schedule);
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    // Child additions cover route changes and dynamic panels. Avoid observing
+    // characterData because our own translations would otherwise reschedule
+    // the translator continuously.
+    observer.observe(document.body, { childList: true, subtree: true });
     return () => {
       observer.disconnect();
       clearTimeout(timer);
