@@ -483,3 +483,74 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
 }
 
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .step-card, .feature-card { opacity: 1; transform: none; transition: none; } }
+
+/* ===== Design polish pass (visual refinement only, no structure changes) ===== */
+body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+::selection { background: color-mix(in oklab, var(--brand-blue) 65%, transparent); color: var(--primary-foreground); }
+
+/* Header: subtle blur + active-state underline for nav */
+.site-header { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent); }
+.main-nav a { position: relative; padding-block: 6px; }
+.main-nav a::after { content: ""; position: absolute; left: 0; right: 100%; bottom: 0; height: 2px; background: linear-gradient(90deg, var(--primary), var(--brand-blue)); transition: right .25s ease; }
+.main-nav a:hover::after { right: 0; }
+
+/* Buttons: gentle lift + shadow feedback */
+.blue-action, .yellow-action, .header-signup, .header-login, .account-submit, .login-submit { transition: transform .2s ease, box-shadow .2s ease, background .2s ease, filter .2s ease; }
+.blue-action:hover { transform: translateY(-2px); box-shadow: 0 10px 24px color-mix(in oklab, var(--brand-blue) 35%, transparent); filter: brightness(1.08); }
+.yellow-action:hover { transform: translateY(-2px); box-shadow: 0 10px 24px color-mix(in oklab, var(--brand-yellow) 30%, transparent); }
+.header-signup:hover, .header-login:hover { transform: translateY(-1px); }
+.account-submit:hover, .login-submit:hover { transform: translateY(-2px); }
+.blue-action:active, .yellow-action:active { transform: translateY(0); }
+
+/* Keyboard accessibility */
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+/* Hero highlights: hover lift */
+.hero-highlight { transition: transform .25s ease; border-radius: 6px; }
+@media (min-width: 561px) { .hero-highlight:hover { transform: translateY(-4px); } }
+
+/* Feature & step cards: elevation on hover */
+.feature-card { transition: opacity .6s ease-out, transform .6s ease-out, box-shadow .25s ease, border-color .25s ease; }
+.feature-card:hover { box-shadow: 0 16px 38px color-mix(in oklab, var(--deep) 75%, transparent); border-color: color-mix(in oklab, var(--brand-blue) 45%, transparent); }
+.feature-top img { transition: transform .3s ease; }
+.feature-card:hover .feature-top img { transform: scale(1.06); }
+.step-card { transition: opacity .6s ease-out, transform .6s ease-out, box-shadow .25s ease, background .25s ease; }
+.step-card:hover { box-shadow: 0 12px 30px color-mix(in oklab, var(--deep) 65%, transparent); background: color-mix(in oklab, var(--panel) 80%, var(--brand-blue) 4%); }
+
+/* Testimonial arrows + back-to-top feedback */
+.testimonial-controls button, .back-to-top { transition: transform .2s ease, background .2s ease, color .2s ease, box-shadow .2s ease; }
+.testimonial-controls button:hover, .back-to-top:hover { transform: translateY(-2px); box-shadow: 0 8px 20px color-mix(in oklab, var(--deep) 60%, transparent); }
+
+/* CTA banner: soft inner highlight */
+.cta-banner { box-shadow: 0 18px 44px color-mix(in oklab, var(--brand-blue) 22%, transparent), inset 0 1px 0 color-mix(in oklab, var(--foreground) 25%, transparent); }
+
+/* Footer links: color + slide feedback */
+.footer-grid a:not(.email-link), .contact-links > a { transition: color .2s ease, transform .2s ease; }
+.footer-grid a:not(.email-link):hover, .contact-links > a:hover { color: var(--brand-blue); transform: translateX(3px); }
+.coin-strip img { transition: transform .2s ease; }
+.coin-strip img:hover { transform: translateY(-3px) scale(1.1); }
+
+/* Plan cards: smoother curve + image-free depth */
+.plan-card { transition-timing-function: cubic-bezier(.22,.61,.36,1); }
+.plan-card .blue-action { transition: transform .2s ease, box-shadow .2s ease, background .2s ease; }
+.plan-card .blue-action:hover { transform: translateY(-2px); box-shadow: 0 12px 24px color-mix(in oklab, var(--plan-ink) 45%, transparent); }
+
+/* FAQ accordion rows: gentle hover background */
+.faq-accordion button { transition: color .2s ease, padding-left .2s ease; }
+.faq-accordion button:hover { padding-left: 6px; }
+.faq-tabs button { transition: transform .2s ease, box-shadow .2s ease; }
+.faq-tabs button:hover { transform: translateY(-2px); }
+
+/* Forms: focused field glow */
+.support-form input:focus, .support-form textarea:focus { border-color: var(--brand-blue); box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand-blue) 25%, transparent); }
+.account-field > div:focus-within { border-color: oklch(0.82 0.16 83); box-shadow: 0 0 0 3px color-mix(in oklab, oklch(0.82 0.16 83) 22%, transparent); }
+.login-input:focus-within { border-bottom-color: var(--brand-blue); }
+
+/* Login/signup panels: slight float */
+.login-panel, .signup-form { border-radius: 8px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--deep); }
+::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--brand-blue) 45%, var(--header)); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--brand-blue); }
