@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/theme-toggle";
 import loginIcon from "@/assets/uploads/login-icon.jpg.asset.json";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,7 +63,7 @@ function LoginPage() {
 
   return (
     <main className="login-page">
-      <div className="login-top"><Link to="/" aria-label="Back to home"><ArrowLeft /></Link><span>Hi! Welcome Back!</span></div>
+      <div className="login-top"><Link to="/" aria-label="Back to home"><ArrowLeft /></Link><span>Hi! Welcome Back!</span><ThemeToggle className="auth-theme-toggle" /></div>
       <div className="login-panel">
         <img className="login-icon" src={loginIcon.url} alt="Secure member login" />
         <form onSubmit={submit}>

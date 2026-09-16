@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/reset-password")({
@@ -45,7 +46,7 @@ function ResetPasswordPage() {
 
   return (
     <main className="login-page">
-      <div className="login-top"><Link to="/login" aria-label="Back to login"><ArrowLeft /></Link><span>Set A New Password</span></div>
+      <div className="login-top"><Link to="/login" aria-label="Back to login"><ArrowLeft /></Link><span>Set A New Password</span><ThemeToggle className="auth-theme-toggle" /></div>
       <div className="login-panel">
         <form onSubmit={submit}>
           <label><span>New Password:</span><div className="login-input"><LockKeyhole /><Input name="password" type="password" minLength={8} autoComplete="new-password" placeholder="New password" required /></div></label>

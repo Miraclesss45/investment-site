@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Mail, Menu, Moon, Send, Sun, X } from "lucide-react";
+import { ArrowRight, Mail, Menu, Send, X } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSelect } from "@/lib/i18n";
-import { useTheme } from "@/lib/theme";
 import banner from "@/assets/uploads/banner-5.jpg.asset.json";
 import btc from "@/assets/coins/btc.png.asset.json";
 import usdt from "@/assets/coins/usdt.png.asset.json";
@@ -31,7 +31,6 @@ export function Logo() {
 
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { theme, toggleTheme } = useTheme();
   const closeMenu = () => setMenuOpen(false);
   return (
     <>
@@ -55,17 +54,7 @@ export function SiteHeader() {
             <Button asChild className="header-signup"><Link to="/signup">Sign Up</Link></Button>
             <Button asChild variant="outline" className="header-login"><Link to="/login">Log In</Link></Button>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="site-theme-toggle"
-            onClick={toggleTheme}
-            aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
-            title={theme === "light" ? "Dark mode" : "Light mode"}
-          >
-            {theme === "light" ? <Moon /> : <Sun />}
-          </Button>
+          <ThemeToggle className="site-theme-toggle" />
           <Button type="button" variant="ghost" size="icon" className="menu-toggle" aria-label={menuOpen ? "Close menu" : "Open menu"} onClick={() => setMenuOpen((open) => !open)}>{menuOpen ? <X /> : <Menu />}</Button>
         </div>
       </header>
