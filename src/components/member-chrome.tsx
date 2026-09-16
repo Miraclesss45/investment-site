@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNotifications, useProfile, useUnread } from "@/lib/account";
 import { shortDate } from "@/lib/member-data";
 import { useTheme } from "@/lib/theme";
+import { LanguageSelect } from "@/lib/i18n";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", Icon: Gauge },
