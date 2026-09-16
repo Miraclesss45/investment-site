@@ -221,7 +221,7 @@ h1, h2, h3 { letter-spacing: 0; }
 .feature-body p { color: var(--foreground); font-size: 11px; line-height: 1.75; }
 .feature-link { height: 47px; margin: 0 9px 9px; display: flex; align-items: center; justify-content: center; gap: 16px; background: var(--header); border-radius: 0 0 4px 4px; text-transform: uppercase; font-size: 11px; font-weight: 700; transition: background .2s ease; }
 .feature-link svg { width: 15px; }
-.feature-link:hover { background: linear-gradient(90deg, var(--primary), var(--brand-blue)); }
+.feature-card:hover .feature-link { background: linear-gradient(90deg, var(--primary), var(--brand-blue)); }
 
 .guide { padding: 84px 0 104px; background: var(--header); text-align: center; }
 .guide h2 { margin-bottom: 57px; }
