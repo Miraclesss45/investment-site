@@ -329,8 +329,7 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
 .plans-section, .faq-section, .support-section { padding: 94px 0 105px; background: var(--background); }
 .plans-section > .site-width > h2 { margin: 28px 0 55px; text-align: center; font-size: 39px; }
 .plans-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 23px; }
-.plan-card { min-height: 422px; padding: 22px 28px 25px; border: 0; border-radius: 8px; background: var(--plan-surface); color: var(--plan-ink); text-align: center; transition: transform .25s ease, box-shadow .25s ease; }
-.plan-card-premium { background: var(--plan-premium); }
+.plan-card { min-height: 422px; padding: 22px 28px 25px; border: 0; border-radius: 8px; background: oklch(1 0 0); color: var(--plan-ink); text-align: center; transition: transform .25s ease, box-shadow .25s ease, background .25s ease; }
 .plan-card:hover { transform: translateY(-8px); background: var(--plan-premium); box-shadow: 0 14px 30px color-mix(in oklab, var(--deep) 55%, transparent); }
 .plan-name { width: max-content; margin: 0 auto 13px; padding: 8px 14px; border-radius: 999px; background: linear-gradient(90deg, var(--primary), var(--brand-blue)); color: var(--primary-foreground); font-size: 10px; font-weight: 800; text-transform: uppercase; }
 .plan-rate { position: relative; display: inline-block; font-size: 56px; line-height: 1.1; font-weight: 800; color: var(--plan-ink); }
