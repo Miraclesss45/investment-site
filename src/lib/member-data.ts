@@ -5,39 +5,12 @@ import usdt from "@/assets/coins/usdt.png.asset.json";
 import usdtb from "@/assets/coins/usdtb.png.asset.json";
 import bnb from "@/assets/coins/bnb.png.asset.json";
 
-/** Sample member data. Replace with real account data once the backend is linked. */
-export const member = {
-  name: "John Doe",
-  username: "johndoe",
-  email: "johndoe@example.com",
-  phone: "+44 000 000 0000",
-  country: "United Kingdom",
-  joined: "16 September 2026",
-  upline: "N/A (n/a)",
-  referralLink: "https://legacyproalliance.org/?a=signup&ref=johndoe",
-  wallets: {
-    bitcoin: "bc1q0000000000000000000000000000000000",
-    usdt: "TA000000000000000000000000000000000",
-    ethereum: "0x0000000000000000000000000000000000000000",
-    litecoin: "L0000000000000000000000000000000000",
-  },
-};
-
-export const balances = [
-  { label: "Account Balance", value: "$0.00" },
-  { label: "Total Deposit", value: "$0.00" },
-  { label: "Total Withdrawn", value: "$0.00" },
-  { label: "Active Deposits", value: "$0.00" },
-  { label: "Total Earnings", value: "$0.00" },
-  { label: "Referral Bonus", value: "$0.00" },
-];
-
 export const plans = [
-  { name: "Starter Plan", rate: "2.5%", range: "$35 - $3,000" },
-  { name: "Regular Plan", rate: "10%", range: "$3,001 - $10,000" },
-  { name: "Pro Plan", rate: "20%", range: "$10,000 - $20,000" },
-  { name: "Premium Plan", rate: "35%", range: "$20,001 - Unlimited" },
-];
+  { name: "Starter Plan", rate: 2.5, range: "$35 - $3,000", min: 35, max: 3000 },
+  { name: "Regular Plan", rate: 10, range: "$3,001 - $10,000", min: 3001, max: 10000 },
+  { name: "Pro Plan", rate: 20, range: "$10,000 - $20,000", min: 10000, max: 20000 },
+  { name: "Premium Plan", rate: 35, range: "$20,001 - Unlimited", min: 20001, max: 1000000 },
+] as const;
 
 export const paymentMethods = [
   { id: "btc", name: "Bitcoin (BTC)", icon: btc.url, address: "bc1qlegacyproalliancebtcwalletaddress00" },
@@ -48,13 +21,16 @@ export const paymentMethods = [
   { id: "bnb", name: "BNB (BEP20)", icon: bnb.url, address: "0xLegacyProAllianceBnbWalletAddress000" },
 ];
 
-export type MemberTransaction = { type: string; amount: string; date: string; status: string };
-
-export const transactions: MemberTransaction[] = [];
-export const deposits: MemberTransaction[] = [];
-
 export const notices = [
   "Welcome to your Legacy Pro Alliance member area.",
   "Deposits are credited after 3 network confirmations.",
   "Withdrawals are processed within 24 hours on business days.",
 ];
+
+export function money(value: number) {
+  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+export function shortDate(value: string) {
+  return new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}

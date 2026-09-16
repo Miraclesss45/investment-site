@@ -1,10 +1,13 @@
-# Website reconstruction roadmap
+# Roadmap
 
-- [x] Inspect all provided original URLs and capture shared/page-specific details
-- [x] Compare original pages with the existing Home and About implementations
-- [x] Recreate Bonds, FAQ, Support, Sign Up, and Login at stable local routes
-- [x] Update shared navigation and styles without regressing Home or About
-- [x] Validate all routes, interactions, assets, desktop, and mobile behavior
-- [x] Place the supplied feature, certificate, and login images in their matching sections
-- [x] Verify the updated Home, About Us, and Login pages on desktop and mobile
-- [x] Match the Our Packages cards to the supplied visual reference
+## Done
+- Public site clone (home, about, packages, FAQ, support, signup, login).
+- Member area clone (dashboard, deposit, my deposits, withdraw, transactions, profile, referral, support).
+- Real accounts: email + password and Google sign in, sign up writes a profile, sign out, password reset.
+- Member pages moved behind the login gate and reading/writing real account data.
+- Notifications bell fed by real deposits, withdrawals, transactions and support tickets, plus toasts on every action.
+- Profile icon account menu (profile, referral, support, log out).
+- Dark / light mode toggle in the member area.
+
+## Open
+- Nothing blocking. Daily earnings are credited once the user's own payment/earning process is connected.

@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { EmptyTable, MemberLayout, MemberPanel } from "@/components/member-chrome";
 import { plans } from "@/lib/member-data";
 
-export const Route = createFileRoute("/my-deposits")({
+export const Route = createFileRoute("/_authenticated/my-deposits")({
   head: () => ({ meta: [
     { title: "My Deposits | Legacy Pro Alliance" },
     { name: "description", content: "Review every active and completed deposit on your Legacy Pro Alliance account." },
