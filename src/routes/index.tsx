@@ -101,8 +101,10 @@ function Index() {
   const [pendingDirection, setPendingDirection] = useState(1);
   const [tick, setTick] = useState(0);
   const [stepsInView, setStepsInView] = useState(false);
+  const [featuresInView, setFeaturesInView] = useState(false);
   const isTransitioningRef = useRef(false);
   const stepsRef = useRef<HTMLDivElement>(null);
+  const featuresRef = useRef<HTMLDivElement>(null);
 
   const activeTestimonial = testimonials[testimonial] ?? testimonials[0];
 
