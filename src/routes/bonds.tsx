@@ -3,6 +3,7 @@ import { Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { InnerHero, PublicCta, SiteFooter, SiteHeader } from "@/components/site-chrome";
+import { useReveal } from "@/lib/use-reveal";
 
 export const Route = createFileRoute("/bonds")({
   head: () => ({ meta: [
