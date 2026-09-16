@@ -447,4 +447,4 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
   .login-top { padding-inline: 18px; }
 }
 
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .step-card { opacity: 1; transform: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .step-card, .feature-card { opacity: 1; transform: none; transition: none; } }
