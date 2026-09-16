@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Mail, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import banner from "@/assets/uploads/banner-5.jpg.asset.json";
@@ -125,10 +125,49 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function Index() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [testimonial, setTestimonial] = useState(1);
+  const [isExiting, setIsExiting] = useState(false);
+  const [isBlank, setIsBlank] = useState(false);
+  const [pendingDirection, setPendingDirection] = useState(1);
+  const [tick, setTick] = useState(0);
+  const isTransitioningRef = useRef(false);
+
   const activeTestimonial = testimonials[testimonial] ?? testimonials[0];
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isTransitioningRef.current) return;
+      isTransitioningRef.current = true;
+      setPendingDirection(1);
+      setIsExiting(true);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [tick]);
+
+  useEffect(() => {
+    if (!isExiting || isBlank) return;
+    const exitTimeout = setTimeout(() => {
+      setTestimonial((current) => (current + pendingDirection + testimonials.length) % testimonials.length);
+      setIsBlank(true);
+    }, 500);
+    return () => clearTimeout(exitTimeout);
+  }, [isExiting, isBlank, pendingDirection]);
+
+  useEffect(() => {
+    if (!isBlank) return;
+    const blankTimeout = setTimeout(() => {
+      setIsBlank(false);
+      setIsExiting(false);
+      isTransitioningRef.current = false;
+    }, 800);
+    return () => clearTimeout(blankTimeout);
+  }, [isBlank]);
+
   const moveTestimonial = (direction: number) => {
-    setTestimonial((current) => (current + direction + testimonials.length) % testimonials.length);
+    if (isTransitioningRef.current) return;
+    isTransitioningRef.current = true;
+    setPendingDirection(direction);
+    setIsExiting(true);
+    setTick((t) => t + 1);
   };
 
   const closeMenu = () => setMenuOpen(false);
@@ -245,7 +284,7 @@ function Index() {
           <div className="site-width testimonial-wrap">
             <SectionLabel>Testimonial</SectionLabel>
             <h2>Our Members Investments &amp;<br />Profits Experience</h2>
-            <div className="quote-stage" aria-live="polite">
+            <div className={`quote-stage ${isExiting ? "exiting" : ""}`} aria-live="polite">
               <div className="quote-mark">”</div>
               <blockquote>“{activeTestimonial?.quote}”</blockquote>
               <cite>{activeTestimonial?.name}</cite>
