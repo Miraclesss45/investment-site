@@ -302,7 +302,7 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
 .about-story li { margin-bottom: 22px; }
 .about-story img { width: 100%; min-height: 480px; object-fit: cover; border-radius: 0 0 10px 10px; }
 .certificate-section { padding: 0 0 80px; background: var(--header); }
-.certificate-section img { display: block; width: min(920px, 100%); max-height: 1000px; margin: 0 auto; object-fit: cover; object-position: top; }
+.certificate-section img { display: block; width: min(768px, 100%); height: auto; margin: 0 auto; }
 .back-to-top { position: fixed; right: 28px; bottom: 28px; z-index: 40; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 999px; background: var(--brand-blue); color: var(--deep); }
 .back-to-top svg { width: 21px; }
 
