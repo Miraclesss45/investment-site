@@ -7,9 +7,9 @@ import { money, shortDate } from "@/lib/member-data";
 
 export const Route = createFileRoute("/_authenticated/transactions")({
   head: () => ({ meta: [
-    { title: "Transactions | Legacy Pro Alliance" },
-    { name: "description", content: "Filter and review every deposit, earning, bonus and withdrawal on your Legacy Pro Alliance account." },
-    { property: "og:title", content: "Transactions | Legacy Pro Alliance" },
+    { title: "Transactions | MeridianVest" },
+    { name: "description", content: "Filter and review every deposit, earning, bonus and withdrawal on your MeridianVest account." },
+    { property: "og:title", content: "Transactions | MeridianVest" },
     { property: "og:description", content: "Filter and review your account transactions." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },

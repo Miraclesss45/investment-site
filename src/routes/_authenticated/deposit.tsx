@@ -10,9 +10,9 @@ import { money, paymentMethods, plans } from "@/lib/member-data";
 
 export const Route = createFileRoute("/_authenticated/deposit")({
   head: () => ({ meta: [
-    { title: "Make a Deposit | Legacy Pro Alliance" },
-    { name: "description", content: "Fund your Legacy Pro Alliance account with Bitcoin, Ethereum, USDT, Litecoin or BNB and start earning daily." },
-    { property: "og:title", content: "Make a Deposit | Legacy Pro Alliance" },
+    { title: "Make a Deposit | MeridianVest" },
+    { name: "description", content: "Fund your MeridianVest account with Bitcoin, Ethereum, USDT, Litecoin or BNB and start earning daily." },
+    { property: "og:title", content: "Make a Deposit | MeridianVest" },
     { property: "og:description", content: "Fund your account and start earning daily." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },

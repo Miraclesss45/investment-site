@@ -12,10 +12,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [
-    { title: "Create Account | Legacy Pro Alliance" },
-    { name: "description", content: "Create your Legacy Pro Alliance member account." },
-    { property: "og:title", content: "Create Account | Legacy Pro Alliance" },
-    { property: "og:description", content: "Register for a Legacy Pro Alliance member account." },
+    { title: "Create Account | MeridianVest" },
+    { name: "description", content: "Create your MeridianVest member account." },
+    { property: "og:title", content: "Create Account | MeridianVest" },
+    { property: "og:description", content: "Register for a MeridianVest member account." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },
   ] }), component: SignupPage,
@@ -67,7 +67,7 @@ function SignupPage() {
         },
       });
       if (error) throw error;
-      toast.success("Account created", { description: "Welcome to Legacy Pro Alliance." });
+      toast.success("Account created", { description: "Welcome to MeridianVest." });
       void navigate({ to: "/dashboard" });
     } catch (error) {
       toast.error("Sign up failed", { description: error instanceof Error ? error.message : "Please try again." });
@@ -109,7 +109,7 @@ function SignupPage() {
         </form>
         <Button type="button" variant="outline" className="login-google" onClick={() => void google()}>Continue with Google</Button>
         <footer className="signup-footer">
-          <p>Copyright © 2025 legacyproalliance.org. All rights reserved.</p>
+          <p>Copyright © 2025 meridianvest.com. All rights reserved.</p>
           <nav><Link to="/about">About Us</Link><span>|</span><a href="#terms">Terms &amp; Conditions</a></nav>
           <select aria-label="Select language" defaultValue="en"><option value="en">SELECT LANGUAGE</option></select>
         </footer>

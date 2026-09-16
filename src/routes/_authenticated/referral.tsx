@@ -8,9 +8,9 @@ import { money, shortDate } from "@/lib/member-data";
 
 export const Route = createFileRoute("/_authenticated/referral")({
   head: () => ({ meta: [
-    { title: "My Referral | Legacy Pro Alliance" },
-    { name: "description", content: "Share your Legacy Pro Alliance referral link and earn a bonus on every deposit your referrals make." },
-    { property: "og:title", content: "My Referral | Legacy Pro Alliance" },
+    { title: "My Referral | MeridianVest" },
+    { name: "description", content: "Share your MeridianVest referral link and earn a bonus on every deposit your referrals make." },
+    { property: "og:title", content: "My Referral | MeridianVest" },
     { property: "og:description", content: "Share your referral link and earn bonuses." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },

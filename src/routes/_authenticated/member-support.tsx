@@ -2,13 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { FormEvent, useState } from "react";
 import { Mail, Send } from "lucide-react";
 
-import { EmptyTable, MemberLayout, MemberPanel } from "@/components/member-chrome";
+import { DataTable, MemberLayout, MemberPanel } from "@/components/member-chrome";
 
 export const Route = createFileRoute("/_authenticated/member-support")({
   head: () => ({ meta: [
-    { title: "Get Support | Legacy Pro Alliance" },
-    { name: "description", content: "Open a support ticket or reach the Legacy Pro Alliance team by e-mail or Telegram from your member area." },
-    { property: "og:title", content: "Get Support | Legacy Pro Alliance" },
+    { title: "Get Support | MeridianVest" },
+    { name: "description", content: "Open a support ticket or reach the MeridianVest team by e-mail or Telegram from your member area." },
+    { property: "og:title", content: "Get Support | MeridianVest" },
     { property: "og:description", content: "Open a support ticket from your member area." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },
@@ -38,9 +38,9 @@ function MemberSupportPage() {
           </form>
         </MemberPanel>
         <MemberPanel title="Other Ways To Reach Us">
-          <p className="member-note"><Mail /> support@legacyproalliance.org</p>
+          <p className="member-note"><Mail /> support@meridianvest.com</p>
           <ul className="member-list">
-            <li>Telegram: <a href="https://t.me/legacyproalliance" target="_blank" rel="noreferrer">@legacyproalliance</a></li>
+            <li>Telegram: <a href="https://t.me/meridianvest" target="_blank" rel="noreferrer">@meridianvest</a></li>
             <li>The Mount, 47 Castle Bank, Stafford, UK, ST16 1DP</li>
             <li>Support hours: Monday to Friday, 9am – 6pm GMT</li>
           </ul>
@@ -48,7 +48,7 @@ function MemberSupportPage() {
       </div>
 
       <MemberPanel title="My Tickets">
-        <EmptyTable columns={["Subject", "Category", "Date", "Status"]} message="No tickets found" />
+        <DataTable columns={["Subject", "Category", "Date", "Status"]} rows={[]} empty="No tickets found" />
       </MemberPanel>
     </MemberLayout>
   );

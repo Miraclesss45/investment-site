@@ -13,16 +13,16 @@ export const plans = [
 ] as const;
 
 export const paymentMethods = [
-  { id: "btc", name: "Bitcoin (BTC)", icon: btc.url, address: "bc1qlegacyproalliancebtcwalletaddress00" },
-  { id: "eth", name: "Ethereum (ETH)", icon: eth.url, address: "0xLegacyProAllianceEthWalletAddress0000" },
-  { id: "usdt", name: "USDT (TRC20)", icon: usdt.url, address: "TLegacyProAllianceUsdtTrc20Address000" },
-  { id: "usdtb", name: "USDT (BEP20)", icon: usdtb.url, address: "0xLegacyProAllianceUsdtBep20Address000" },
-  { id: "ltc", name: "Litecoin (LTC)", icon: ltc.url, address: "LLegacyProAllianceLtcWalletAddress000" },
-  { id: "bnb", name: "BNB (BEP20)", icon: bnb.url, address: "0xLegacyProAllianceBnbWalletAddress000" },
+  { id: "btc", name: "Bitcoin (BTC)", icon: btc.url, address: "bc1qmeridianvestbtcwalletaddress00" },
+  { id: "eth", name: "Ethereum (ETH)", icon: eth.url, address: "0xMeridianVestEthWalletAddress0000" },
+  { id: "usdt", name: "USDT (TRC20)", icon: usdt.url, address: "TMeridianVestUsdtTrc20Address000" },
+  { id: "usdtb", name: "USDT (BEP20)", icon: usdtb.url, address: "0xMeridianVestUsdtBep20Address000" },
+  { id: "ltc", name: "Litecoin (LTC)", icon: ltc.url, address: "LMeridianVestLtcWalletAddress000" },
+  { id: "bnb", name: "BNB (BEP20)", icon: bnb.url, address: "0xMeridianVestBnbWalletAddress000" },
 ];
 
 export const notices = [
-  "Welcome to your Legacy Pro Alliance member area.",
+  "Welcome to your MeridianVest member area.",
   "Deposits are credited after 3 network confirmations.",
   "Withdrawals are processed within 24 hours on business days.",
 ];

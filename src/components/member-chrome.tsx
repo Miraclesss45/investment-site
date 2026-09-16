@@ -117,7 +117,7 @@ export function MemberLayout({ title, crumb, children }: { title: string; crumb?
     <div className={`member-shell${open ? " is-open" : ""}`}>
       <aside className="member-sidebar">
         <div className="member-brand">
-          <Link to="/" className="member-logo"><strong>LEGACY</strong><span>PRO ALLIANCE</span></Link>
+          <Link to="/" className="member-logo"><strong>MERIDIAN</strong><span>VEST</span></Link>
           <button type="button" className="member-close" aria-label="Close menu" onClick={() => setOpen(false)}><X /></button>
         </div>
         <div className="member-card-user">
@@ -145,11 +145,11 @@ export function MemberLayout({ title, crumb, children }: { title: string; crumb?
           </div>
         </header>
         <main className="member-content">{children}</main>
-        <footer className="member-footer">copyright © 2025, <span>legacyproalliance.org</span> All Rights Reserved</footer>
+        <footer className="member-footer">copyright © 2025, <span>meridianvest.com</span> All Rights Reserved</footer>
       </div>
 
       <button type="button" className="member-backdrop" aria-label="Close menu" onClick={() => setOpen(false)} />
-      <a className="member-chat" href="https://t.me/legacyproalliance" target="_blank" rel="noreferrer"><MessageCircle /> Chat</a>
+      <a className="member-chat" href="https://t.me/meridianvest" target="_blank" rel="noreferrer"><MessageCircle /> Chat</a>
     </div>
   );
 }
