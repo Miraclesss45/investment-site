@@ -309,4 +309,4 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
   .coin-strip { flex-wrap: wrap; justify-content: center; }
 }
 
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .step-card { opacity: 1; transform: none; transition: none; } }
