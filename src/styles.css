@@ -165,7 +165,8 @@
     margin: 0;
     min-width: 320px;
     font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
-    letter-spacing: -0.005em;
+    word-spacing: 0.04em;
+    -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3, h4, h5, .brand, .plan-name, .member-logo {
