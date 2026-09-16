@@ -172,7 +172,9 @@
 .utility-group { gap: 25px; font-size: 10px; font-weight: 800; }
 .utility-group a { gap: 12px; }
 .utility-group svg { width: 16px; color: var(--brand-yellow); }
-.flag { font-size: 24px; line-height: 1; }
+.flag { position: relative; width: 30px; height: 19px; overflow: hidden; background: linear-gradient(90deg, transparent 42%, var(--foreground) 42% 58%, transparent 58%), linear-gradient(transparent 36%, var(--foreground) 36% 64%, transparent 64%), oklch(0.37 0.14 260); }
+.flag i, .flag b { position: absolute; inset: 8px -5px; height: 3px; background: oklch(0.62 0.23 25); transform: rotate(31deg); }
+.flag b { transform: rotate(-31deg); }
 .site-header { position: sticky; top: 0; z-index: 50; height: 76px; background: color-mix(in oklab, var(--header) 93%, transparent); box-shadow: 0 2px 8px color-mix(in oklab, var(--deep) 80%, transparent); }
 .header-inner { height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .brand { display: inline-flex; align-items: center; gap: 9px; flex: none; font-weight: 800; font-size: 17px; letter-spacing: 0; white-space: nowrap; }

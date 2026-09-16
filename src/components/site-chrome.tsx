@@ -33,7 +33,7 @@ export function SiteHeader() {
     <>
       <div className="utility-bar">
         <div className="site-width utility-inner">
-          <div className="utility-group"><span>SELECT LANGUAGE</span><span className="flag" aria-label="English">🇬🇧</span><strong>LEGACYPROALLIANCE.ORG CRYPTO MANAGEMENT GROUP</strong></div>
+          <div className="utility-group"><span>SELECT LANGUAGE</span><span className="flag" aria-label="English"><i /><b /></span><strong>LEGACYPROALLIANCE.ORG CRYPTO MANAGEMENT GROUP</strong></div>
           <div className="utility-group"><Send aria-hidden="true" /><a href="mailto:support@legacyproalliance.org"><Mail aria-hidden="true" /> SUPPORT@LEGACYPROALLIANCE.ORG</a></div>
         </div>
       </div>
