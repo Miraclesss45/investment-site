@@ -25,6 +25,8 @@ const plans = [
 ];
 
 function BondsPage() {
+  const [plansRef, plansInView] = useReveal();
+
   return <div className="site-shell inner-page">
     <SiteHeader />
     <main>
@@ -32,7 +34,7 @@ function BondsPage() {
       <section className="plans-section"><div className="site-width">
         <div className="section-label"><span />Investment Bonds</div>
         <h2>Choose The Plan That Works For You</h2>
-        <div className="plans-grid">{plans.map((plan) => <article className={plan.premium ? "plan-card plan-card-premium" : "plan-card"} key={plan.name}>
+        <div className={`plans-grid reveal-grid${plansInView ? " is-visible" : ""}`} ref={plansRef}>{plans.map((plan) => <article className={plan.premium ? "plan-card plan-card-premium" : "plan-card"} key={plan.name}>
           <p className="plan-name">{plan.name}</p><div className="plan-rate">{plan.rate}</div><p className="plan-period">Daily Yield</p>
           <ul><li><Check />Minimum Deposit: <b>{plan.minimum}</b></li><li><Check />Maximum Deposit: <b>{plan.maximum}</b></li><li><Check />Daily Yield: <b>{plan.rate}%</b></li><li><Check />Duration: <b>14 Calendar Days</b></li><li><Check />Deposit Return: <b>YES</b></li></ul>
           <Button asChild className="blue-action"><Link to="/signup">Get Started</Link></Button>
