@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNotifications, useProfile, useUnread } from "@/lib/account";
 import { shortDate } from "@/lib/member-data";
 import { useTheme } from "@/lib/theme";
+import { LanguageSelect } from "@/lib/i18n";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", Icon: Gauge },
@@ -139,6 +140,7 @@ export function MemberLayout({ title, crumb, children }: { title: string; crumb?
           <button type="button" className="member-burger" aria-label="Open menu" onClick={() => setOpen(true)}><Menu /></button>
           <div className="member-title"><h1>{title}</h1>{crumb && <p>{crumb}</p>}</div>
           <div className="member-topbar-actions">
+            <LanguageSelect />
             <ThemeToggle />
             <NotificationBell />
             <AccountMenu initial={initial} name={name} username={username} />

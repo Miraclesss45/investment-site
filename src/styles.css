@@ -797,3 +797,51 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
     transition: none !important;
   }
 }
+
+/* ---------- language switcher ---------- */
+.language-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+.language-select > span[aria-hidden="true"] {
+  font-size: 15px;
+  line-height: 1;
+}
+.language-select select {
+  appearance: none;
+  background: transparent;
+  border: 1px solid color-mix(in oklab, currentColor 28%, transparent);
+  border-radius: 999px;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 3px 22px 3px 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.language-select select:hover {
+  border-color: var(--brand-blue, currentColor);
+  background: color-mix(in oklab, currentColor 8%, transparent);
+}
+.language-select select option {
+  color: #0b1320;
+  background: #fff;
+}
+.language-select .language-spinner {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: language-spin 0.8s linear infinite;
+}
+@keyframes language-spin {
+  to { transform: rotate(360deg); }
+}
+.signup-language select {
+  font-size: 12px;
+  padding: 8px 26px 8px 14px;
+}

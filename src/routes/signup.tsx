@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Logo } from "@/components/site-chrome";
+import { LanguageSelect } from "@/lib/i18n";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -111,7 +112,7 @@ function SignupPage() {
         <footer className="signup-footer">
           <p>Copyright © 2025 meridianvest.com. All rights reserved.</p>
           <nav><Link to="/about">About Us</Link><span>|</span><a href="#terms">Terms &amp; Conditions</a></nav>
-          <select aria-label="Select language" defaultValue="en"><option value="en">SELECT LANGUAGE</option></select>
+          <LanguageSelect className="signup-language" />
         </footer>
       </div>
     </main>
