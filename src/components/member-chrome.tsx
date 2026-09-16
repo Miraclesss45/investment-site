@@ -139,6 +139,7 @@ export function MemberLayout({ title, crumb, children }: { title: string; crumb?
           <button type="button" className="member-burger" aria-label="Open menu" onClick={() => setOpen(true)}><Menu /></button>
           <div className="member-title"><h1>{title}</h1>{crumb && <p>{crumb}</p>}</div>
           <div className="member-topbar-actions">
+            <LanguageSelect />
             <ThemeToggle />
             <NotificationBell />
             <AccountMenu initial={initial} name={name} username={username} />
