@@ -1,10 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowUp, Bot, Coins, Rocket } from "lucide-react";
 
-import banner from "@/assets/uploads/banner-5.jpg.asset.json";
 import tradingDesk from "@/assets/uploads/image-1.png.asset.json";
 import certificate from "@/assets/uploads/legacy-pro-alliance-certificate.jpg.asset.json";
-import { SiteFooter, SiteHeader } from "@/components/site-chrome";
+import { InnerHero, PublicCta, SiteFooter, SiteHeader } from "@/components/site-chrome";
 
 export const Route = createFileRoute("/about")({
   head: () => ({ meta: [
@@ -29,14 +28,11 @@ function AboutPage() {
     <div className="site-shell about-page" id="top">
       <SiteHeader />
       <main>
-        <section className="about-title" aria-labelledby="about-title">
-          <img src={banner.url} alt="Modern glass office buildings" />
-          <div className="about-title-shade" />
-          <div className="site-width"><h1 id="about-title">About Us</h1><p><Link to="/">Home</Link><span>Who we are?</span></p></div>
-        </section>
+        <InnerHero title="About Us" crumb="Who we are?" />
         <section className="about-benefits"><div className="site-width benefit-grid">{benefits.map(({ icon: Icon, title, copy }) => <article key={title}><Icon /><div><h2>{title}</h2><p>{copy}</p></div></article>)}</div></section>
         <section className="about-story"><div className="site-width about-story-grid"><div><div className="section-label"><span />WHAT IS LEGACYPROALLIANCE.ORG?</div><h2>Secure, Innovative, And User-Friendly Crypto Management Solutions.</h2><ul><li>legacyproalliance.org is an innovative platform designed to work in a new era of crypto management.</li><li>Our automated strategies identify profit making opportunities across different crypto ecosystems.</li><li>Our platform seamlessly integrates advanced technological tools, making sophisticated crypto management strategies accessible to all.</li></ul></div><img src={tradingDesk.url} alt="Investment professionals reviewing cryptocurrency markets" /></div></section>
         <section className="certificate-section"><div className="site-width"><img src={certificate.url} alt="Legacy Pro Alliance Ltd certificate of incorporation, company number 12184006" /></div></section>
+        <PublicCta />
       </main>
       <SiteFooter />
       <a className="back-to-top" href="#top" aria-label="Back to top"><ArrowUp /></a>
