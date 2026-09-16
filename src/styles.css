@@ -357,8 +357,8 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
 .signup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 24px; }
 .account-field > span { display: block; margin-bottom: 8px; font-size: 12px; }
 .account-field > div { display: flex; align-items: center; border: 1px solid oklch(0.31 0.004 260); background: oklch(0.145 0.004 260); }
-.account-field svg { width: 42px; padding: 12px; color: oklch(0.64 0 0); }
-.account-field input { height: 44px; border: 0; border-left: 1px solid oklch(0.31 0.004 260); border-radius: 0; box-shadow: none; color: var(--foreground); }
+.account-field svg { width: 42px; height: 42px; flex: none; padding: 12px; color: oklch(0.64 0 0); }
+.account-field input { min-width: 0; height: 44px; border: 0; border-left: 1px solid oklch(0.31 0.004 260); border-radius: 0; box-shadow: none; color: var(--foreground); }
 .terms-check { display: flex; align-items: center; gap: 10px; margin: 27px 0 20px; font-size: 12px; }
 .terms-check a, .account-switch a { color: oklch(0.82 0.16 83); }
 .terms-check button { border-color: oklch(0.82 0.16 83); }
