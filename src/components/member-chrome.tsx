@@ -10,6 +10,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useNotifications, useProfile, useUnread } from "@/lib/account";
 import { shortDate } from "@/lib/member-data";
@@ -41,15 +42,17 @@ export function useSignOut() {
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, toggleTheme } = useTheme();
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon"
       className={className ?? "member-icon-button"}
       onClick={toggleTheme}
       aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
       title={theme === "light" ? "Dark mode" : "Light mode"}
     >
       {theme === "light" ? <Moon /> : <Sun />}
-    </button>
+    </Button>
   );
 }
 
