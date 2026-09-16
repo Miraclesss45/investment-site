@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { ChevronDown, Languages } from "lucide-react";
 
 import { translateTexts } from "@/lib/translate.functions";
 
@@ -239,7 +240,7 @@ export function LanguageSelect({ className }: { className?: string }) {
   const active = languages.find((item) => item.code === language) ?? languages[0]!;
   return (
     <span className={className ? `language-select ${className}` : "language-select"} data-no-translate>
-      <span aria-hidden="true">{active.flag}</span>
+      <Languages className="language-select-icon" aria-hidden="true" />
       <select
         aria-label="Select language"
         value={language}
@@ -251,6 +252,7 @@ export function LanguageSelect({ className }: { className?: string }) {
           </option>
         ))}
       </select>
+      <ChevronDown className="language-select-chevron" aria-hidden="true" />
       {busy ? <i className="language-spinner" aria-hidden="true" /> : null}
     </span>
   );

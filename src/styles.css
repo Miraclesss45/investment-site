@@ -388,30 +388,31 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
 .support-form .blue-action { margin-top: 2px; }
 .form-note, .account-message { margin-top: 17px; color: var(--brand-yellow); font-size: 12px; line-height: 1.5; }
 
-.signup-page { position: relative; min-height: 100vh; padding: 86px 24px 52px; background: oklch(0.16 0.004 260); color: oklch(0.72 0 0); }
-.signup-login-prompt { position: absolute; top: 18px; right: 24px; display: flex; align-items: center; gap: 16px; font-size: 13px; font-weight: 600; }
-.signup-login-prompt a { min-width: 78px; height: 32px; border-color: oklch(0.78 0 0); border-radius: 999px; color: var(--foreground); font-size: 11px; font-weight: 800; text-transform: uppercase; }
-.signup-shell { width: min(650px, 100%); margin: 0 auto; }
-.account-logo { justify-content: flex-start; margin-bottom: 14px; color: var(--foreground); }
-.account-logo .brand { font-size: 14px; }
+.signup-page { position: relative; min-height: 100vh; padding: 96px 24px 56px; background: oklch(0.16 0.004 260); color: oklch(0.72 0 0); }
+.signup-login-prompt { position: absolute; top: 24px; right: 32px; display: flex; align-items: center; gap: 14px; font-size: 13px; font-weight: 600; }
+.signup-login-prompt a { min-width: 86px; height: 36px; border-color: oklch(0.78 0 0); border-radius: 999px; color: var(--foreground); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.signup-shell { width: min(820px, 100%); margin: 0 auto; }
+.account-logo { justify-content: flex-start; margin-bottom: 20px; color: var(--foreground); }
+.account-logo .brand { font-size: 16px; }
 .signup-form { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-.signup-form h1 { margin-bottom: 8px; color: var(--foreground); font-size: 18px; font-weight: 800; }
-.signup-form > p { margin-bottom: 18px; font-size: 15px; font-weight: 600; }
-.signup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 4px; }
+.signup-form h1 { margin-bottom: 8px; color: var(--foreground); font-size: 26px; font-weight: 800; line-height: 1.2; }
+.signup-form > p { margin-bottom: 24px; font-size: 15px; font-weight: 600; }
+.signup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .account-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.account-field > div { height: 52px; display: flex; align-items: center; border: 1px solid oklch(0.66 0.005 260); border-radius: 5px; background: oklch(0.145 0.004 260); overflow: hidden; }
-.account-field svg { width: 56px; height: 52px; flex: none; padding: 18px; background: var(--brand-yellow); color: var(--primary-foreground); stroke-width: 3; }
-.account-field input { min-width: 0; height: 50px; border: 0; border-left: 1px solid oklch(0.66 0.005 260); border-radius: 0; background: transparent; box-shadow: none; color: var(--foreground); font-size: 13px; }
+.account-field > div { height: 58px; display: flex; align-items: center; border: 1px solid oklch(0.52 0.006 260); border-radius: 6px; background: oklch(0.145 0.004 260); overflow: hidden; transition: border-color .2s ease, box-shadow .2s ease; }
+.account-field > div:focus-within { border-color: var(--brand-yellow); box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand-yellow) 16%, transparent); }
+.account-field svg { width: 60px; height: 58px; flex: none; padding: 19px; background: var(--brand-yellow); color: var(--primary-foreground); stroke-width: 3; }
+.account-field input { min-width: 0; height: 56px; padding-inline: 16px; border: 0; border-left: 1px solid oklch(0.52 0.006 260); border-radius: 0; background: transparent; box-shadow: none; color: var(--foreground); font-size: 14px; }
 .account-field input::placeholder { color: oklch(0.48 0.008 260); }
-.signup-upline { margin: 34px 0 0 !important; font-size: 14px !important; font-weight: 700 !important; }
+.signup-upline { margin: 28px 0 0 !important; font-size: 14px !important; font-weight: 700 !important; }
 .signup-upline b { color: var(--foreground); }
 .terms-check { display: flex; align-items: center; gap: 8px; margin: 17px 0 25px; font-size: 13px; font-weight: 600; }
 .terms-check a { color: var(--brand-blue); }
 .terms-check button { width: 14px; height: 14px; border-color: var(--foreground); border-radius: 1px; background: var(--foreground); }
-.account-submit { width: 100%; height: 50px; border-radius: 2px; background: var(--brand-yellow); color: var(--deep); font-size: 14px; font-weight: 900; text-transform: uppercase; }
+.account-submit { width: 100%; height: 54px; border-radius: 5px; background: var(--brand-yellow); color: var(--deep); font-size: 14px; font-weight: 900; text-transform: uppercase; }
 .account-submit:hover { background: color-mix(in oklab, var(--brand-yellow) 90%, var(--foreground)); }
 .account-submit svg { width: 17px; }
-.signup-footer { margin-top: 52px; padding: 0; background: transparent; color: oklch(0.65 0.005 260); font-size: 12px; font-weight: 600; }
+.signup-footer { margin-top: 46px; padding: 28px 0 0; border-top: 1px solid oklch(0.27 0.006 260); background: transparent; color: oklch(0.65 0.005 260); font-size: 12px; font-weight: 600; }
 .signup-footer p { margin-bottom: 8px; }
 .signup-footer nav { display: flex; gap: 9px; margin-bottom: 20px; }
 .signup-footer a { color: oklch(0.75 0.09 245); font-weight: 800; }
@@ -514,8 +515,11 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
   .plans-grid, .signup-grid { grid-template-columns: 1fr; }
   .faq-tabs { display: grid; grid-template-columns: 1fr 1fr; }
   .support-form { padding: 32px 24px; }
-  .signup-page { padding: 92px 18px 40px; }
-  .signup-login-prompt { top: 22px; right: 18px; font-size: 11px; }
+  .signup-page { padding: 88px 18px 40px; }
+  .signup-login-prompt { top: 20px; right: 18px; gap: 10px; font-size: 11px; }
+  .signup-login-prompt a { min-width: 76px; height: 34px; }
+  .account-logo { margin-bottom: 20px; }
+  .signup-form h1 { font-size: 22px; }
   .signup-grid { gap: 14px; }
   .account-field > div { height: 56px; }
   .account-field svg { height: 56px; }
@@ -802,12 +806,17 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .language-select {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 0;
   position: relative;
+  color: inherit;
 }
-.language-select > span[aria-hidden="true"] {
-  font-size: 15px;
-  line-height: 1;
+.language-select-icon {
+  position: absolute;
+  left: 11px;
+  z-index: 1;
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
 }
 .language-select select {
   appearance: none;
@@ -817,10 +826,19 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   color: inherit;
   font: inherit;
   font-size: 11px;
-  letter-spacing: 0.04em;
-  padding: 3px 22px 3px 10px;
+  letter-spacing: 0;
+  min-width: 132px;
+  min-height: 34px;
+  padding: 6px 32px 6px 34px;
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease;
+}
+.language-select-chevron {
+  position: absolute;
+  right: 10px;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
 }
 .language-select select:hover {
   border-color: var(--brand-blue, currentColor);
@@ -843,5 +861,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 }
 .signup-language select {
   font-size: 12px;
-  padding: 8px 26px 8px 14px;
+  min-width: 154px;
+  height: 40px;
+  padding: 8px 32px 8px 38px;
 }
