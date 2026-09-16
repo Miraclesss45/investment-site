@@ -177,7 +177,7 @@ function Index() {
     if (!grid) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
+        if (entry?.isIntersecting) {
           setStepsInView(true);
           observer.disconnect();
         }
