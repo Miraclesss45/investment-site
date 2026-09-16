@@ -101,8 +101,10 @@ function Index() {
   const [pendingDirection, setPendingDirection] = useState(1);
   const [tick, setTick] = useState(0);
   const [stepsInView, setStepsInView] = useState(false);
+  const [featuresInView, setFeaturesInView] = useState(false);
   const isTransitioningRef = useRef(false);
   const stepsRef = useRef<HTMLDivElement>(null);
+  const featuresRef = useRef<HTMLDivElement>(null);
 
   const activeTestimonial = testimonials[testimonial] ?? testimonials[0];
 
@@ -159,6 +161,22 @@ function Index() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const grid = featuresRef.current;
+    if (!grid) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setFeaturesInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="site-shell" id="home">
       <SiteHeader />
@@ -198,7 +216,7 @@ function Index() {
           <div className="site-width">
             <SectionLabel>Our Features</SectionLabel>
             <h2>Maximize Your Earnings With<br />Legacyproalliance.Org Today</h2>
-            <div className="feature-grid" id="packages">
+            <div className={`feature-grid ${featuresInView ? "is-visible" : ""}`} id="packages" ref={featuresRef}>
               {features.map((feature) => (
                 <article className="feature-card" key={feature.title}>
                   <div className="feature-top">

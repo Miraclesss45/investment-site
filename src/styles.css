@@ -221,7 +221,12 @@ h1, h2, h3 { letter-spacing: 0; }
 .features { padding: 94px 0 110px; }
 .features h2, .guide h2, .testimonials h2 { margin: 33px 0 58px; text-align: center; }
 .feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
-.feature-card { min-height: 420px; border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; background: var(--deep); }
+.feature-card { min-height: 420px; border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; background: var(--deep); opacity: 0; transform: translateY(40px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+.feature-grid.is-visible .feature-card { opacity: 1; transform: translateY(0); }
+.feature-grid.is-visible .feature-card:nth-child(1) { transition-delay: 0ms; }
+.feature-grid.is-visible .feature-card:nth-child(2) { transition-delay: 150ms; }
+.feature-grid.is-visible .feature-card:nth-child(3) { transition-delay: 300ms; }
+.feature-grid.is-visible .feature-card:nth-child(4) { transition-delay: 450ms; }
 .feature-top { height: 108px; margin: 9px 9px 0; border-radius: 5px 5px 0 0; background: var(--card); transition: background .25s ease; }
 .feature-top img { display: block; width: 88px; height: 88px; margin: 44px auto 0; object-fit: cover; border-radius: 999px; }
 .feature-card:hover .feature-top { background: linear-gradient(90deg, var(--primary), var(--brand-blue)); }
@@ -442,4 +447,4 @@ footer { background: linear-gradient(180deg, var(--deep), var(--background)); }
   .login-top { padding-inline: 18px; }
 }
 
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .step-card { opacity: 1; transform: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .step-card, .feature-card { opacity: 1; transform: none; transition: none; } }
