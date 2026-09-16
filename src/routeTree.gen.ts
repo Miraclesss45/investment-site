@@ -12,10 +12,18 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as BondsRouteImport } from './routes/bonds'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as DepositRouteImport } from './routes/deposit'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as MemberSupportRouteImport } from './routes/member-support'
+import { Route as MyDepositsRouteImport } from './routes/my-deposits'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as ReferralRouteImport } from './routes/referral'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SupportRouteImport } from './routes/support'
+import { Route as TransactionsRouteImport } from './routes/transactions'
+import { Route as WithdrawRouteImport } from './routes/withdraw'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -32,6 +40,16 @@ const BondsRoute = BondsRouteImport.update({
   path: '/bonds',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DepositRoute = DepositRouteImport.update({
+  id: '/deposit',
+  path: '/deposit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FaqRoute = FaqRouteImport.update({
   id: '/faq',
   path: '/faq',
@@ -40,6 +58,26 @@ const FaqRoute = FaqRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MemberSupportRoute = MemberSupportRouteImport.update({
+  id: '/member-support',
+  path: '/member-support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyDepositsRoute = MyDepositsRouteImport.update({
+  id: '/my-deposits',
+  path: '/my-deposits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReferralRoute = ReferralRouteImport.update({
+  id: '/referral',
+  path: '/referral',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -52,60 +90,139 @@ const SupportRoute = SupportRouteImport.update({
   path: '/support',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TransactionsRoute = TransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WithdrawRoute = WithdrawRouteImport.update({
+  id: '/withdraw',
+  path: '/withdraw',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/bonds': typeof BondsRoute
+  '/dashboard': typeof DashboardRoute
+  '/deposit': typeof DepositRoute
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
+  '/member-support': typeof MemberSupportRoute
+  '/my-deposits': typeof MyDepositsRoute
+  '/profile': typeof ProfileRoute
+  '/referral': typeof ReferralRoute
   '/signup': typeof SignupRoute
   '/support': typeof SupportRoute
+  '/transactions': typeof TransactionsRoute
+  '/withdraw': typeof WithdrawRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/bonds': typeof BondsRoute
+  '/dashboard': typeof DashboardRoute
+  '/deposit': typeof DepositRoute
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
+  '/member-support': typeof MemberSupportRoute
+  '/my-deposits': typeof MyDepositsRoute
+  '/profile': typeof ProfileRoute
+  '/referral': typeof ReferralRoute
   '/signup': typeof SignupRoute
   '/support': typeof SupportRoute
+  '/transactions': typeof TransactionsRoute
+  '/withdraw': typeof WithdrawRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/bonds': typeof BondsRoute
+  '/dashboard': typeof DashboardRoute
+  '/deposit': typeof DepositRoute
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
+  '/member-support': typeof MemberSupportRoute
+  '/my-deposits': typeof MyDepositsRoute
+  '/profile': typeof ProfileRoute
+  '/referral': typeof ReferralRoute
   '/signup': typeof SignupRoute
   '/support': typeof SupportRoute
+  '/transactions': typeof TransactionsRoute
+  '/withdraw': typeof WithdrawRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/about' | '/bonds' | '/faq' | '/login' | '/signup' | '/support'
+    | '/'
+    | '/about'
+    | '/bonds'
+    | '/dashboard'
+    | '/deposit'
+    | '/faq'
+    | '/login'
+    | '/member-support'
+    | '/my-deposits'
+    | '/profile'
+    | '/referral'
+    | '/signup'
+    | '/support'
+    | '/transactions'
+    | '/withdraw'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/bonds' | '/faq' | '/login' | '/signup' | '/support'
+  to:
+    | '/'
+    | '/about'
+    | '/bonds'
+    | '/dashboard'
+    | '/deposit'
+    | '/faq'
+    | '/login'
+    | '/member-support'
+    | '/my-deposits'
+    | '/profile'
+    | '/referral'
+    | '/signup'
+    | '/support'
+    | '/transactions'
+    | '/withdraw'
   id:
     | '__root__'
     | '/'
     | '/about'
     | '/bonds'
+    | '/dashboard'
+    | '/deposit'
     | '/faq'
     | '/login'
+    | '/member-support'
+    | '/my-deposits'
+    | '/profile'
+    | '/referral'
     | '/signup'
     | '/support'
+    | '/transactions'
+    | '/withdraw'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   BondsRoute: typeof BondsRoute
+  DashboardRoute: typeof DashboardRoute
+  DepositRoute: typeof DepositRoute
   FaqRoute: typeof FaqRoute
   LoginRoute: typeof LoginRoute
+  MemberSupportRoute: typeof MemberSupportRoute
+  MyDepositsRoute: typeof MyDepositsRoute
+  ProfileRoute: typeof ProfileRoute
+  ReferralRoute: typeof ReferralRoute
   SignupRoute: typeof SignupRoute
   SupportRoute: typeof SupportRoute
+  TransactionsRoute: typeof TransactionsRoute
+  WithdrawRoute: typeof WithdrawRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -131,6 +248,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BondsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deposit': {
+      id: '/deposit'
+      path: '/deposit'
+      fullPath: '/deposit'
+      preLoaderRoute: typeof DepositRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/faq': {
       id: '/faq'
       path: '/faq'
@@ -143,6 +274,34 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/member-support': {
+      id: '/member-support'
+      path: '/member-support'
+      fullPath: '/member-support'
+      preLoaderRoute: typeof MemberSupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-deposits': {
+      id: '/my-deposits'
+      path: '/my-deposits'
+      fullPath: '/my-deposits'
+      preLoaderRoute: typeof MyDepositsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/referral': {
+      id: '/referral'
+      path: '/referral'
+      fullPath: '/referral'
+      preLoaderRoute: typeof ReferralRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -159,6 +318,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SupportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/transactions': {
+      id: '/transactions'
+      path: '/transactions'
+      fullPath: '/transactions'
+      preLoaderRoute: typeof TransactionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/withdraw': {
+      id: '/withdraw'
+      path: '/withdraw'
+      fullPath: '/withdraw'
+      preLoaderRoute: typeof WithdrawRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -166,10 +339,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   BondsRoute: BondsRoute,
+  DashboardRoute: DashboardRoute,
+  DepositRoute: DepositRoute,
   FaqRoute: FaqRoute,
   LoginRoute: LoginRoute,
+  MemberSupportRoute: MemberSupportRoute,
+  MyDepositsRoute: MyDepositsRoute,
+  ProfileRoute: ProfileRoute,
+  ReferralRoute: ReferralRoute,
   SignupRoute: SignupRoute,
   SupportRoute: SupportRoute,
+  TransactionsRoute: TransactionsRoute,
+  WithdrawRoute: WithdrawRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
