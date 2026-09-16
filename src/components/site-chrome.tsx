@@ -3,6 +3,7 @@ import { ArrowRight, Mail, Menu, Send, X } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { LanguageSelect } from "@/lib/i18n";
 import banner from "@/assets/uploads/banner-5.jpg.asset.json";
 import btc from "@/assets/coins/btc.png.asset.json";
 import usdt from "@/assets/coins/usdt.png.asset.json";
@@ -34,7 +35,7 @@ export function SiteHeader() {
     <>
       <div className="utility-bar">
         <div className="site-width utility-inner">
-          <div className="utility-group"><span>SELECT LANGUAGE</span><span className="flag" aria-label="English"><i /><b /></span><strong>MERIDIANVEST.COM CRYPTO MANAGEMENT GROUP</strong></div>
+          <div className="utility-group"><span>SELECT LANGUAGE</span><LanguageSelect /><strong>MERIDIANVEST.COM CRYPTO MANAGEMENT GROUP</strong></div>
           <div className="utility-group"><Send aria-hidden="true" /><a href="mailto:support@meridianvest.com"><Mail aria-hidden="true" /> SUPPORT@MERIDIANVEST.COM</a></div>
         </div>
       </div>

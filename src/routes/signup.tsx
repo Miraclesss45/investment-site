@@ -111,7 +111,7 @@ function SignupPage() {
         <footer className="signup-footer">
           <p>Copyright © 2025 meridianvest.com. All rights reserved.</p>
           <nav><Link to="/about">About Us</Link><span>|</span><a href="#terms">Terms &amp; Conditions</a></nav>
-          <select aria-label="Select language" defaultValue="en"><option value="en">SELECT LANGUAGE</option></select>
+          <LanguageSelect className="signup-language" />
         </footer>
       </div>
     </main>

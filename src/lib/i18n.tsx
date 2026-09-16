@@ -236,7 +236,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
 export function LanguageSelect({ className }: { className?: string }) {
   const { language, setLanguage, busy } = useLanguage();
-  const active = languages.find((item) => item.code === language) ?? languages[0];
+  const active = languages.find((item) => item.code === language) ?? languages[0]!;
   return (
     <span className={className ? `language-select ${className}` : "language-select"} data-no-translate>
       <span aria-hidden="true">{active.flag}</span>
