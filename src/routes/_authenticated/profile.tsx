@@ -9,9 +9,9 @@ import { notifyError, useProfile, useRefreshAccount } from "@/lib/account";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({ meta: [
-    { title: "My Profile | Legacy Pro Alliance" },
-    { name: "description", content: "Update your Legacy Pro Alliance contact details, payout wallets and account password." },
-    { property: "og:title", content: "My Profile | Legacy Pro Alliance" },
+    { title: "My Profile | MeridianVest" },
+    { name: "description", content: "Update your MeridianVest contact details, payout wallets and account password." },
+    { property: "og:title", content: "My Profile | MeridianVest" },
     { property: "og:description", content: "Update your details, wallets and password." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },

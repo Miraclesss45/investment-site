@@ -10,9 +10,9 @@ import { money, paymentMethods, shortDate } from "@/lib/member-data";
 
 export const Route = createFileRoute("/_authenticated/withdraw")({
   head: () => ({ meta: [
-    { title: "Withdraw Funds | Legacy Pro Alliance" },
-    { name: "description", content: "Request a withdrawal from your Legacy Pro Alliance balance to your crypto wallet." },
-    { property: "og:title", content: "Withdraw Funds | Legacy Pro Alliance" },
+    { title: "Withdraw Funds | MeridianVest" },
+    { name: "description", content: "Request a withdrawal from your MeridianVest balance to your crypto wallet." },
+    { property: "og:title", content: "Withdraw Funds | MeridianVest" },
     { property: "og:description", content: "Request a withdrawal to your crypto wallet." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },

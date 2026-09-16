@@ -137,7 +137,7 @@ export function useNotifications() {
   if (profile) {
     items.push({
       id: "welcome",
-      title: "Welcome to Legacy Pro Alliance",
+      title: "Welcome to MeridianVest",
       body: `Your member account @${profile.username} is ready. Make your first deposit to start earning.`,
       date: profile.created_at,
     });

@@ -16,12 +16,12 @@ import featureFour from "@/assets/uploads/feature4.png.asset.json";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Legacy Pro Alliance | Crypto Management" },
+      { title: "MeridianVest | Crypto Management" },
       {
         name: "description",
         content: "Build long-term cryptocurrency earnings with accessible investment plans and expert support.",
       },
-      { property: "og:title", content: "Legacy Pro Alliance | Crypto Management" },
+      { property: "og:title", content: "MeridianVest | Crypto Management" },
       {
         property: "og:description",
         content: "Accessible cryptocurrency management plans designed for steady long-term earnings.",
@@ -88,17 +88,17 @@ const steps = [
 const testimonials = [
   {
     quote:
-      "I Like The Different Types Of Investment Bonds Offered At Legacyproalliance.Org, And The Stable, Regular, Long-Term Returns On My Investments.",
+      "I Like The Different Types Of Investment Bonds Offered At MeridianVest.com, And The Stable, Regular, Long-Term Returns On My Investments.",
     name: "Richard Trump",
   },
   {
     quote:
-      "It's The Best Online Investment Opportunity I Have Come Across. Legacyproalliance.Org Is The Best. Keep It Up. Let's Build Our Future Together.",
+      "It's The Best Online Investment Opportunity I Have Come Across. MeridianVest.com Is The Best. Keep It Up. Let's Build Our Future Together.",
     name: "Simone Rose",
   },
   {
     quote:
-      "Such A Smooth Investment Experience. Your Support Is World Class. Long Live Legacyproalliance.Org. I Will Recommend Legacyproalliance.Org To All My Friends And Family.",
+      "Such A Smooth Investment Experience. Your Support Is World Class. Long Live MeridianVest.com. I Will Recommend MeridianVest.com To All My Friends And Family.",
     name: "Andrew Phillips",
   },
 ];
@@ -233,7 +233,7 @@ function Index() {
               <SectionLabel>About Our Company</SectionLabel>
               <h2>A Smarter Way To Grow Your Crypto Portfolio</h2>
               <p>
-                Legacy Pro Alliance provides a straightforward route into digital asset management,
+                MeridianVest provides a straightforward route into digital asset management,
                 pairing secure opportunities with a dedicated support team.
               </p>
               <ul>
@@ -250,7 +250,7 @@ function Index() {
         <section className="features section-black" id="features">
           <div className="site-width">
             <SectionLabel>Our Features</SectionLabel>
-            <h2>Maximize Your Earnings With<br />Legacyproalliance.Org Today</h2>
+            <h2>Maximize Your Earnings With<br />MeridianVest.com Today</h2>
             <div className={`feature-grid ${featuresInView ? "is-visible" : ""}`} id="packages" ref={featuresRef}>
               {features.map((feature) => (
                 <article className="feature-card" key={feature.title}>

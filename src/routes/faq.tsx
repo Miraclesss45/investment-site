@@ -7,9 +7,9 @@ import { InnerHero, PublicCta, SiteFooter, SiteHeader } from "@/components/site-
 
 export const Route = createFileRoute("/faq")({
   head: () => ({ meta: [
-    { title: "Frequently Asked Questions | Legacy Pro Alliance" },
-    { name: "description", content: "Answers about Legacy Pro Alliance accounts, deposits, payouts, and referrals." },
-    { property: "og:title", content: "Frequently Asked Questions | Legacy Pro Alliance" },
+    { title: "Frequently Asked Questions | MeridianVest" },
+    { name: "description", content: "Answers about MeridianVest accounts, deposits, payouts, and referrals." },
+    { property: "og:title", content: "Frequently Asked Questions | MeridianVest" },
     { property: "og:description", content: "Find answers about accounts, deposits, payouts, and referrals." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/faq")({
 
 const faqGroups = {
   General: [
-    ["What is legacyproalliance.org?", "Legacy Pro Alliance is a crypto management platform that uses automated strategies to identify opportunities across different digital asset ecosystems."],
+    ["What is meridianvest.com?", "MeridianVest is a crypto management platform that uses automated strategies to identify opportunities across different digital asset ecosystems."],
     ["Who can register?", "Anyone of legal age who accepts our terms and can use the supported payment methods may create an account."],
     ["How do I create an account?", "Select Sign Up, complete the registration form, add your payment addresses and accept the terms and conditions."],
     ["Is my data safe?", "The platform uses SSL protection and safeguards designed to protect account information and availability."],
@@ -27,7 +27,7 @@ const faqGroups = {
   Deposits: [
     ["How do I purchase an investment bond?", "Create an account, sign in, choose an available package and follow the deposit instructions shown in your account."],
     ["Which payment methods are accepted?", "Bitcoin, Ethereum, Litecoin, Dogecoin, Dash, Tron, BNB, XRP, XLM and USDT on ERC20, TRC20 and BEP20 networks are accepted."],
-    ["Are there transaction fees?", "Legacy Pro Alliance does not charge a deposit fee. Your payment processor or blockchain network may apply its own fee."],
+    ["Are there transaction fees?", "MeridianVest does not charge a deposit fee. Your payment processor or blockchain network may apply its own fee."],
     ["Can I reinvest my earnings?", "Yes. Available earnings may be used to purchase another eligible investment bond."],
     ["How many deposits can I make?", "You may purchase multiple available plans from one account."],
   ],

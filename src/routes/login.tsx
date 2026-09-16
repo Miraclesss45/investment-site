@@ -11,10 +11,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [
-    { title: "Member Login | Legacy Pro Alliance" },
-    { name: "description", content: "Sign in to your Legacy Pro Alliance member account." },
-    { property: "og:title", content: "Member Login | Legacy Pro Alliance" },
-    { property: "og:description", content: "Access your Legacy Pro Alliance member account." },
+    { title: "Member Login | MeridianVest" },
+    { name: "description", content: "Sign in to your MeridianVest member account." },
+    { property: "og:title", content: "Member Login | MeridianVest" },
+    { property: "og:description", content: "Access your MeridianVest member account." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },
   ] }), component: LoginPage,
@@ -76,7 +76,7 @@ function LoginPage() {
           <p>Forgot Password? <button type="button" className="login-reset" onClick={() => void reset()}>Reset</button></p>
         </div>
       </div>
-      <footer>copyright © 2025, <span>legacyproalliance.org</span> All Rights Reserved</footer>
+      <footer>copyright © 2025, <span>meridianvest.com</span> All Rights Reserved</footer>
     </main>
   );
 }

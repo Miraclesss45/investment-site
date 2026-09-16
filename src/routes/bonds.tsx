@@ -6,9 +6,9 @@ import { InnerHero, PublicCta, SiteFooter, SiteHeader } from "@/components/site-
 
 export const Route = createFileRoute("/bonds")({
   head: () => ({ meta: [
-    { title: "Our Packages | Legacy Pro Alliance" },
-    { name: "description", content: "Compare Legacy Pro Alliance investment packages and choose a plan for your goals." },
-    { property: "og:title", content: "Our Packages | Legacy Pro Alliance" },
+    { title: "Our Packages | MeridianVest" },
+    { name: "description", content: "Compare MeridianVest investment packages and choose a plan for your goals." },
+    { property: "og:title", content: "Our Packages | MeridianVest" },
     { property: "og:description", content: "Compare four stable investment packages from Starter to Premium." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },

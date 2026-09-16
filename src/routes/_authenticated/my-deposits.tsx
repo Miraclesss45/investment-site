@@ -5,9 +5,9 @@ import { plans } from "@/lib/member-data";
 
 export const Route = createFileRoute("/_authenticated/my-deposits")({
   head: () => ({ meta: [
-    { title: "My Deposits | Legacy Pro Alliance" },
-    { name: "description", content: "Review every active and completed deposit on your Legacy Pro Alliance account." },
-    { property: "og:title", content: "My Deposits | Legacy Pro Alliance" },
+    { title: "My Deposits | MeridianVest" },
+    { name: "description", content: "Review every active and completed deposit on your MeridianVest account." },
+    { property: "og:title", content: "My Deposits | MeridianVest" },
     { property: "og:description", content: "Review your active and completed deposits." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },

@@ -7,10 +7,10 @@ import { InnerHero, PublicCta, SiteFooter, SiteHeader } from "@/components/site-
 
 export const Route = createFileRoute("/about")({
   head: () => ({ meta: [
-    { title: "About Us | Legacy Pro Alliance" },
-    { name: "description", content: "Learn about Legacy Pro Alliance and our secure, automated cryptocurrency management solutions." },
-    { property: "og:title", content: "About Us | Legacy Pro Alliance" },
-    { property: "og:description", content: "Learn about Legacy Pro Alliance and our secure, automated cryptocurrency management solutions." },
+    { title: "About Us | MeridianVest" },
+    { name: "description", content: "Learn about MeridianVest and our secure, automated cryptocurrency management solutions." },
+    { property: "og:title", content: "About Us | MeridianVest" },
+    { property: "og:description", content: "Learn about MeridianVest and our secure, automated cryptocurrency management solutions." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },
   ] }),
@@ -30,8 +30,8 @@ function AboutPage() {
       <main>
         <InnerHero title="About Us" crumb="Who we are?" />
         <section className="about-benefits"><div className="site-width benefit-grid">{benefits.map(({ icon: Icon, title, copy }) => <article key={title}><Icon /><div><h2>{title}</h2><p>{copy}</p></div></article>)}</div></section>
-        <section className="about-story"><div className="site-width about-story-grid"><div><div className="section-label"><span />WHAT IS LEGACYPROALLIANCE.ORG?</div><h2>Secure, Innovative, And User-Friendly Crypto Management Solutions.</h2><ul><li>legacyproalliance.org is an innovative platform designed to work in a new era of crypto management.</li><li>Our automated strategies identify profit making opportunities across different crypto ecosystems.</li><li>Our platform seamlessly integrates advanced technological tools, making sophisticated crypto management strategies accessible to all.</li></ul></div><img src={tradingDesk.url} alt="Investment professionals reviewing cryptocurrency markets" /></div></section>
-        <section className="certificate-section"><div className="site-width"><img src={certificate.url} alt="Legacy Pro Alliance Ltd certificate of incorporation, company number 12184006" /></div></section>
+        <section className="about-story"><div className="site-width about-story-grid"><div><div className="section-label"><span />WHAT IS MERIDIANVEST.COM?</div><h2>Secure, Innovative, And User-Friendly Crypto Management Solutions.</h2><ul><li>meridianvest.com is an innovative platform designed to work in a new era of crypto management.</li><li>Our automated strategies identify profit making opportunities across different crypto ecosystems.</li><li>Our platform seamlessly integrates advanced technological tools, making sophisticated crypto management strategies accessible to all.</li></ul></div><img src={tradingDesk.url} alt="Investment professionals reviewing cryptocurrency markets" /></div></section>
+        <section className="certificate-section"><div className="site-width"><img src={certificate.url} alt="MeridianVest Ltd certificate of incorporation, company number 12184006" /></div></section>
         <PublicCta />
       </main>
       <SiteFooter />

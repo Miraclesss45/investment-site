@@ -24,7 +24,7 @@ function Mark() {
 }
 
 export function Logo() {
-  return <Link to="/" className="brand" aria-label="Legacy Pro Alliance home"><Mark /><span>LEGACY PRO <b>ALLIANCE</b></span></Link>;
+  return <Link to="/" className="brand" aria-label="MeridianVest home"><Mark /><span>MERIDIAN<b>VEST</b></span></Link>;
 }
 
 export function SiteHeader() {
@@ -34,8 +34,8 @@ export function SiteHeader() {
     <>
       <div className="utility-bar">
         <div className="site-width utility-inner">
-          <div className="utility-group"><span>SELECT LANGUAGE</span><span className="flag" aria-label="English"><i /><b /></span><strong>LEGACYPROALLIANCE.ORG CRYPTO MANAGEMENT GROUP</strong></div>
-          <div className="utility-group"><Send aria-hidden="true" /><a href="mailto:support@legacyproalliance.org"><Mail aria-hidden="true" /> SUPPORT@LEGACYPROALLIANCE.ORG</a></div>
+          <div className="utility-group"><span>SELECT LANGUAGE</span><span className="flag" aria-label="English"><i /><b /></span><strong>MERIDIANVEST.COM CRYPTO MANAGEMENT GROUP</strong></div>
+          <div className="utility-group"><Send aria-hidden="true" /><a href="mailto:support@meridianvest.com"><Mail aria-hidden="true" /> SUPPORT@MERIDIANVEST.COM</a></div>
         </div>
       </div>
       <header className="site-header">
@@ -63,11 +63,11 @@ export function SiteFooter() {
   return (
     <footer id="contact">
       <div className="site-width footer-grid">
-        <div className="contact-links"><a href="mailto:support@legacyproalliance.org" className="email-link"><Mail /> Email Us</a><Link to="/support"><Send /> Support</Link><a href="https://t.me/legacyproalliance"><Send /> Telegram Group</a></div>
+        <div className="contact-links"><a href="mailto:support@meridianvest.com" className="email-link"><Mail /> Email Us</a><Link to="/support"><Send /> Support</Link><a href="https://t.me/meridianvest"><Send /> Telegram Group</a></div>
         <div><h3>Company</h3><Link to="/about">About us</Link><a href="#contact">Terms</a></div>
         <div><h3>Features</h3><Link to="/bonds">Our Packages</Link><Link to="/signup">Registration</Link></div>
         <div><h3>Support</h3><Link to="/faq">FAQ</Link><Link to="/support">Contact Us</Link><Link to="/login">Login</Link></div>
-        <address>Legacyproalliance.Org<br />CRYPTO MANAGEMENT GROUP<br />The Mount, 47 Castle Bank,<br />Stafford, United Kingdom,<br />ST16 1DP</address>
+        <address>MeridianVest.com<br />CRYPTO MANAGEMENT GROUP<br />The Mount, 47 Castle Bank,<br />Stafford, United Kingdom,<br />ST16 1DP</address>
       </div>
       <div className="footer-bottom"><div className="site-width footer-bottom-inner"><p>Copyright © 2026. All Right Reserved.</p><div className="coin-strip" aria-label="Supported cryptocurrencies">{coinIcons.map((coin, index) => <img key={`${coin.asset_id}-${index}`} src={coin.url} alt="" />)}</div></div></div>
     </footer>

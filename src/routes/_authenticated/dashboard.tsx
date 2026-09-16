@@ -8,9 +8,9 @@ import { money, notices, plans, shortDate } from "@/lib/member-data";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [
-    { title: "Member Dashboard | Legacy Pro Alliance" },
-    { name: "description", content: "Track your balance, active deposits, earnings and referral bonus in your Legacy Pro Alliance member area." },
-    { property: "og:title", content: "Member Dashboard | Legacy Pro Alliance" },
+    { title: "Member Dashboard | MeridianVest" },
+    { name: "description", content: "Track your balance, active deposits, earnings and referral bonus in your MeridianVest member area." },
+    { property: "og:title", content: "Member Dashboard | MeridianVest" },
     { property: "og:description", content: "Track your balance, active deposits and earnings." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },

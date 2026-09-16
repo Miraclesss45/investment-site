@@ -10,9 +10,9 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/reset-password")({
   ssr: false,
   head: () => ({ meta: [
-    { title: "Reset Password | Legacy Pro Alliance" },
-    { name: "description", content: "Choose a new password for your Legacy Pro Alliance member account." },
-    { property: "og:title", content: "Reset Password | Legacy Pro Alliance" },
+    { title: "Reset Password | MeridianVest" },
+    { name: "description", content: "Choose a new password for your MeridianVest member account." },
+    { property: "og:title", content: "Reset Password | MeridianVest" },
     { property: "og:description", content: "Choose a new password for your member account." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },
@@ -53,7 +53,7 @@ function ResetPasswordPage() {
           <Button type="submit" className="login-submit" disabled={busy}>{busy ? "Saving…" : "Save Password"}</Button>
         </form>
       </div>
-      <footer>copyright © 2025, <span>legacyproalliance.org</span> All Rights Reserved</footer>
+      <footer>copyright © 2025, <span>meridianvest.com</span> All Rights Reserved</footer>
     </main>
   );
 }
