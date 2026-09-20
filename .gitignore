@@ -35,5 +35,5 @@ firebase-service-account*.json
 *.sln
 *.sw?
 
-# Local Netlify folder
-.netlify
+# Vercel
+.vercel
