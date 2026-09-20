@@ -18,6 +18,7 @@ dist-ssr
 .env
 .env.*
 !.env.example
+firebase-service-account*.json
 
 # Wrangler / Cloudflare
 .wrangler/
@@ -33,3 +34,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local Netlify folder
+.netlify

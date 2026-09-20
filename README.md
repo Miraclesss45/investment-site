@@ -13,12 +13,14 @@ Copy `.env.example` to `.env` and fill in the Firebase web app values before tes
 
 The Firebase web configuration is safe to expose in a browser bundle. Keep server credentials, service account JSON files, and private API keys out of this repository.
 
-## Deploy to Netlify
+## Deploy to Vercel
 
-1. Push the repository to GitHub. `.env` is ignored, so it will not be committed.
-2. In Netlify, choose **Add new project -> Import an existing project -> GitHub**, then select this repository.
-3. Netlify will use `netlify.toml` automatically. The build command is `npm run build` and the publish directory is `dist`.
-4. In **Site configuration -> Environment variables**, add these variables for the deploy context:
+This project runs on Vercel without requiring Firebase Cloud Functions. The React app is built to `dist`, and the server endpoints in `api/` are Vercel Functions that use the Firebase Admin SDK.
+
+1. Push the repository to GitHub. `.env` is ignored.
+2. Create a Vercel account or log in at https://vercel.com.
+3. Import the GitHub repository: **Add New -> Project -> Import Git Repository**.
+4. In **Environment Variables**, add these variables:
 
    ```text
    VITE_FIREBASE_API_KEY
@@ -27,15 +29,24 @@ The Firebase web configuration is safe to expose in a browser bundle. Keep serve
    VITE_FIREBASE_STORAGE_BUCKET
    VITE_FIREBASE_MESSAGING_SENDER_ID
    VITE_FIREBASE_APP_ID
+   FIREBASE_SERVICE_ACCOUNT
+   TELEGRAM_BOT_TOKEN
+   TELEGRAM_CHAT_ID
    ```
 
-   Use the matching values from the Firebase web app configuration. If the Supabase-backed parts of the project are used, also add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+   Use values from **Firebase Console -> Project settings -> Your apps -> Web app** for the `VITE_*` variables.
 
-5. Trigger a new deploy after adding or changing environment variables. Vite injects `VITE_*` values at build time.
-6. In Firebase Console, open **Authentication -> Settings -> Authorized domains** and add the Netlify domain, for example `your-site.netlify.app`. Add the custom domain too if one is configured.
+   `FIREBASE_SERVICE_ACCOUNT` must contain the complete Firebase Admin service account JSON (download from **Project settings -> Service accounts -> Generate new private key**). Never commit this file; use Vercel's encrypted environment settings only.
+
+   Add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` if deposit notifications are enabled.
+
+5. Click **Deploy**. Vercel's default build command (`npm run build`) and output directory (`dist`) work automatically.
+6. After the first deploy, in Firebase Console open **Authentication -> Settings -> Authorized domains** and add the Vercel domain (e.g. `your-app.vercel.app`) and custom domain.
 7. Under **Authentication -> Sign-in method**, enable **Email/Password**. New accounts must verify their email before the app allows dashboard access.
-
-The Netlify redirect in `netlify.toml` keeps React Router routes such as `/login` and `/dashboard` working after a browser refresh.
+8. To attach the custom domain `meridianvests.com`:
+   - Add it in Vercel's **Project settings -> Domains**.
+   - Update your domain registrar's DNS records with the values Vercel provides.
+   - Wait for DNS propagation (typically a few minutes to a few hours).
 
 ## Deploy Firestore rules
 
@@ -48,6 +59,67 @@ firebase deploy --only firestore:rules
 ```
 
 Review `firestore.rules` before deploying to production. The rules allow each signed-in member to access only their own records, while username lookup is intentionally public for email-or-username login.
+
+## Deposit notifications
+
+Deposit requests are saved to Firestore and the Vercel Function `/api/send-deposit-telegram`
+sends a formatted notification to a private Telegram chat. Add these private
+environment variables in Vercel:
+
+```text
+TELEGRAM_BOT_TOKEN=your-bot-token
+TELEGRAM_CHAT_ID=your-chat-id
+```
+
+Create a bot with Telegram's `@BotFather`, send the bot a message, and obtain
+the chat ID from Telegram's `getUpdates` API. The notification contains the
+depositor name, email, bundle, chain, amount, and request ID. Never expose the
+bot token in frontend code.
+
+## Admin access
+
+The app uses the standard Firebase sign-in flow for both members and administrators.
+After authentication, the app checks the signed-in user's trusted Firebase role
+information and redirects admins to `/admin` while members go to `/dashboard`.
+Set admin authorization in Firebase Auth custom claims or by a trusted backend
+process; never store admin credentials in frontend code or browser environment
+variables.
+
+### Granting your first admin access
+
+This is a one-time local setup command. It uses the Firebase service-account JSON
+from a file on your computer and does not expose that file to the browser.
+
+1. In Firebase Console, open **Project settings -> Service accounts -> Generate new private key**.
+2. Save the downloaded JSON outside the project folder.
+3. Make sure the admin user already exists under **Authentication -> Users**.
+4. From the project folder, run this command in PowerShell:
+
+   ```powershell
+   npm run set-admin
+   ```
+
+   When prompted, paste the path to the downloaded JSON file and enter the email
+   of the Firebase Authentication user.
+
+5. Open `/login`, sign in with that Firebase account, and the app will redirect you
+   to `/admin`. Sign out and sign in again if the account was already logged in.
+
+Never commit the service-account JSON, paste it into `.env`, or use a `VITE_`
+prefix for it. The `firebase-admin` package is only used by this local command;
+it must not be imported by browser code.
+
+## Referral rewards
+
+Referral rewards are created by the trusted Vercel Function `/api/create-referral-reward`,
+not by the browser. Configure the private `FIREBASE_SERVICE_ACCOUNT` Vercel
+environment variable with the service-account JSON contents. The function verifies
+the signed-in user's token, rejects self-referrals, and uses a transaction so a
+referred account can only produce one reward.
+
+If a service-account key is ever exposed, immediately generate a replacement
+key in Firebase Console, update `FIREBASE_SERVICE_ACCOUNT` in Vercel, wait for
+the automatic redeploy, and delete the exposed key from **Project settings -> Service accounts**.
 
 ## Production build
 

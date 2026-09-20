@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { LanguageContext } from "./i18nContext";
 
 const translations = {
   es: {
@@ -17,24 +18,26 @@ const translations = {
     "Sign me up": "Registrarme",
     "Get started": "Comenzar",
     "Our packages": "Nuestros paquetes",
-    "What is MeridianVest?": "Que es MeridianVest?",
+    "What is MeridianVests?": "Que es MeridianVests?",
     "Secure, innovative, and user-friendly crypto management solutions.":
       "Soluciones de gestion de criptomonedas seguras, innovadoras y faciles de usar.",
     "What we do": "Lo que hacemos",
-    "Why MeridianVest": "Por que MeridianVest",
+    "Why MeridianVests": "Por que MeridianVests",
     "How to get started": "Como comenzar",
-    "Create an account and start exploring.": "Crea una cuenta y comienza a explorar.",
+    "Create an account and start exploring.":
+      "Crea una cuenta y comienza a explorar.",
     Testimonial: "Testimonio",
     "Our members' investment and profits experience.":
       "La experiencia de inversion y ganancias de nuestros miembros.",
     "Start investing now!!": "Comienza a invertir ahora!!",
-    "About MeridianVest.": "Sobre MeridianVest.",
+    "About MeridianVests.": "Sobre MeridianVests.",
     "Our story": "Nuestra historia",
     "Crypto management made clearer and more intentional.":
       "Gestion de criptomonedas mas clara e intencional.",
     "Choose the structure that fits your capital goals.":
       "Elige la estructura que se adapta a tus objetivos de capital.",
-    "Answers for members who value clarity.": "Respuestas para miembros que valoran la claridad.",
+    "Answers for members who value clarity.":
+      "Respuestas para miembros que valoran la claridad.",
     "Request assistance.": "Solicita asistencia.",
     "Support Center": "Centro de soporte",
     "Request Assistance": "Solicitar asistencia",
@@ -71,18 +74,19 @@ const translations = {
     "Sign me up": "Je m'inscris",
     "Get started": "Commencer",
     "Our packages": "Nos forfaits",
-    "What is MeridianVest?": "Qu'est-ce que MeridianVest ?",
+    "What is MeridianVests?": "Qu'est-ce que MeridianVests ?",
     "Secure, innovative, and user-friendly crypto management solutions.":
       "Des solutions de gestion crypto securisees, innovantes et faciles a utiliser.",
     "What we do": "Ce que nous faisons",
-    "Why MeridianVest": "Pourquoi MeridianVest",
+    "Why MeridianVests": "Pourquoi MeridianVests",
     "How to get started": "Comment commencer",
-    "Create an account and start exploring.": "Creez un compte et commencez a explorer.",
+    "Create an account and start exploring.":
+      "Creez un compte et commencez a explorer.",
     Testimonial: "Temoignage",
     "Our members' investment and profits experience.":
       "L'experience d'investissement et de profits de nos membres.",
     "Start investing now!!": "Commencez a investir maintenant !!",
-    "About MeridianVest.": "A propos de MeridianVest.",
+    "About MeridianVests.": "A propos de MeridianVests.",
     "Our story": "Notre histoire",
     "Crypto management made clearer and more intentional.":
       "Une gestion crypto plus claire et plus pertinente.",
@@ -126,11 +130,11 @@ const translations = {
     "Sign me up": "Registrieren",
     "Get started": "Loslegen",
     "Our packages": "Unsere Pakete",
-    "What is MeridianVest?": "Was ist MeridianVest?",
+    "What is MeridianVests?": "Was ist MeridianVests?",
     "Secure, innovative, and user-friendly crypto management solutions.":
       "Sichere, innovative und benutzerfreundliche Kryptoverwaltung.",
     "What we do": "Was wir tun",
-    "Why MeridianVest": "Warum MeridianVest",
+    "Why MeridianVests": "Warum MeridianVests",
     "How to get started": "So starten Sie",
     "Create an account and start exploring.":
       "Erstellen Sie ein Konto und entdecken Sie die Moglichkeiten.",
@@ -138,13 +142,14 @@ const translations = {
     "Our members' investment and profits experience.":
       "Die Anlage- und Gewinnerfahrung unserer Mitglieder.",
     "Start investing now!!": "Jetzt investieren!!",
-    "About MeridianVest.": "Uber MeridianVest.",
+    "About MeridianVests.": "Uber MeridianVests.",
     "Our story": "Unsere Geschichte",
     "Crypto management made clearer and more intentional.":
       "Kryptoverwaltung klarer und bewusster gestaltet.",
     "Choose the structure that fits your capital goals.":
       "Wahlen Sie die Struktur fur Ihre Kapitalziele.",
-    "Answers for members who value clarity.": "Antworten fur Mitglieder, die Klarheit schatzen.",
+    "Answers for members who value clarity.":
+      "Antworten fur Mitglieder, die Klarheit schatzen.",
     "Request assistance.": "Hilfe anfordern.",
     "Support Center": "Supportcenter",
     "Request Assistance": "Hilfe anfordern",
@@ -181,24 +186,26 @@ const translations = {
     "Sign me up": "Quero me cadastrar",
     "Get started": "Comecar",
     "Our packages": "Nossos pacotes",
-    "What is MeridianVest?": "O que e MeridianVest?",
+    "What is MeridianVests?": "O que e MeridianVests?",
     "Secure, innovative, and user-friendly crypto management solutions.":
       "Solucoes de gestao de criptomoedas seguras, inovadoras e faceis de usar.",
     "What we do": "O que fazemos",
-    "Why MeridianVest": "Por que a MeridianVest",
+    "Why MeridianVests": "Por que a MeridianVests",
     "How to get started": "Como comecar",
-    "Create an account and start exploring.": "Crie uma conta e comece a explorar.",
+    "Create an account and start exploring.":
+      "Crie uma conta e comece a explorar.",
     Testimonial: "Depoimento",
     "Our members' investment and profits experience.":
       "A experiencia de investimento e lucro dos nossos membros.",
     "Start investing now!!": "Comece a investir agora!!",
-    "About MeridianVest.": "Sobre a MeridianVest.",
+    "About MeridianVests.": "Sobre a MeridianVests.",
     "Our story": "Nossa historia",
     "Crypto management made clearer and more intentional.":
       "Gestao de criptomoedas mais clara e planejada.",
     "Choose the structure that fits your capital goals.":
       "Escolha a estrutura que combina com seus objetivos de capital.",
-    "Answers for members who value clarity.": "Respostas para membros que valorizam a clareza.",
+    "Answers for members who value clarity.":
+      "Respostas para membros que valorizam a clareza.",
     "Request assistance.": "Solicite ajuda.",
     "Support Center": "Central de suporte",
     "Request Assistance": "Solicitar ajuda",
@@ -235,24 +242,26 @@ const translations = {
     "Sign me up": "Registrami",
     "Get started": "Inizia",
     "Our packages": "I nostri pacchetti",
-    "What is MeridianVest?": "Cos'e MeridianVest?",
+    "What is MeridianVests?": "Cos'e MeridianVests?",
     "Secure, innovative, and user-friendly crypto management solutions.":
       "Soluzioni di gestione crypto sicure, innovative e facili da usare.",
     "What we do": "Cosa facciamo",
-    "Why MeridianVest": "Perche MeridianVest",
+    "Why MeridianVests": "Perche MeridianVests",
     "How to get started": "Come iniziare",
-    "Create an account and start exploring.": "Crea un account e inizia a esplorare.",
+    "Create an account and start exploring.":
+      "Crea un account e inizia a esplorare.",
     Testimonial: "Testimonianza",
     "Our members' investment and profits experience.":
       "L'esperienza di investimento e profitto dei nostri membri.",
     "Start investing now!!": "Inizia a investire ora!!",
-    "About MeridianVest.": "Informazioni su MeridianVest.",
+    "About MeridianVests.": "Informazioni su MeridianVests.",
     "Our story": "La nostra storia",
     "Crypto management made clearer and more intentional.":
       "Gestione crypto piu chiara e consapevole.",
     "Choose the structure that fits your capital goals.":
       "Scegli la struttura adatta ai tuoi obiettivi di capitale.",
-    "Answers for members who value clarity.": "Risposte per i membri che cercano chiarezza.",
+    "Answers for members who value clarity.":
+      "Risposte per i membri che cercano chiarezza.",
     "Request assistance.": "Richiedi assistenza.",
     "Support Center": "Centro assistenza",
     "Request Assistance": "Richiedi assistenza",
@@ -289,24 +298,26 @@ const translations = {
     "Sign me up": "Registreren",
     "Get started": "Aan de slag",
     "Our packages": "Onze pakketten",
-    "What is MeridianVest?": "Wat is MeridianVest?",
+    "What is MeridianVests?": "Wat is MeridianVests?",
     "Secure, innovative, and user-friendly crypto management solutions.":
       "Veilige, innovatieve en gebruiksvriendelijke crypto-oplossingen.",
     "What we do": "Wat wij doen",
-    "Why MeridianVest": "Waarom MeridianVest",
+    "Why MeridianVests": "Waarom MeridianVests",
     "How to get started": "Zo begint u",
-    "Create an account and start exploring.": "Maak een account en begin met ontdekken.",
+    "Create an account and start exploring.":
+      "Maak een account en begin met ontdekken.",
     Testimonial: "Ervaring",
     "Our members' investment and profits experience.":
       "De investerings- en winstervaring van onze leden.",
     "Start investing now!!": "Begin nu met investeren!!",
-    "About MeridianVest.": "Over MeridianVest.",
+    "About MeridianVests.": "Over MeridianVests.",
     "Our story": "Ons verhaal",
     "Crypto management made clearer and more intentional.":
       "Cryptobeheer duidelijker en doelgerichter gemaakt.",
     "Choose the structure that fits your capital goals.":
       "Kies de structuur die bij uw kapitaaldoelen past.",
-    "Answers for members who value clarity.": "Antwoorden voor leden die duidelijkheid waarderen.",
+    "Answers for members who value clarity.":
+      "Antwoorden voor leden die duidelijkheid waarderen.",
     "Request assistance.": "Hulp aanvragen.",
     "Support Center": "Supportcentrum",
     "Request Assistance": "Hulp aanvragen",
@@ -343,20 +354,22 @@ const translations = {
     "Sign me up": "立即注册",
     "Get started": "开始使用",
     "Our packages": "我们的套餐",
-    "What is MeridianVest?": "什么是 MeridianVest？",
+    "What is MeridianVests?": "什么是 MeridianVests？",
     "Secure, innovative, and user-friendly crypto management solutions.":
       "安全、创新且易于使用的加密货币管理方案。",
     "What we do": "我们的服务",
-    "Why MeridianVest": "为什么选择 MeridianVest",
+    "Why MeridianVests": "为什么选择 MeridianVests",
     "How to get started": "如何开始",
     "Create an account and start exploring.": "创建账户并开始探索。",
     Testimonial: "用户评价",
     "Our members' investment and profits experience.": "会员的投资与收益体验。",
     "Start investing now!!": "现在开始投资！！",
-    "About MeridianVest.": "关于 MeridianVest。",
+    "About MeridianVests.": "关于 MeridianVests。",
     "Our story": "我们的故事",
-    "Crypto management made clearer and more intentional.": "让加密货币管理更清晰、更有规划。",
-    "Choose the structure that fits your capital goals.": "选择适合您资金目标的方案。",
+    "Crypto management made clearer and more intentional.":
+      "让加密货币管理更清晰、更有规划。",
+    "Choose the structure that fits your capital goals.":
+      "选择适合您资金目标的方案。",
     "Answers for members who value clarity.": "为重视透明度的会员提供答案。",
     "Request assistance.": "请求帮助。",
     "Support Center": "支持中心",
@@ -386,8 +399,6 @@ const reverseTranslations = Object.fromEntries(
   ),
 );
 
-const LanguageContext = createContext(null);
-
 function translateText(text, language) {
   const value = text.trim();
   const source = reverseTranslations[value] || value;
@@ -400,62 +411,93 @@ function translateAttribute(value, language) {
   return translations[language]?.[source] || source;
 }
 
+function shouldTranslateTextNode(node) {
+  return (
+    node.parentElement &&
+    !["SCRIPT", "STYLE", "OPTION"].includes(node.parentElement.tagName)
+  );
+}
+
+function translateAttributes(element, language) {
+  ["placeholder", "title", "aria-label"].forEach((attribute) => {
+    const value = element.getAttribute(attribute);
+    if (!value) return;
+    const translated = translateAttribute(value, language);
+    if (translated !== value) element.setAttribute(attribute, translated);
+  });
+}
+
+function translateSubtree(root, language) {
+  if (root.nodeType === Node.TEXT_NODE) {
+    if (!shouldTranslateTextNode(root)) return;
+    const nextText = translateText(root.nodeValue, language);
+    if (nextText !== root.nodeValue) root.nodeValue = nextText;
+    return;
+  }
+
+  if (root.nodeType !== Node.ELEMENT_NODE) return;
+
+  translateAttributes(root, language);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if (shouldTranslateTextNode(node)) {
+      const nextText = translateText(node.nodeValue, language);
+      if (nextText !== node.nodeValue) node.nodeValue = nextText;
+    }
+    node = walker.nextNode();
+  }
+
+  root
+    .querySelectorAll("[placeholder], [title], [aria-label]")
+    .forEach((element) => translateAttributes(element, language));
+}
+
 export function LanguageProvider({ children }) {
-  const [language, setLanguage] = useState(() => localStorage.getItem("legacy-language") || "en");
+  const [language, setLanguage] = useState(
+    () => localStorage.getItem("legacy-language") || "en",
+  );
 
   useEffect(() => {
     localStorage.setItem("legacy-language", language);
     document.documentElement.lang = language;
 
-    const updateTextNodes = () => {
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-      const nodes = [];
-      let node = walker.nextNode();
-      while (node) {
-        if (
-          node.parentElement &&
-          !["SCRIPT", "STYLE", "OPTION"].includes(node.parentElement.tagName)
-        ) {
-          nodes.push(node);
-        }
-        node = walker.nextNode();
-      }
-      nodes.forEach((textNode) => {
-        const nextText = translateText(textNode.nodeValue, language);
-        if (nextText !== textNode.nodeValue) textNode.nodeValue = nextText;
-      });
+    const appRoot = document.getElementById("root");
+    if (!appRoot) return undefined;
 
-      document.querySelectorAll("[placeholder], [title], [aria-label]").forEach((element) => {
-        ["placeholder", "title", "aria-label"].forEach((attribute) => {
-          const value = element.getAttribute(attribute);
-          if (!value) return;
-          const translated = translateAttribute(value, language);
-          if (translated !== value) element.setAttribute(attribute, translated);
+    translateSubtree(appRoot, language);
+
+    let frameId = null;
+    const pendingRoots = new Set();
+    const flushPendingRoots = () => {
+      frameId = null;
+      pendingRoots.forEach((root) => translateSubtree(root, language));
+      pendingRoots.clear();
+    };
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach(({ addedNodes }) => {
+        addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) {
+            pendingRoots.add(node);
+          }
         });
       });
+      if (pendingRoots.size && frameId === null) {
+        frameId = window.requestAnimationFrame(flushPendingRoots);
+      }
+    });
+    observer.observe(appRoot, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      if (frameId !== null) window.cancelAnimationFrame(frameId);
+      pendingRoots.clear();
     };
-
-    updateTextNodes();
-    const observer = new MutationObserver(updateTextNodes);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
   }, [language]);
 
   const value = useMemo(() => ({ language, setLanguage }), [language]);
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+  return (
+    <LanguageContext.Provider value={value}>
+      {children}
+    </LanguageContext.Provider>
+  );
 }
-
-export function useLanguage() {
-  return useContext(LanguageContext);
-}
-
-export const languageOptions = [
-  ["en", "English", "🇬🇧"],
-  ["es", "Espanol", "🇪🇸"],
-  ["fr", "Francais", "🇫🇷"],
-  ["de", "Deutsch", "🇩🇪"],
-  ["pt", "Portugues", "🇵🇹"],
-  ["it", "Italiano", "🇮🇹"],
-  ["nl", "Nederlands", "🇳🇱"],
-  ["zh", "中文", "🇨🇳"],
-];

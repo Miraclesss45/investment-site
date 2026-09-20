@@ -1,0 +1,22 @@
+<svg width="768" height="768" viewBox="0 0 768 768" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="768" height="768" fill="#020A24"/>
+  <path d="M176 219L252 276V501L176 550V219Z" fill="#FAFAFA"/>
+  <path d="M252 276L441 429L381 492L252 374V276Z" fill="url(#blueA)"/>
+  <path d="M381 492L252 374L252 276L441 429L381 492Z" fill="url(#blueB)"/>
+  <path d="M592 201L501 244L381 376L441 429L592 269V201Z" fill="url(#blueC)"/>
+  <path d="M592 290L512 371V501L592 550V290Z" fill="#FAFAFA"/>
+  <defs>
+    <linearGradient id="blueA" x1="252" y1="276" x2="441" y2="492" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#20D7F0"/>
+      <stop offset="1" stop-color="#0879F3"/>
+    </linearGradient>
+    <linearGradient id="blueB" x1="252" y1="276" x2="441" y2="492" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0CC9F0"/>
+      <stop offset="1" stop-color="#0D5BEE"/>
+    </linearGradient>
+    <linearGradient id="blueC" x1="381" y1="429" x2="592" y2="201" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1054E9"/>
+      <stop offset="1" stop-color="#20D7F0"/>
+    </linearGradient>
+  </defs>
+</svg>
