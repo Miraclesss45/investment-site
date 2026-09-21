@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "./authContext";
 import {
   buildEmptyFinancialSummary,
@@ -52,9 +52,24 @@ export default function useAccountData() {
         setLoading(false);
       });
 
+    const refreshTimer = window.setInterval(() => {
+      loadAccountData(user.uid)
+        .then((nextAccount) => {
+          if (active) setAccount(nextAccount);
+        })
+        .catch(() => {});
+    }, 30000);
+
     return () => {
       active = false;
+      window.clearInterval(refreshTimer);
     };
+  }, [user]);
+
+  const refresh = useCallback(async () => {
+    if (!user) return;
+    const nextAccount = await loadAccountData(user.uid);
+    setAccount(nextAccount);
   }, [user]);
 
   return {
@@ -62,5 +77,6 @@ export default function useAccountData() {
     error,
     loading,
     user,
+    refresh,
   };
 }

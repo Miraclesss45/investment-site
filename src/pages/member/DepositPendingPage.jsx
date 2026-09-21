@@ -21,7 +21,7 @@ export default function DepositPendingPage() {
             <img
               className="h-10 w-10 rounded-lg object-cover"
               src="/meridianvest-logo.svg"
-              alt=""
+                          alt="MeridianVests logo"
               width="40"
               height="40"
             />
@@ -109,7 +109,7 @@ export default function DepositPendingPage() {
               <a
                 href={WHATSAPP_URL}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="inline-flex h-13 items-center justify-center gap-2 rounded-xl border border-green-400/30 bg-green-400/10 px-5 py-4 text-xs font-extrabold uppercase tracking-[0.1em] text-green-300 transition hover:border-green-300 hover:bg-green-400/20"
               >
                 <WhatsAppIcon size={16} /> WhatsApp support

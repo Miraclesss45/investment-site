@@ -16,10 +16,12 @@ import CountrySelect from "../../components/ui/CountrySelect";
 import {
   buildEmptyFinancialSummary,
   formatMoney,
+  formatTransactionType,
   loadAccountData,
   invalidateAccountData,
 } from "../../lib/financial";
 import WhatsAppIcon, { WHATSAPP_URL } from "../../components/ui/WhatsAppIcon";
+import FeedbackMessage from "../../components/ui/FeedbackMessage";
 
 const navigation = [
   ["Dashboard", "/dashboard"],
@@ -423,6 +425,7 @@ export default function MemberFeaturePage() {
       const request = await createMemberRequest(user.uid, "deposits", {
         plan: selectedPackage,
         amount,
+        currency: "USD",
         method: selectedAsset,
         fullName: depositorName,
         email: user.email || "",
@@ -543,7 +546,7 @@ export default function MemberFeaturePage() {
             <img
               className="h-9 w-9 rounded-lg object-cover"
               src="/meridianvest-logo.svg"
-              alt=""
+              alt="MeridianVests logo"
               width="36"
               height="36"
             />
@@ -585,7 +588,7 @@ export default function MemberFeaturePage() {
               type="button"
               aria-label="Sign out"
               onClick={signOut}
-              className="grid h-10 w-10 place-items-center rounded-full border border-white/15 text-slate-300 transition hover:border-sky-400 hover:text-sky-400"
+              className="grid h-10 w-10 place-items-center rounded-xl border border-white/15 bg-white/[0.03] text-slate-300 transition hover:border-rose-300/50 hover:bg-rose-400/10 hover:text-rose-200"
             >
               <LogOut size={17} aria-hidden="true" />
             </button>
@@ -618,9 +621,7 @@ export default function MemberFeaturePage() {
             {title}
           </h1>
           {message && !accountLoading && (
-            <p className="mt-4 text-sm text-yellow-300" role="alert" aria-live="polite">
-              {message}
-            </p>
+            <FeedbackMessage className="mt-4" type="warning">{message}</FeedbackMessage>
           )}
           {accountLoading ? (
             <AccountPageSkeleton />
@@ -961,7 +962,7 @@ export default function MemberFeaturePage() {
                   <Link to="/support" className="font-bold text-sky-300 hover:text-cyan-200">
                     Contact support →
                   </Link>
-                  <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-green-300 hover:text-green-200">
+                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-bold text-green-300 hover:text-green-200">
                     <WhatsAppIcon size={15} /> WhatsApp
                   </a>
                 </div>
@@ -1003,7 +1004,7 @@ export default function MemberFeaturePage() {
                         >
                           <div>
                             <p className="font-semibold text-white">
-                              {item.type || "Withdrawal"}
+                              {formatTransactionType(item.type, "Withdrawal")}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
                               {transactionDate(item)} · {transactionStatus(item)}
@@ -1156,7 +1157,7 @@ export default function MemberFeaturePage() {
                   >
                     Need help? Contact support
                   </Link>
-                  <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-green-300 hover:text-green-200">
+                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-green-300 hover:text-green-200">
                     <WhatsAppIcon size={14} /> WhatsApp
                   </a>
                 </div>
@@ -1235,7 +1236,7 @@ export default function MemberFeaturePage() {
                             >
                               <div>
                                 <p className="font-semibold text-white">
-                                  {item.type || "Account activity"}
+                                  {formatTransactionType(item.type, "Account activity")}
                                 </p>
                                 <p className="mt-1 text-xs capitalize text-slate-500">
                                   {category}

@@ -13,6 +13,13 @@ Copy `.env.example` to `.env` and fill in the Firebase web app values before tes
 
 The Firebase web configuration is safe to expose in a browser bundle. Keep server credentials, service account JSON files, and private API keys out of this repository.
 
+To run the protected admin API locally with real Firebase users, also set
+`FIREBASE_SERVICE_ACCOUNT_FILE` in `.env.local` to the absolute path of a
+Firebase Admin service-account JSON file stored outside this repository. This
+variable is server-only and is used by `npm run dev:vercel`; it is never sent
+to the browser. Plain `npm run dev` serves only the frontend and cannot execute
+admin mutations.
+
 ## Deploy to Vercel
 
 This project runs on Vercel without requiring Firebase Cloud Functions. The React app is built to `dist`, and the server endpoints in `api/` are Vercel Functions that use the Firebase Admin SDK.
@@ -30,6 +37,7 @@ This project runs on Vercel without requiring Firebase Cloud Functions. The Reac
    VITE_FIREBASE_MESSAGING_SENDER_ID
    VITE_FIREBASE_APP_ID
    FIREBASE_SERVICE_ACCOUNT
+   FIREBASE_SERVICE_ACCOUNT_FILE
    TELEGRAM_BOT_TOKEN
    TELEGRAM_CHAT_ID
    ```
@@ -37,6 +45,10 @@ This project runs on Vercel without requiring Firebase Cloud Functions. The Reac
    Use values from **Firebase Console -> Project settings -> Your apps -> Web app** for the `VITE_*` variables.
 
    `FIREBASE_SERVICE_ACCOUNT` must contain the complete Firebase Admin service account JSON (download from **Project settings -> Service accounts -> Generate new private key**). Never commit this file; use Vercel's encrypted environment settings only.
+
+   For local development, use `FIREBASE_SERVICE_ACCOUNT_FILE` instead and
+   point it to the downloaded JSON file outside the repository. Do not add the
+   file to Git or use a `VITE_` prefix.
 
    Add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` if deposit notifications are enabled.
 
@@ -80,7 +92,9 @@ bot token in frontend code.
 
 The app uses the standard Firebase sign-in flow for both members and administrators.
 After authentication, the app checks the signed-in user's trusted Firebase role
-information and redirects admins to `/admin` while members go to `/dashboard`.
+information and redirects admins to the private `/control-room` console while
+members go to `/dashboard`. Public `/admin/*` paths intentionally render the
+normal not-found page.
 Set admin authorization in Firebase Auth custom claims or by a trusted backend
 process; never store admin credentials in frontend code or browser environment
 variables.
@@ -103,11 +117,34 @@ from a file on your computer and does not expose that file to the browser.
    of the Firebase Authentication user.
 
 5. Open `/login`, sign in with that Firebase account, and the app will redirect you
-   to `/admin`. Sign out and sign in again if the account was already logged in.
+   to `/control-room`. Sign out and sign in again if the account was already logged in.
 
 Never commit the service-account JSON, paste it into `.env`, or use a `VITE_`
 prefix for it. The `firebase-admin` package is only used by this local command;
 it must not be imported by browser code.
+
+### Offline deposit settlement
+
+Deposit settlement is an administrator-controlled offline workflow. The member
+submits a request, the administrator independently confirms that payment was
+received outside the website, and then uses **Credit offline payment** in the
+admin Deposits page to enter the amount received in USD. This action does not
+process a payment, contact a payment provider, or verify a blockchain
+transaction.
+
+The protected admin API validates recent authentication, requires a reason and
+a positive amount, and uses a Firestore transaction to credit the member's
+available balance, create a completed ledger entry, mark the request settled,
+and write an audit record. A deterministic settlement record prevents the same
+deposit request from being credited twice.
+
+Administrators may delete only pending, rejected, or cancelled request
+documents. Deletion requires recent authentication, a password, a reason, and
+the exact `DELETE DEPOSIT` confirmation. Approved, completed, settled, or
+credited requests are locked and cannot be deleted. Deletion does not change
+the member profile, balance, or transaction history and is recorded in the
+audit history. Deposit rows show the requesting member's stored username and
+email for identification.
 
 ## Referral rewards
 

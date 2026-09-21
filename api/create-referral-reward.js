@@ -43,6 +43,9 @@ export default async function handler(req, res) {
   try {
     const app = getFirebaseAdmin();
     const decodedToken = await app.auth().verifyIdToken(authorization.slice(7));
+    if (decodedToken.email_verified !== true) {
+      return sendJson(res, 403, { error: "Verify your email before claiming referral rewards." });
+    }
     const db = app.firestore();
     const usernameSnapshot = await db.collection("usernames").doc(referralUsername).get();
     if (!usernameSnapshot.exists) return sendJson(res, 404, { error: "Referral username not found." });
@@ -52,24 +55,48 @@ export default async function handler(req, res) {
       return sendJson(res, 400, { error: "Self-referrals are not allowed." });
     }
 
+    const referredUserRef = db.doc(`users/${decodedToken.uid}`);
+    const referredUserSnapshot = await referredUserRef.get();
+    if (!referredUserSnapshot.exists) {
+      return sendJson(res, 409, { error: "Your member profile is not ready for referral attribution." });
+    }
+    const referredBy = String(referredUserSnapshot.data().referredBy || "").trim().toLowerCase();
+    if (referredBy !== referralUsername) {
+      return sendJson(res, 403, { error: "Referral attribution does not match your signup record." });
+    }
+
     const rewardRef = db.doc(`users/${referrerId}/referralRewards/${decodedToken.uid}`);
+    const refereeRewardRef = db.doc(`users/${decodedToken.uid}/referralRewards/${referrerId}`);
     const referrerRef = db.doc(`users/${referrerId}`);
     await db.runTransaction(async (transaction) => {
       const rewardSnapshot = await transaction.get(rewardRef);
-      if (rewardSnapshot.exists) return;
-      transaction.set(rewardRef, {
-        referrerId,
-        referredUserId: decodedToken.uid,
-        amount: 5,
-        status: "promotional",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      transaction.set(referrerRef, {
-        referralCount: admin.firestore.FieldValue.increment(1),
-      }, { merge: true });
+      const refereeRewardSnapshot = await transaction.get(refereeRewardRef);
+      if (!rewardSnapshot.exists) {
+        transaction.set(rewardRef, {
+          referrerId,
+          referredUserId: decodedToken.uid,
+          amount: 5,
+          recipientRole: "referrer",
+          status: "promotional",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        transaction.set(referrerRef, {
+          referralCount: admin.firestore.FieldValue.increment(1),
+        }, { merge: true });
+      }
+      if (!refereeRewardSnapshot.exists) {
+        transaction.set(refereeRewardRef, {
+          referrerId,
+          referredUserId: decodedToken.uid,
+          amount: 5,
+          recipientRole: "referee",
+          status: "promotional",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
     });
 
-    return sendJson(res, 200, { recorded: true });
+    return sendJson(res, 200, { recorded: true, amount: 5, status: "promotional" });
   } catch (error) {
     if (error?.code === "auth/id-token-expired" || error?.code === "auth/argument-error") {
       return sendJson(res, 401, { error: "Authentication token is invalid or expired." });

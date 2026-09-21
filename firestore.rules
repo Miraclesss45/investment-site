@@ -108,5 +108,17 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.token.admin == true;
       allow write: if false;
     }
+
+    // Provisioning journal logs every stage of account creation for recovery.
+    // Server-side only; clients have no access. Logged on every stage:
+    // - "start": signup began
+    // - "auth-created": Firebase Auth user created
+    // - "profile-created": Firestore profile and username reserved
+    // - "cleanup-failed": Auth account was meant to be deleted but deletion failed
+    // - "auth-deleted": Orphaned Auth account successfully cleaned up
+    match /accountProvisioning/{entryId} {
+      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow write: if false;
+    }
   }
 }

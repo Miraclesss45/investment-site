@@ -3,10 +3,19 @@ import { firestoreDb } from "./firebase";
 
 const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const formatMoney = (value = 0) => moneyFormatter.format(Number(value) || 0);
+export function formatTransactionType(type, fallback = "Transaction") {
+  if (String(type || "").toLowerCase() === "paper-trading-valuation") {
+    return "Trading Valuation";
+  }
+  return type || fallback;
+}
 export function buildEmptyFinancialSummary() {
   return { availableBalance: 0, withdrawableBalance: 0, promotionalCredit: 0, lockedBonus: 0, activeDeposit: 0, totalDeposit: 0, totalWithdrawal: 0, totalEarnings: 0, lastDeposit: 0, lastWithdrawal: 0, referralCount: 0, commission: 0, transactions: [], referralRewards: 0 };
 }
 function completed(item) { return ["completed", "complete", "approved", "settled", "success"].includes(String(item.status || "completed").toLowerCase()); }
+function isTradingValuation(item) {
+  return String(item?.type || "").toLowerCase() === "paper-trading-valuation";
+}
 export async function loadAccountData(userId) {
   if (!firestoreDb || !userId) return { profile: {}, summary: buildEmptyFinancialSummary() };
   let profileSnap;
@@ -24,7 +33,9 @@ export async function loadAccountData(userId) {
     error.accountDataStage = "transactions";
     throw error;
   }
-  const transactions = txSnap.docs.map((item) => ({ id: item.id, ...item.data() }));
+  const transactions = txSnap.docs
+    .map((item) => ({ id: item.id, ...item.data() }))
+    .filter((item) => !isTradingValuation(item));
   let rewardsSnap;
   try {
     rewardsSnap = await getDocs(query(collection(firestoreDb, "users", userId, "referralRewards"), limit(100)));
@@ -49,8 +60,10 @@ export async function loadAccountData(userId) {
   }
   summary.totalDeposit ||= Number(profile.totalDeposit) || 0;
   summary.totalWithdrawal ||= Number(profile.totalWithdrawal) || 0;
-  summary.totalEarnings ||= Number(profile.totalEarnings) || 0;
-  summary.activeDeposit = Math.max(summary.totalDeposit - summary.totalWithdrawal, 0);
+  const ledgerEarnings = summary.totalEarnings || Number(profile.totalEarnings) || 0;
+  const paperTradingProfit = Number(profile.paperTradingProfit) || 0;
+  summary.totalEarnings = ledgerEarnings + paperTradingProfit;
+  summary.activeDeposit = Math.max(summary.totalDeposit - summary.totalWithdrawal + paperTradingProfit, 0);
   summary.withdrawableBalance = Math.max(summary.totalDeposit + summary.totalEarnings - summary.totalWithdrawal - summary.commission, 0);
   summary.availableBalance = summary.withdrawableBalance + summary.promotionalCredit;
   return { profile, summary };

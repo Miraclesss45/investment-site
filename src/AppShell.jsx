@@ -84,9 +84,10 @@ export default function AppShell() {
                 }
               />
             ))}
-            <Route path="/admin/login" element={<LoginPage />} />
+            <Route path="/admin/*" element={<NotFoundPage />} />
+            <Route path="/control-room/login" element={<LoginPage />} />
             <Route
-              path="/admin/*"
+              path="/control-room/*"
               element={
                 <AdminRoute>
                   <AdminPage />

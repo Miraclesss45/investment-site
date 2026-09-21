@@ -61,7 +61,8 @@ vercel --prod
 ### 4. Verify Deployment
 
 - Visit your Vercel URL
-- Test `/admin/login` route
+- Test `/control-room/login` for administrator sign-in
+- Confirm `/admin`, `/admin/login`, and other `/admin/*` paths render Not Found
 - Test API routes: `/api/admin-data` (should return 401 if not authenticated)
 
 ### 5. Attach Custom Domain

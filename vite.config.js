@@ -7,6 +7,25 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5173,
+    proxy: {
+      "/api/market-prices": {
+        target: "https://api.coingecko.com",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/market-prices/, "/api/v3/simple/price"),
+      },
+      "/api/admin-data": {
+        target: "http://localhost:5174",
+        changeOrigin: true,
+      },
+      "/api/paper-trading-sync": {
+        target: "http://localhost:5174",
+        changeOrigin: true,
+      },
+      "/api/create-account": {
+        target: "http://localhost:5174",
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     host: "0.0.0.0",

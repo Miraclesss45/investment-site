@@ -15,14 +15,23 @@ import {
   signOut,
 } from "firebase/auth";
 import { getAuthErrorMessage, resolveLoginEmail } from "../../lib/authHelpers";
+import { createReferralReward } from "../../lib/firebaseData";
+import FeedbackMessage from "../../components/ui/FeedbackMessage";
 
 function getSafeReturnPath(location) {
   const from = location.state?.from;
   return typeof from === "string" && from.startsWith("/")
     ? from
-    : location.pathname.startsWith("/admin")
-      ? "/admin"
+    : location.pathname.startsWith("/control-room")
+      ? "/control-room"
       : "/dashboard";
+}
+
+function getDestination(location, role) {
+  const requestedPath = getSafeReturnPath(location);
+  const isAdminPath = requestedPath.startsWith("/control-room");
+  if (role === "admin") return isAdminPath ? requestedPath : "/control-room";
+  return isAdminPath ? "/dashboard" : requestedPath;
 }
 
 async function resolveUserRole(user) {
@@ -56,7 +65,7 @@ async function resolveUserRole(user) {
 export default function LoginPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const adminLogin = location.pathname.startsWith("/admin");
+  const adminLogin = location.pathname.startsWith("/control-room");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("status");
   const [loading, setLoading] = useState(false);
@@ -92,8 +101,20 @@ export default function LoginPage() {
         return;
       }
 
+      try {
+        const profileSnapshot = firestoreDb
+          ? await getDoc(doc(firestoreDb, "users", credential.user.uid))
+          : null;
+        const referralUsername = profileSnapshot?.data()?.referredBy;
+        if (referralUsername) {
+          await createReferralReward(referralUsername, credential.user);
+        }
+      } catch (error) {
+        console.error("Referral reward retry failed", error);
+      }
+
       const userRole = await resolveUserRole(credential.user);
-      const nextPath = userRole === "admin" ? "/admin" : getSafeReturnPath(location);
+      const nextPath = getDestination(location, userRole);
       navigate(nextPath, { replace: true });
     } catch (error) {
       setFeedback(
@@ -174,21 +195,22 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050b14] text-white">
-      <div className="pointer-events-none absolute -left-32 top-[-12rem] h-[32rem] w-[32rem] rounded-full bg-sky-500/15 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-15rem] right-[-8rem] h-[34rem] w-[34rem] rounded-full bg-cyan-400/10 blur-3xl" />
+    <div className="relative min-h-screen overflow-hidden bg-[#050b14] font-['DM_Sans'] text-white">
+      <div className="pointer-events-none absolute left-[-14rem] top-[-14rem] h-[38rem] w-[38rem] rounded-full bg-sky-500/15 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-[-16rem] right-[-10rem] h-[38rem] w-[38rem] rounded-full bg-cyan-400/10 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(56,189,248,0.08),transparent_38%)]" />
 
-      <div className="relative flex h-[76px] items-center justify-between border-b border-white/10 px-5 sm:px-10">
+      <div className="relative flex h-[76px] items-center justify-between border-b border-white/[0.08] bg-[#07111d]/50 px-5 sm:px-10">
         <Link
           to="/"
           aria-label="Back to home"
-          className="flex items-center gap-2 text-sm font-bold text-slate-300 transition hover:text-white"
+          className="flex items-center gap-2 text-sm font-semibold text-slate-400 transition hover:text-white"
         >
           <span className="text-lg">←</span> Back to home
         </Link>
         <Link
           to="/signup"
-          className="text-sm font-bold text-sky-300 transition hover:text-cyan-200"
+          className="rounded-full border border-sky-300/20 bg-sky-300/10 px-4 py-2 text-sm font-semibold text-sky-200 transition hover:border-sky-200/40 hover:bg-sky-300/15"
         >
           Create account <span className="ml-1">→</span>
         </Link>
@@ -196,10 +218,10 @@ export default function LoginPage() {
 
       <div className="relative mx-auto grid w-[min(1120px,calc(100%-2rem))] items-center gap-10 py-12 sm:w-[min(1120px,calc(100%-4rem))] lg:grid-cols-[0.9fr_1.1fr] lg:gap-20 lg:py-20">
         <div className="hidden motion-safe:transition motion-safe:duration-700 lg:block">
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.2em] text-sky-300">
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-sky-300">
             <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" /> Private member access
           </div>
-          <h1 className="max-w-xl text-5xl font-semibold leading-[1.08] tracking-[-0.06em] text-white xl:text-6xl">
+          <h1 className="max-w-xl text-5xl font-semibold leading-[1.02] tracking-[-0.07em] text-white xl:text-7xl">
             Your next move starts with clarity.
           </h1>
           <p className="mt-6 max-w-md text-base leading-8 text-slate-400">
@@ -208,7 +230,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="motion-safe:transition motion-safe:duration-700 rounded-2xl border border-white/10 bg-white/[0.045] p-6 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-10">
+        <div className="motion-safe:transition motion-safe:duration-700 rounded-[2rem] border border-white/[0.12] bg-[#0b1626]/80 p-6 shadow-[0_30px_90px_rgba(2,8,23,0.45)] backdrop-blur-2xl sm:p-10">
           <div className="mb-8 flex items-center gap-3">
             <img
               className="h-12 w-12 rounded-xl object-cover ring-1 ring-white/20"
@@ -277,20 +299,13 @@ export default function LoginPage() {
               </div>
             </label>
 
-            {message && (
-              <p
-                role={messageType === "error" ? "alert" : "status"}
-                className={messageType === "error" ? "rounded-lg border border-rose-500/25 bg-rose-500/10 p-3 text-sm text-rose-200" : "rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-200"}
-              >
-                {message}
-              </p>
-            )}
+            {message && <FeedbackMessage type={messageType}>{message}</FeedbackMessage>}
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex h-[52px] items-center justify-center rounded-xl bg-gradient-to-r from-sky-400 to-cyan-400 px-5 text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#081321] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-[54px] items-center justify-center rounded-xl bg-gradient-to-r from-sky-300 via-cyan-300 to-sky-400 px-6 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#081321] shadow-[0_14px_30px_rgba(34,211,238,0.16)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? (
                   <>

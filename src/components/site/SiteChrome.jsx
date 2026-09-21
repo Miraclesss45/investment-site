@@ -133,7 +133,7 @@ export function SiteHeader() {
             <a
               href={WHATSAPP_URL}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 hover:text-green-400"
             >
               <WhatsAppIcon size={14} /> WhatsApp
@@ -154,7 +154,7 @@ export function SiteHeader() {
             <img
               className="h-9 w-9 rounded-lg object-cover sm:h-10 sm:w-10"
               src="/meridianvest-logo.svg"
-              alt=""
+              alt="MeridianVests logo"
               width="44"
               height="44"
             />
@@ -203,7 +203,6 @@ export function SiteHeader() {
           {menuOpen && (
             <button
               type="button"
-              ref={menuButtonRef}
               aria-label="Close navigation overlay"
               className="fixed inset-0 top-[68px] -z-10 bg-slate-950/60 backdrop-blur-[2px] lg:hidden sm:top-[78px]"
               onClick={() => setMenuOpen(false)}
@@ -225,6 +224,7 @@ export function SiteHeader() {
           </div>
           <button
             type="button"
+            ref={menuButtonRef}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white lg:hidden"
             aria-label={menuOpen ? "Close navigation" : "Open navigation"}
             aria-expanded={menuOpen}
@@ -259,7 +259,7 @@ export function SiteFooter() {
                 <img
                   className="h-10 w-10 rounded-xl object-cover shadow-lg shadow-sky-950/20"
                   src="/meridianvest-logo.svg"
-                  alt=""
+                  alt="MeridianVests logo"
                   width="40"
                   height="40"
                 />
@@ -283,7 +283,7 @@ export function SiteFooter() {
               <a
                 href={WHATSAPP_URL}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="group flex items-center gap-3 transition hover:text-green-400"
               >
                 <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/5 text-green-400 transition group-hover:bg-green-400/15">

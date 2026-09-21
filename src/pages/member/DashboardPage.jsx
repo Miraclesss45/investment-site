@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Check, Copy, LogOut, Menu, X } from "lucide-react";
+import { Check, Copy, LogOut, Menu, TrendingDown, TrendingUp, X } from "lucide-react";
 import { useAuth } from "../../lib/authContext";
 import useAccountData from "../../lib/useAccountData";
-import { formatMoney } from "../../lib/financial";
+import { buildEmptyFinancialSummary, formatMoney, formatTransactionType } from "../../lib/financial";
+import { CRYPTO_ASSETS, useCryptoMarketData } from "../../lib/cryptoMarket";
+import { syncPaperTradingMarket } from "../../lib/firebaseData";
+import FeedbackMessage from "../../components/ui/FeedbackMessage";
 
 const navigation = [
   ["Dashboard", "/dashboard"],
@@ -18,14 +21,128 @@ const navigation = [
 export default function DashboardPage() {
   const { user, signOutUser } = useAuth();
   const account = useAccountData();
+  const refreshAccount = account.refresh;
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState("BTC");
   const mobileMenuRef = useRef(null);
   const mobileMenuButtonRef = useRef(null);
   const firstMobileLinkRef = useRef(null);
+  const lastPaperTradingSyncRef = useRef(0);
+  const marketData = useCryptoMarketData();
+
+  const loading = account.loading;
+  const accountError = account.error;
+  const profile =
+    Object.keys(account.profile).length > 0
+      ? account.profile
+      : user
+        ? { fullName: user.displayName || "", username: user.displayName || "" }
+        : null;
+  const summary = account?.summary || buildEmptyFinancialSummary();
+  const paperTrading = profile?.paperTrading;
+  const persistedPaperTradingProfit = Number(profile?.paperTradingProfit) || 0;
+  const livePaperTradingProfit = useMemo(() => {
+    if (!paperTrading?.enabled) return persistedPaperTradingProfit;
+
+    let capital = 0;
+    let currentValue = 0;
+    for (const asset of CRYPTO_ASSETS) {
+      const allocation = Math.max(Number(paperTrading.allocations?.[asset.symbol]) || 0, 0);
+      if (!allocation) continue;
+      const livePrice = Number(marketData[asset.symbol]?.price);
+      const entryPrice = Number(
+        paperTrading.marketEntryPrices?.[asset.symbol] ||
+          marketData[asset.symbol]?.entryPrice,
+      );
+      if (!Number.isFinite(livePrice) || livePrice <= 0 || !Number.isFinite(entryPrice) || entryPrice <= 0) {
+        return persistedPaperTradingProfit;
+      }
+      capital += allocation;
+      currentValue += (allocation / entryPrice) * livePrice;
+    }
+    return capital > 0 ? currentValue - capital : persistedPaperTradingProfit;
+  }, [marketData, paperTrading, persistedPaperTradingProfit]);
+  const liveSummary = useMemo(() => {
+    const profitDelta = livePaperTradingProfit - persistedPaperTradingProfit;
+    return {
+      ...summary,
+      totalEarnings: summary.totalEarnings + profitDelta,
+      activeDeposit: Math.max(summary.activeDeposit + profitDelta, 0),
+      availableBalance: Math.max(summary.availableBalance + profitDelta, 0),
+    };
+  }, [livePaperTradingProfit, persistedPaperTradingProfit, summary]);
+  const assignedAssets = useMemo(
+    () =>
+      paperTrading?.enabled
+        ? CRYPTO_ASSETS.filter(
+            (asset) => Number(paperTrading.allocations?.[asset.symbol]) > 0,
+          )
+        : [],
+    [paperTrading],
+  );
+  const selectedAssetData = marketData[selectedAsset] || null;
+
+  const simCapital = Math.max(Number(paperTrading?.allocations?.[selectedAsset]) || 0, 0);
+  const selectedAssetMeta = CRYPTO_ASSETS.find((asset) => asset.symbol === selectedAsset) || CRYPTO_ASSETS[0];
+
+  const positionMetrics = useMemo(() => {
+    const livePrice = Number(selectedAssetData?.price || 0);
+    const entryPrice = Number(selectedAssetData?.entryPrice || selectedAssetData?.price || 0);
+    const capital = simCapital;
+
+    if (!Number.isFinite(livePrice) || livePrice <= 0 || !Number.isFinite(entryPrice) || entryPrice <= 0) {
+      return {
+        quantity: 0,
+        currentValue: 0,
+        pnl: 0,
+        percentChange: 0,
+        priceChange: 0,
+      };
+    }
+
+    const quantity = capital / entryPrice;
+    const currentValue = quantity * livePrice;
+    const pnl = currentValue - capital;
+    const priceChange = (livePrice - entryPrice) / entryPrice;
+
+    return {
+      quantity,
+      currentValue,
+      pnl,
+      percentChange: priceChange * 100,
+      priceChange,
+    };
+  }, [selectedAssetData, simCapital]);
+
+  const chartPoints = selectedAssetData?.history || [];
+  const priceTrend = chartPoints.length >= 2 ? chartPoints[chartPoints.length - 1].price - chartPoints[0].price : 0;
+  const priceTrendPercent = chartPoints.length >= 2 && chartPoints[0].price > 0 ? (priceTrend / chartPoints[0].price) * 100 : 0;
+
+  useEffect(() => {
+    if (!paperTrading?.enabled) return undefined;
+    const now = Date.now();
+    if (now - lastPaperTradingSyncRef.current < 30000) return undefined;
+    const prices = Object.fromEntries(
+      CRYPTO_ASSETS
+        .map((asset) => [asset.symbol, Number(marketData[asset.symbol]?.price)])
+        .filter(([, price]) => Number.isFinite(price) && price > 0),
+    );
+    if (!Object.keys(prices).length) return undefined;
+    lastPaperTradingSyncRef.current = now;
+    let active = true;
+    syncPaperTradingMarket(prices)
+      .then(() => {
+      if (active) refreshAccount().catch(() => {});
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [paperTrading?.enabled, marketData, refreshAccount]);
 
   useEffect(() => {
     if (!mobileMenuOpen) return undefined;
@@ -58,15 +175,13 @@ export default function DashboardPage() {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
-  const loading = account.loading;
-  const accountError = account.error;
-  const profile =
-    Object.keys(account.profile).length > 0
-      ? account.profile
-      : user
-        ? { fullName: user.displayName || "", username: user.displayName || "" }
-        : null;
-  const summary = account.summary;
+  useEffect(() => {
+    if (assignedAssets.length && !assignedAssets.some((asset) => asset.symbol === selectedAsset)) {
+      setSelectedAsset(assignedAssets[0].symbol);
+    }
+  }, [assignedAssets, selectedAsset]);
+
+  const isMarketLoading = Object.values(marketData).some((asset) => asset?.loading);
 
   const displayName =
     profile?.fullName ||
@@ -103,7 +218,7 @@ export default function DashboardPage() {
             <img
               className="h-9 w-9 rounded-lg object-cover"
               src="/meridianvest-logo.svg"
-              alt=""
+                          alt="MeridianVests logo"
               width="36"
               height="36"
             />
@@ -145,7 +260,7 @@ export default function DashboardPage() {
               type="button"
               aria-label="Sign out"
               onClick={handleSignOut}
-              className="grid h-10 w-10 place-items-center rounded-full border border-white/15 text-slate-300 transition hover:border-sky-400 hover:text-sky-400"
+              className="grid h-10 w-10 place-items-center rounded-xl border border-white/15 bg-white/[0.03] text-slate-300 transition hover:border-rose-300/50 hover:bg-rose-400/10 hover:text-rose-200"
             >
               <LogOut size={17} aria-hidden="true" />
             </button>
@@ -190,15 +305,11 @@ export default function DashboardPage() {
               Invest now
             </Link>
           </div>
-          {message && (
-            <p className="mt-6 text-sm text-yellow-300" role="alert">
-              {message}
-            </p>
-          )}
+          {message && <FeedbackMessage className="mt-6" type="warning">{message}</FeedbackMessage>}
           {accountError && (
-            <div className="mt-6 rounded-lg border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100" role="alert">
+            <FeedbackMessage className="mt-6" type="error">
               {accountError}
-            </div>
+            </FeedbackMessage>
           )}
           {loading ? (
             <section
@@ -279,12 +390,12 @@ export default function DashboardPage() {
             {[
               [
                 "Available balance",
-                summary.availableBalance,
+                liveSummary.availableBalance,
                 "Includes promotional credit",
               ],
               [
                 "Active deposit",
-                summary.activeDeposit,
+                liveSummary.activeDeposit,
                 "Deposits less withdrawals",
               ],
               [
@@ -313,13 +424,13 @@ export default function DashboardPage() {
               </article>
             ))}
           </section>
-          {summary.promotionalCredit > 0 && (
+          {liveSummary.promotionalCredit > 0 && (
             <section className="mt-5 rounded-lg border border-cyan-300/20 bg-cyan-300/10 p-6">
               <h2 className="text-lg font-semibold text-cyan-100">
                 Referral promotion
               </h2>
               <p className="mt-2 text-sm leading-7 text-cyan-50/80">
-                You have {formatMoney(summary.promotionalCredit)} in
+                You have {formatMoney(liveSummary.promotionalCredit)} in
                 promotional credit. This credit cannot be withdrawn. Purchase
                 and complete a qualifying plan to become eligible to withdraw.
               </p>
@@ -340,7 +451,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-slate-400">Total earnings</p>
                   <p className="mt-2 font-['IBM_Plex_Mono'] text-xl font-semibold">
-                    {formatMoney(summary.totalEarnings)}
+                    {formatMoney(liveSummary.totalEarnings)}
                   </p>
                 </div>
                 <div>
@@ -394,6 +505,147 @@ export default function DashboardPage() {
             </article>
           </section>
           <section className="mt-5 rounded-lg border border-white/10 bg-[#0d1728] p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-sky-400">
+                  Crypto Position
+                </p>
+                <h2 className="mt-2 text-xl font-semibold">Crypto position</h2>
+              </div>
+              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-[#101d30] p-1">
+                {assignedAssets.map((asset) => (
+                  <button
+                    key={asset.symbol}
+                    type="button"
+                    onClick={() => setSelectedAsset(asset.symbol)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      selectedAsset === asset.symbol
+                        ? "bg-sky-400 text-slate-950"
+                        : "text-slate-300 hover:bg-white/10"
+                    }`}
+                  >
+                    {asset.symbol}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {assignedAssets.length === 0 ? (
+              <div className="mt-6 rounded-2xl border border-dashed border-white/15 bg-[#091321] p-8 text-sm text-slate-400">
+                Paper trading has not been assigned to this account by an administrator.
+              </div>
+            ) : (
+            <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[#091321] p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm text-slate-400">{selectedAssetMeta.name}</p>
+                  <div className="mt-3 flex items-center gap-3">
+                    <h3 className="text-3xl font-bold tracking-[-0.04em]">
+                      {selectedAssetData?.price != null ? formatMoney(selectedAssetData.price) : "—"}
+                    </h3>
+                    {selectedAssetData?.price != null && (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${
+                          positionMetrics.percentChange >= 0
+                            ? "bg-emerald-500/10 text-emerald-300"
+                            : "bg-rose-500/10 text-rose-300"
+                        }`}
+                      >
+                        {positionMetrics.percentChange >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                        {Math.abs(positionMetrics.percentChange).toFixed(2)}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Simulated value</p>
+                  <p className="mt-2 font-['IBM_Plex_Mono'] text-2xl font-semibold tracking-[-0.04em]">
+                    {formatMoney(positionMetrics.currentValue)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-xl border border-white/10 bg-[#0d1728] p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">P/L</p>
+                  <p className={`mt-3 font-['IBM_Plex_Mono'] text-xl font-semibold ${positionMetrics.pnl >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                    {positionMetrics.pnl >= 0 ? "+" : "-"}
+                    {formatMoney(Math.abs(positionMetrics.pnl))}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#0d1728] p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Capital</p>
+                  <p className="mt-3 font-['IBM_Plex_Mono'] text-xl font-semibold">{formatMoney(simCapital)}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#0d1728] p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Position</p>
+                  <p className="mt-3 font-['IBM_Plex_Mono'] text-xl font-semibold">
+                    {positionMetrics.quantity ? `${positionMetrics.quantity.toFixed(6)} ${selectedAsset}` : "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-xl border border-white/10 bg-[#0d1728] p-4">
+                <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.18em] text-slate-400">
+                  <span>{selectedAsset} live chart</span>
+                  <span>{selectedAssetData?.timestamp ? new Date(selectedAssetData.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "Waiting..."}</span>
+                </div>
+
+                {selectedAssetData?.error && (
+                  <p className="mb-3 text-sm text-amber-300">{selectedAssetData.error}</p>
+                )}
+                {selectedAssetData?.loading && chartPoints.length === 0 ? (
+                  <div className="flex h-36 items-center justify-center text-sm text-slate-400">
+                    Loading live crypto price…
+                  </div>
+                ) : chartPoints.length > 0 ? (
+                  <div className="relative h-44 w-full overflow-hidden rounded-lg bg-[#091321]">
+                    <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="h-full w-full">
+                      <defs>
+                        <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                          <stop offset="0%" stopColor="rgba(56,189,248,0.45)" />
+                          <stop offset="100%" stopColor="rgba(56,189,248,0.02)" />
+                        </linearGradient>
+                      </defs>
+                      {(() => {
+                        const width = 100;
+                        const height = 40;
+                        const rawMin = Math.min(...chartPoints.map((point) => point.price));
+                        const rawMax = Math.max(...chartPoints.map((point) => point.price));
+                        const padding = rawMax === rawMin
+                          ? Math.max(rawMin * 0.005, 1)
+                          : (rawMax - rawMin) * 0.1;
+                        const min = rawMin - padding;
+                        const max = rawMax + padding;
+                        const range = max - min;
+                        const linePoints = chartPoints
+                          .map((point, index) => {
+                            const x = (index / Math.max(chartPoints.length - 1, 1)) * width;
+                            const y = height - ((point.price - min) / range) * (height - 4) - 2;
+                            return `${x},${y}`;
+                          })
+                          .join(" ");
+                        const areaPoints = `${linePoints} ${width},${height} 0,${height}`;
+
+                        return (
+                          <>
+                            <polygon points={areaPoints} fill="url(#chartGradient)" />
+                            <polyline points={linePoints} fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </>
+                        );
+                      })()}
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="flex h-36 items-center justify-center text-sm text-slate-400">
+                    No CoinGecko market data available yet.
+                  </div>
+                )}
+              </div>
+            </div>
+            )}
+          </section>
+          <section className="mt-5 rounded-lg border border-white/10 bg-[#0d1728] p-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Recent transactions</h2>
               <span className="text-xs text-slate-400">
@@ -408,7 +660,7 @@ export default function DashboardPage() {
                     className="grid gap-1 border-b border-white/5 py-3 text-sm text-slate-300 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-4"
                   >
                     <span className="font-semibold text-white">
-                      {transaction.type || "Transaction"}
+                      {formatTransactionType(transaction.type)}
                     </span>
                     <span className="text-slate-300">
                       {formatMoney(transaction.amount)}{" "}

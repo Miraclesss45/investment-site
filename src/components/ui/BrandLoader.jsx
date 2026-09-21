@@ -9,7 +9,7 @@ export default function BrandLoader({ label = "Loading your MeridianVests experi
         <div className="motion-safe:animate-pulse">
           <img
             src="/meridianvest-logo.svg"
-            alt=""
+                      alt="MeridianVests logo"
             className="h-14 w-14 rounded-2xl object-cover"
             width="56"
             height="56"

@@ -4,6 +4,13 @@ export default function NotFoundPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-[#050b14] px-6 text-white">
       <div className="max-w-xl text-center">
+        <img
+          src="/meridianvest-logo.svg"
+          alt="MeridianVests logo"
+          className="mx-auto mb-8 h-14 w-14 rounded-2xl"
+          width="56"
+          height="56"
+        />
         <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-sky-400">
           404
         </p>

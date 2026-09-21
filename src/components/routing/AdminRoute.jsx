@@ -13,7 +13,7 @@ export default function AdminRoute({ children }) {
   if (!user || !user.emailVerified) {
     return (
       <Navigate
-        to="/admin/login"
+        to="/control-room/login"
         replace
         state={{ from: `${location.pathname}${location.search}` }}
       />

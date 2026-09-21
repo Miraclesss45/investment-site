@@ -242,7 +242,7 @@ export default function HomePage() {
                       <img
                         className="h-[128px] w-[128px] rounded-full object-cover transition duration-300 group-hover:scale-105"
                         src={image}
-                        alt=""
+                                              alt={title}
                         width="128"
                         height="128"
                         loading="lazy"
@@ -293,7 +293,7 @@ export default function HomePage() {
                   <img
                     className="mb-7 h-[58px] w-[58px] object-contain"
                     src={image}
-                    alt=""
+                                      alt={label}
                     width="58"
                     height="58"
                     loading="lazy"

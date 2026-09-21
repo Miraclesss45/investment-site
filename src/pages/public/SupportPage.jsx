@@ -7,6 +7,7 @@ import { PublicPage } from "../../components/site/SiteChrome";
 import heroAsset from "../../assets/uploads/banner-5.webp";
 import heroAssetMedium from "../../assets/uploads/banner-5-1440.webp";
 import heroAssetSmall from "../../assets/uploads/banner-5-960.webp";
+import FeedbackMessage from "../../components/ui/FeedbackMessage";
 
 const SUPPORT_EMAIL = "meridianvest948@gmail.com";
 const SUPPORT_TELEGRAM_URL = "https://t.me/meridianvests";
@@ -14,11 +15,13 @@ const SUPPORT_TELEGRAM_URL = "https://t.me/meridianvests";
 export default function SupportPage() {
   const { user } = useAuth();
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("status");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setMessage("");
+    setMessageType("status");
     setLoading(true);
     const form = event.currentTarget;
     const formData = new FormData(form);
@@ -43,8 +46,10 @@ export default function SupportPage() {
 
       window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       setMessage("Your email app is opening with the support message addressed to MeridianVests.");
+      setMessageType("success");
       form.reset();
     } catch (error) {
+      setMessageType("error");
       setMessage(
         error instanceof Error
           ? error.message
@@ -110,7 +115,7 @@ export default function SupportPage() {
                 <a
                   href={SUPPORT_TELEGRAM_URL}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-xs font-extrabold uppercase tracking-[0.12em] text-cyan-200 transition hover:border-cyan-300 hover:bg-cyan-400/15"
                 >
                   <Send size={16} /> Telegram
@@ -134,6 +139,7 @@ export default function SupportPage() {
                   type="text"
                   placeholder="Your full name"
                   required
+                  maxLength={120}
                   className="mt-2 h-12 w-full rounded-md border border-white/10 bg-[#101d30] px-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
                 />
               </label>
@@ -144,6 +150,7 @@ export default function SupportPage() {
                   type="email"
                   placeholder="name@example.com"
                   required
+                  maxLength={254}
                   className="mt-2 h-12 w-full rounded-md border border-white/10 bg-[#101d30] px-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
                 />
               </label>
@@ -153,6 +160,8 @@ export default function SupportPage() {
                   name="message"
                   placeholder="Tell us how we can help"
                   required
+                  minLength={10}
+                  maxLength={4000}
                   className="mt-2 min-h-[145px] w-full rounded-md border border-white/10 bg-[#101d30] px-3 py-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
                 />
               </label>
@@ -171,11 +180,7 @@ export default function SupportPage() {
                   "Submit request"
                 )}
               </button>
-              {message && (
-                <p className="mt-4 text-sm text-yellow-300" role="status" aria-live="polite">
-                  {message}
-                </p>
-              )}
+              {message && <FeedbackMessage className="mt-4" type={messageType}>{message}</FeedbackMessage>}
             </form>
           </div>
         </section>

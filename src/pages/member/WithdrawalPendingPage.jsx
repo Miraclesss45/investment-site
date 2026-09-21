@@ -12,7 +12,7 @@ export default function WithdrawalPendingPage() {
       <div className="relative mx-auto w-full max-w-[760px]">
         <header className="flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-3 text-lg font-extrabold tracking-[-0.04em]">
-            <img className="h-10 w-10 rounded-lg object-cover" src="/meridianvest-logo.svg" alt="" width="40" height="40" />
+            <img className="h-10 w-10 rounded-lg object-cover" src="/meridianvest-logo.svg" alt="MeridianVests logo" width="40" height="40" />
             Meridian<span className="text-sky-400">Vests</span>
           </Link>
           <Link to="/support" className="hidden items-center gap-2 text-sm font-bold text-sky-300 sm:flex">
@@ -47,7 +47,7 @@ export default function WithdrawalPendingPage() {
             <a href="mailto:meridianvest948@gmail.com" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 py-4 text-xs font-extrabold uppercase tracking-[0.1em] text-slate-200">
               <Mail size={16} /> Email support
             </a>
-            <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-green-400/30 bg-green-400/10 px-5 py-4 text-xs font-extrabold uppercase tracking-[0.1em] text-green-300">
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-green-400/30 bg-green-400/10 px-5 py-4 text-xs font-extrabold uppercase tracking-[0.1em] text-green-300">
               <WhatsAppIcon size={16} /> WhatsApp support
             </a>
           </div>

@@ -2,32 +2,12 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LoaderCircle, Mail, MapPin } from "lucide-react";
 import { firebaseAuth, firestoreDb, getFirebaseStatus } from "../../lib/firebase";
-import { createUserWithEmailAndPassword, sendEmailVerification, signOut, updateProfile } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { sendEmailVerification, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getAuthErrorMessage } from "../../lib/authHelpers";
+import { createAccount } from "../../lib/firebaseData";
 import CountrySelect from "../../components/ui/CountrySelect";
 import WhatsAppIcon, { WHATSAPP_URL } from "../../components/ui/WhatsAppIcon";
-
-async function createReferralReward(referralUsername, createdUser) {
-  if (!referralUsername || !createdUser) return;
-  const token = await createdUser.getIdToken();
-  const response = await fetch("/api/create-referral-reward", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ referralUsername }),
-  });
-  if (!response.ok) {
-    const error = new Error("Referral reward could not be recorded.");
-    error.code = response.status === 503
-      ? "referral-reward-not-configured"
-      : "referral-reward-failed";
-    throw error;
-  }
-  return response.json();
-}
+import FeedbackMessage from "../../components/ui/FeedbackMessage";
 
 export default function SignupPage() {
   const location = useLocation();
@@ -67,7 +47,6 @@ export default function SignupPage() {
         .toLowerCase();
       const referralUsername =
         formData.get("upline")?.trim().toLowerCase() || referralUsernameFromLink;
-      let referrerUid = "";
       const password = formData.get("password");
       const passwordConfirmation = formData.get("passwordConfirmation");
 
@@ -89,38 +68,24 @@ export default function SignupPage() {
         throw new Error("Accept the terms and conditions to continue.");
       }
 
-      if (referralUsername) {
-        const referrer = await getDoc(doc(firestoreDb, "usernames", referralUsername));
-        if (!referrer.exists()) {
-          const invalidReferralError = new Error("That referral username does not exist. Check it or leave the field blank.");
-          invalidReferralError.code = "invalid-referral";
-          throw invalidReferralError;
-        }
-        referrerUid = referrer.data().uid;
-      }
-      const signupData = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-      createdUser = signupData.user;
-      if (!createdUser) throw new Error("Unable to create your account right now.");
-      if (referrerUid === createdUser.uid) {
-        throw new Error("You cannot use your own referral username.");
-      }
-      const fullName = `${firstName} ${lastName}`.trim();
-      await updateProfile(createdUser, { displayName: fullName });
-      await setDoc(doc(firestoreDb, "users", createdUser.uid), {
-        fullName, username, email, uid: createdUser.uid,
-        phone: formData.get("phone") || "", country: formData.get("country") || "",
+      await createAccount({
+        fullName: `${firstName} ${lastName}`.trim(),
+        username,
+        email,
+        password,
+        termsAccepted: true,
+        phone: formData.get("phone") || "",
+        country: formData.get("country") || "",
         bitcoinWallet: formData.get("bitcoinWallet")?.trim() || "",
         bnbWallet: formData.get("bnbWallet")?.trim() || "",
         ethereumWallet: formData.get("ethereumWallet")?.trim() || "",
         litecoinWallet: formData.get("litecoinWallet")?.trim() || "",
-        referredBy: referralUsername, promotionalCredit: 0,
-        termsAccepted: true, role: "member", createdAt: serverTimestamp(),
+        referredBy: referralUsername,
       });
-      await setDoc(doc(firestoreDb, "usernames", username), { uid: createdUser.uid });
       accountProvisioned = true;
-      if (referralUsername) {
-        await createReferralReward(referralUsername, createdUser);
-      }
+      const signupData = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      createdUser = signupData.user;
+      if (!createdUser) throw new Error("Unable to create your account right now.");
       await sendEmailVerification(createdUser);
       await signOut(firebaseAuth);
       navigate(`/verify-email?email=${encodeURIComponent(email)}`, {
@@ -129,8 +94,11 @@ export default function SignupPage() {
       });
     } catch (error) {
       const signupError =
-        error?.code === "already-exists"
+        error?.code === "already-exists" ||
+        error?.code === "username-already-in-use"
           ? new Error("That username is already in use. Choose another one.")
+          : error?.code === "invalid-referral"
+            ? new Error("That referral username does not exist or is not valid.")
           : error;
       if (createdUser) {
         try {
@@ -157,7 +125,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050b14] px-4 pb-16 pt-8 text-slate-200 sm:px-6">
+    <div className="relative min-h-screen overflow-hidden bg-[#050b14] px-4 pb-16 pt-8 font-['DM_Sans'] text-slate-200 sm:px-6">
       <div className="pointer-events-none absolute right-[-12rem] top-[-14rem] h-[34rem] w-[34rem] rounded-full bg-sky-500/15 blur-3xl" />
       <div className="relative mx-auto flex w-full max-w-[1120px] items-center justify-between">
         <Link
@@ -167,7 +135,7 @@ export default function SignupPage() {
           <img
             className="h-10 w-10 rounded-lg object-cover"
             src="/meridianvest-logo.svg"
-            alt=""
+                      alt="MeridianVests logo"
             width="40"
             height="40"
           />
@@ -183,7 +151,7 @@ export default function SignupPage() {
           </Link>
         </div>
       </div>
-      <div className="relative mx-auto mt-12 w-full max-w-[900px] rounded-2xl border border-white/10 bg-white/[0.045] p-6 shadow-2xl shadow-black/30 backdrop-blur-xl sm:mt-16 sm:p-10">
+      <div className="relative mx-auto mt-12 w-full max-w-[900px] rounded-[2rem] border border-white/[0.12] bg-[#0b1626]/80 p-6 shadow-[0_30px_90px_rgba(2,8,23,0.45)] backdrop-blur-2xl sm:mt-16 sm:p-10">
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div className="mb-8">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.2em] text-cyan-200">
@@ -506,7 +474,7 @@ export default function SignupPage() {
           <a
             href={WHATSAPP_URL}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="mt-3 flex items-center gap-4 text-sm text-slate-200 hover:text-green-400"
           >
             <WhatsAppIcon size={18} /> Chat on WhatsApp
@@ -528,15 +496,7 @@ export default function SignupPage() {
             )}
           </button>
 
-          {message && (
-            <p
-              className={`mt-3 text-sm ${messageType === "error" ? "text-red-300" : "text-yellow-300"}`}
-              role={messageType === "error" ? "alert" : "status"}
-              aria-live={messageType === "error" ? "assertive" : "polite"}
-            >
-              {message}
-            </p>
-          )}
+          {message && <FeedbackMessage type={messageType}>{message}</FeedbackMessage>}
         </form>
       </div>
     </div>
