@@ -1,4 +1,7 @@
-﻿import admin from "firebase-admin";
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { parseFirebaseServiceAccount } from "./firebase-service-account.js";
 
 function sendJson(res, statusCode, body) {
   res.setHeader("Content-Type", "application/json");
@@ -12,12 +15,10 @@ function parseBody(body) {
 }
 
 function getFirebaseAdmin() {
-  if (admin.apps.length) return admin.app();
+  if (getApps().length) return getApp();
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!serviceAccount) throw new Error("Firebase service account is not configured.");
-  return admin.initializeApp({
-    credential: admin.credential.cert(JSON.parse(serviceAccount)),
-  });
+  return initializeApp({ credential: cert(parseFirebaseServiceAccount(serviceAccount)) });
 }
 
 export default async function handler(req, res) {
@@ -42,11 +43,11 @@ export default async function handler(req, res) {
 
   try {
     const app = getFirebaseAdmin();
-    const decodedToken = await app.auth().verifyIdToken(authorization.slice(7));
+    const decodedToken = await getAuth(app).verifyIdToken(authorization.slice(7));
     if (decodedToken.email_verified !== true) {
       return sendJson(res, 403, { error: "Verify your email before claiming referral rewards." });
     }
-    const db = app.firestore();
+    const db = getFirestore(app);
     const usernameSnapshot = await db.collection("usernames").doc(referralUsername).get();
     if (!usernameSnapshot.exists) return sendJson(res, 404, { error: "Referral username not found." });
 
@@ -78,10 +79,10 @@ export default async function handler(req, res) {
           amount: 5,
           recipientRole: "referrer",
           status: "promotional",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
         });
         transaction.set(referrerRef, {
-          referralCount: admin.firestore.FieldValue.increment(1),
+          referralCount: FieldValue.increment(1),
         }, { merge: true });
       }
       if (!refereeRewardSnapshot.exists) {
@@ -91,7 +92,7 @@ export default async function handler(req, res) {
           amount: 5,
           recipientRole: "referee",
           status: "promotional",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
         });
       }
     });

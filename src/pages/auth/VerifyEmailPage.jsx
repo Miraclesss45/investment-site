@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ArrowRight, Check, ExternalLink, Mail, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, ExternalLink, LoaderCircle, Mail, ShieldCheck } from "lucide-react";
+import { sendEmailVerification, signOut } from "firebase/auth";
+import { firebaseAuth } from "../../lib/firebase";
 import WhatsAppIcon, { WHATSAPP_URL } from "../../components/ui/WhatsAppIcon";
 
 function maskEmail(email) {
@@ -17,9 +19,28 @@ export default function VerifyEmailPage() {
     const queryEmail = new URLSearchParams(location.search).get("email");
     return stateEmail || queryEmail || "";
   }, [location.search, location.state]);
+  const [resending, setResending] = useState(false);
+  const [feedback, setFeedback] = useState("");
+
+  async function resendVerification() {
+    if (!firebaseAuth?.currentUser) {
+      setFeedback("Sign in from the member login page to request a new verification email.");
+      return;
+    }
+    setResending(true);
+    setFeedback("");
+    try {
+      await sendEmailVerification(firebaseAuth.currentUser);
+      setFeedback("A new verification email has been sent.");
+    } catch (error) {
+      setFeedback(error?.message || "We could not resend the verification email.");
+    } finally {
+      setResending(false);
+    }
+  }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#050b14] px-4 py-8 font-['DM_Sans'] text-slate-200 sm:px-6">
+    <main className="relative min-h-screen overflow-hidden bg-[#050b14] px-4 py-8 text-slate-200 sm:px-6">
       <div className="pointer-events-none absolute left-[-12rem] top-[-16rem] h-[36rem] w-[36rem] rounded-full bg-sky-500/15 blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-18rem] right-[-8rem] h-[34rem] w-[34rem] rounded-full bg-cyan-400/10 blur-3xl" />
 
@@ -92,6 +113,10 @@ export default function VerifyEmailPage() {
           </div>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-4 text-sm sm:flex-row">
+            <button type="button" onClick={resendVerification} disabled={resending} className="inline-flex items-center gap-2 font-bold text-cyan-300 disabled:opacity-60">
+              {resending && <LoaderCircle className="animate-spin" size={16} />}
+              Resend verification
+            </button>
             <Link
               to="/login"
               className="inline-flex items-center gap-2 font-bold text-sky-300 transition hover:text-cyan-200"
@@ -106,6 +131,12 @@ export default function VerifyEmailPage() {
               Use a different email <Check size={16} />
             </Link>
           </div>
+          {feedback && <p className="mt-5 text-center text-xs text-cyan-200">{feedback}</p>}
+          {firebaseAuth?.currentUser && (
+            <button type="button" onClick={() => signOut(firebaseAuth)} className="mx-auto mt-4 block text-xs text-slate-500 hover:text-white">
+              Sign out
+            </button>
+          )}
         </div>
         <p className="mt-6 text-center text-xs text-slate-500">
           Need help?{" "}

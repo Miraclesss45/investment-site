@@ -6,6 +6,12 @@ export const CRYPTO_ASSETS = [
   { symbol: "LTC", name: "Litecoin", coinGeckoId: "litecoin" },
   { symbol: "BNB", name: "BNB", coinGeckoId: "binancecoin" },
 ];
+export const CHART_RANGES = [
+  { key: "0.041", label: "1H" },
+  { key: "1", label: "1D" },
+  { key: "7", label: "1W" },
+  { key: "30", label: "1M" },
+];
 
 const COINGECKO_API_URL = "/api/market-prices";
 const BINANCE_STREAM_URL =
@@ -14,6 +20,46 @@ const MAX_HISTORY = 60;
 const POLL_INTERVAL_MS = 30000;
 const STALE_TTL_MS = POLL_INTERVAL_MS * 2;
 const STREAM_RECONNECT_MS = 5000;
+
+export function useCryptoChartData(asset, days) {
+  const [state, setState] = useState({ points: [], loading: true, error: "", timestamp: null });
+
+  useEffect(() => {
+    if (!asset) return undefined;
+    const controller = new AbortController();
+    let active = true;
+    const assetConfig = CRYPTO_ASSETS.find((item) => item.symbol === asset);
+    if (!assetConfig) {
+      setState({ points: [], loading: false, error: "Unsupported crypto asset.", timestamp: null });
+      return undefined;
+    }
+    const load = async () => {
+      setState((current) => ({ ...current, loading: true, error: "" }));
+      try {
+        const response = await fetch(
+          `${COINGECKO_API_URL}?chart=1&ids=${encodeURIComponent(assetConfig.coinGeckoId)}&days=${encodeURIComponent(days)}`,
+          { signal: controller.signal, headers: { Accept: "application/json" } },
+        );
+        if (!response.ok) throw new Error(`CoinGecko returned HTTP ${response.status}.`);
+        const payload = await response.json();
+        const points = (Array.isArray(payload?.prices) ? payload.prices : [])
+          .map(([timestamp, price]) => ({ timestamp: Number(timestamp), price: Number(price) }))
+          .filter((point) => Number.isFinite(point.timestamp) && Number.isFinite(point.price) && point.price > 0);
+        if (!points.length) throw new Error("CoinGecko returned no chart points.");
+        if (active) setState({ points, loading: false, error: "", timestamp: Date.now() });
+      } catch (error) {
+        if (active && error?.name !== "AbortError") setState((current) => ({ ...current, loading: false, error: "CoinGecko chart data is temporarily unavailable." }));
+      }
+    };
+    load();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [asset, days]);
+
+  return state;
+}
 
 function buildAssetState() {
   return Object.fromEntries(
@@ -44,6 +90,8 @@ export function useCryptoMarketData() {
     let requestController = null;
     let socket = null;
     let reconnectTimer = null;
+    let streamFrameId = null;
+    const pendingStreamPrices = {};
 
     const updateAssetState = (symbol, updater) => {
       setAssets((previous) => {
@@ -92,16 +140,20 @@ export function useCryptoMarketData() {
       });
     };
 
-    const applyStreamPrice = (symbol, rawPrice) => {
-      const price = Number(rawPrice);
-      if (!Number.isFinite(price) || price <= 0) return;
+    const flushStreamPrices = () => {
+      streamFrameId = null;
+      const prices = { ...pendingStreamPrices };
+      for (const symbol of Object.keys(pendingStreamPrices)) {
+        delete pendingStreamPrices[symbol];
+      }
       const timestamp = Date.now();
       setAssets((previous) => {
-        const currentValue = previous[symbol];
-        if (!currentValue) return previous;
-        return {
-          ...previous,
-          [symbol]: {
+        const next = { ...previous };
+        for (const [symbol, rawPrice] of Object.entries(prices)) {
+          const price = Number(rawPrice);
+          if (!Number.isFinite(price) || price <= 0 || !next[symbol]) continue;
+          const currentValue = next[symbol];
+          next[symbol] = {
             ...currentValue,
             price,
             entryPrice: currentValue.entryPrice || price,
@@ -111,12 +163,23 @@ export function useCryptoMarketData() {
             stale: false,
             error: "",
             history: [...(currentValue.history || []), { timestamp, price }].slice(-MAX_HISTORY),
-          },
-        };
+          };
+        }
+        return next;
       });
     };
 
+    const applyStreamPrice = (symbol, rawPrice) => {
+      const price = Number(rawPrice);
+      if (!Number.isFinite(price) || price <= 0) return;
+      pendingStreamPrices[symbol] = price;
+      if (streamFrameId == null) {
+        streamFrameId = window.requestAnimationFrame(flushStreamPrices);
+      }
+    };
+
     const fetchPrices = async () => {
+      if (document.visibilityState !== "visible") return;
       requestController?.abort();
       requestController = new AbortController();
 
@@ -124,9 +187,10 @@ export function useCryptoMarketData() {
       const url = `${COINGECKO_API_URL}?ids=${ids}&vs_currencies=usd&precision=full`;
 
       try {
-        const timeoutId = window.setTimeout(() => requestController?.abort(), 10000);
+        const controller = requestController;
+        const timeoutId = window.setTimeout(() => controller.abort(), 10000);
         const response = await fetch(url, {
-          signal: requestController.signal,
+          signal: controller.signal,
           headers: { Accept: "application/json" },
         });
         window.clearTimeout(timeoutId);
@@ -166,7 +230,7 @@ export function useCryptoMarketData() {
     };
 
     const connectStream = () => {
-      if (!isActive || typeof WebSocket === "undefined") return;
+      if (!isActive || document.visibilityState !== "visible" || typeof WebSocket === "undefined") return;
       socket?.close();
       socket = new WebSocket(BINANCE_STREAM_URL);
       socket.onopen = () => {
@@ -192,13 +256,26 @@ export function useCryptoMarketData() {
       };
       socket.onerror = () => socket?.close();
       socket.onclose = () => {
-        if (!isActive) return;
+        if (!isActive || document.visibilityState !== "visible") return;
         reconnectTimer = window.setTimeout(connectStream, STREAM_RECONNECT_MS);
       };
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        requestController?.abort();
+        socket?.close();
+        if (reconnectTimer) window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+        return;
+      }
+      fetchPrices();
+      connectStream();
+    };
+
     fetchPrices();
     connectStream();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     const pollTimer = window.setInterval(fetchPrices, POLL_INTERVAL_MS);
     const staleTimer = window.setInterval(() => {
       const now = Date.now();
@@ -228,8 +305,10 @@ export function useCryptoMarketData() {
       requestController?.abort();
       socket?.close();
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      if (streamFrameId != null) window.cancelAnimationFrame(streamFrameId);
       window.clearInterval(pollTimer);
       window.clearInterval(staleTimer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 

@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity, ArrowDownToLine, ArrowUpRight, CheckCircle2, ChevronRight,
   CircleHelp, ClipboardList, FileText, LayoutDashboard, LogOut, Menu, Package,
   ExternalLink, RefreshCw, Search, ShieldCheck, TrendingUp, UserRound, Users, WalletCards, X,
 } from "lucide-react";
 import { useAuth } from "../../lib/authContext";
-import { getAdminResource, requestAdminAction, reauthenticateAdmin } from "../../lib/adminApi";
+import { changeAdminPassword, getAdminResource, requestAdminAction, reauthenticateAdmin } from "../../lib/adminApi";
+import { getAuthErrorMessage } from "../../lib/authHelpers";
 import { clearAdminLoginSession } from "../../lib/adminSession";
 import FeedbackMessage from "../../components/ui/FeedbackMessage";
 
 const nav = [
   ["/control-room", "Overview", LayoutDashboard],
   ["/control-room/users", "Users", Users],
+  ["/control-room/admins", "Admins", ShieldCheck],
   ["/control-room/deposits", "Deposits", ArrowDownToLine],
   ["/control-room/withdrawals", "Withdrawals", ArrowUpRight],
   ["/control-room/support", "Support tickets", CircleHelp],
@@ -24,6 +26,7 @@ const nav = [
 
 const resources = {
   users: ["Users", "Review accounts, verification and access."],
+  admins: ["Admins", "View current administrators and manage your own security."],
   deposits: ["Deposits", "Review incoming funds before they are credited."],
   withdrawals: ["Withdrawals", "Approve or hold outgoing payment requests."],
   support: ["Support tickets", "Keep customer conversations moving."],
@@ -32,6 +35,29 @@ const resources = {
   referrals: ["Referrals", "Track attribution and referral rewards."],
   audit: ["Audit history", "A read-only trail of privileged activity."],
 };
+
+function decodePathPart(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
+function AdminRouteMessage({ title, description }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#0b1626] p-10 text-center">
+      <h1 className="text-xl font-bold text-white">{title}</h1>
+      <p className="mt-3 text-sm text-slate-400">{description}</p>
+      <Link
+        to="/control-room"
+        className="mt-6 inline-flex rounded-md bg-sky-300 px-4 py-2 text-sm font-bold text-[#081321] hover:bg-sky-200"
+      >
+        Return to overview
+      </Link>
+    </div>
+  );
+}
 
 function Status({ children }) {
   const tones = {
@@ -218,6 +244,184 @@ function SupportDetails({ userId, ticketId }) {
   );
 }
 
+function WithdrawalDetails({ userId, withdrawalId, onAction, refreshKey }) {
+  const [withdrawal, setWithdrawal] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    getAdminResource("withdrawals")
+      .then((rows) => {
+        if (!active) return;
+        const match = rows.find((row) => row.userId === userId && row.id === withdrawalId);
+        if (!match) {
+          setError("The requested withdrawal could not be found.");
+          return;
+        }
+        setWithdrawal(match);
+      })
+      .catch((reason) => active && setError(reason.message || "Unable to load withdrawal details."));
+    return () => {
+      active = false;
+    };
+  }, [refreshKey, userId, withdrawalId]);
+
+  const detailEntries = withdrawal
+    ? Object.entries(withdrawal).filter(([key]) => !["id", "__searchText", "emailNotifications"].includes(key))
+    : [];
+  const status = String(withdrawal?.status || "pending").toLowerCase();
+  const canDelete = withdrawal
+    && !withdrawal.settlementId
+    && !withdrawal.settledAt
+    && !withdrawal.completedAt
+    && !withdrawal.paidAt
+    && !["complete", "completed", "settled", "paid", "success"].includes(status);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-sky-300">Withdrawal review</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white">Withdrawal request</h1>
+          <p className="mt-1 text-sm text-slate-400">Review the member identity, requested payout, and current processing status.</p>
+        </div>
+        <Link to="/control-room/withdrawals" className="text-sm font-semibold text-sky-300 hover:text-sky-200">Back to withdrawals</Link>
+      </div>
+      {error ? (
+        <FeedbackMessage type="error">{error}</FeedbackMessage>
+      ) : !withdrawal ? (
+        <div className="rounded-lg border border-white/10 bg-[#0b1626] p-12 text-center text-sm text-slate-400">Loading withdrawal details…</div>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              ["Username", withdrawal.profileUsername || withdrawal.username || "Not recorded"],
+              ["Member email", withdrawal.profileEmail || withdrawal.email || "Not recorded"],
+              ["Member ID", withdrawal.userId],
+              ["Status", withdrawal.status || "Pending"],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-lg border border-white/10 bg-[#0b1626] p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+                <p className="mt-3 break-all text-sm font-bold text-white">{String(value)}</p>
+              </div>
+            ))}
+          </div>
+          <section className="overflow-hidden rounded-lg border border-white/10 bg-[#0b1626]">
+            <div className="flex flex-col justify-between gap-4 border-b border-white/10 p-5 sm:flex-row sm:items-center">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-sky-300">Request details</p>
+                <h2 className="mt-2 font-semibold text-white">{withdrawal.id}</h2>
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <Status>{withdrawal.status || "Pending"}</Status>
+                {["pending", "on-hold"].includes(status) && (
+                  <>
+                    <button
+                      onClick={() => onAction("approve-withdrawal", withdrawal)}
+                      className="text-xs font-bold text-emerald-300 hover:text-emerald-200"
+                    >
+                      Approve and complete
+                    </button>
+                    {String(withdrawal.status || "pending").toLowerCase() !== "approved" && (
+                      <button
+                        onClick={() => onAction("withdrawal-decision", { ...withdrawal, resource: "withdrawals", nextStatus: "rejected" })}
+                        className="text-xs font-bold text-rose-300 hover:text-rose-200"
+                      >
+                        Reject
+                      </button>
+                    )}
+                  </>
+                )}
+                {status === "approved" && (
+                  <button onClick={() => onAction("approve-withdrawal", withdrawal)} className="text-xs font-bold text-emerald-300 hover:text-emerald-200">Complete withdrawal</button>
+                )}
+                {canDelete && (
+                  <button onClick={() => onAction("delete-withdrawal", withdrawal)} className="text-xs font-bold text-rose-300 hover:text-rose-200">Delete request</button>
+                )}
+              </div>
+            </div>
+            <dl className="divide-y divide-white/10">
+              {detailEntries.map(([key, value]) => (
+                <div className="grid gap-2 px-5 py-4 sm:grid-cols-[minmax(140px,0.35fr)_1fr]" key={key}>
+                  <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{key}</dt>
+                  <dd className="whitespace-pre-wrap break-words text-sm text-slate-200">{typeof value === "object" ? JSON.stringify(value) : String(value ?? "—")}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+function WithdrawalDecisionQueue({ onAction, refreshKey }) {
+  const [rows, setRows] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    getAdminResource("withdrawals")
+      .then((withdrawals) => {
+        if (!active) return;
+        setRows(withdrawals.filter((withdrawal) => ["pending", "on-hold", "approved"].includes(String(withdrawal.status || "pending").toLowerCase())));
+        setError("");
+      })
+      .catch((reason) => active && setError(reason.message || "Unable to load pending withdrawals."));
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
+
+  return (
+    <section className="overflow-hidden rounded-lg border border-white/10 bg-[#0b1626]">
+      <div className="border-b border-white/10 p-5">
+        <p className="text-xs font-bold uppercase tracking-widest text-sky-300">Withdrawal decisions</p>
+        <h2 className="mt-2 text-lg font-bold text-white">Requests awaiting a decision or completion</h2>
+        <p className="mt-1 text-sm text-slate-400">Send the payout to the saved wallet outside the website before approving. Approval then completes the request and sends the member an email.</p>
+      </div>
+      {error ? (
+        <div className="p-5"><FeedbackMessage type="error">{error}</FeedbackMessage></div>
+      ) : !rows ? (
+        <div className="p-8 text-center text-sm text-slate-400">Loading withdrawal requests…</div>
+      ) : rows.length === 0 ? (
+        <div className="p-8 text-center text-sm text-slate-400">There are no withdrawal requests awaiting approval or completion.</div>
+      ) : (
+        <div className="divide-y divide-white/10">
+          {rows.map((withdrawal) => (
+            <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center" key={`${withdrawal.userId}:${withdrawal.id}`}>
+              <div className="min-w-0">
+                <p className="break-all text-sm font-semibold text-white">{withdrawal.profileUsername || withdrawal.username || "Member"} · {withdrawal.profileEmail || withdrawal.email || "No email recorded"}</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Request {withdrawal.id} · {withdrawal.asset || withdrawal.method || "Payment method not recorded"} · {Number.isFinite(Number(withdrawal.amount)) ? `$${Number(withdrawal.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "Amount not recorded"}
+                </p>
+                <div className="mt-2"><Status>{withdrawal.status || "Pending"}</Status></div>
+              </div>
+              <div className="flex shrink-0 items-center gap-4">
+                <button
+                  onClick={() => onAction("approve-withdrawal", withdrawal)}
+                  className="text-xs font-bold text-emerald-300 hover:text-emerald-200"
+                >
+                  {String(withdrawal.status || "pending").toLowerCase() === "approved" ? "Complete withdrawal" : "Approve and complete"}
+                </button>
+                <button
+                  onClick={() => onAction("withdrawal-decision", { ...withdrawal, resource: "withdrawals", nextStatus: "rejected" })}
+                  className="text-xs font-bold text-rose-300 hover:text-rose-200"
+                >
+                  Reject
+                </button>
+                <Link to={`/control-room/withdrawals/${encodeURIComponent(withdrawal.userId)}/${encodeURIComponent(withdrawal.id)}`} className="text-xs font-bold text-sky-300 hover:text-sky-200">
+                  Details
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Overview() {
   const [users, setUsers] = useState(null);
   const [error, setError] = useState("");
@@ -319,10 +523,10 @@ function PackageWorkspace({ refreshKey, onRefresh }) {
       setUsers((current) => (current || []).map((user) => user.id === selectedUserId
         ? { ...user, paperTrading: result.paperTrading }
         : user));
-      setStatus({ type: "success", message: "Paper-trading assignment saved successfully. The selected user's Crypto Position is now updated." });
+      setStatus({ type: "success", message: "Crypto trading assignment saved successfully. The selected user's Crypto Position is now updated." });
       setPassword("");
     } catch (error) {
-      setStatus({ type: "error", message: error.message || "The paper-trading allocation could not be saved." });
+      setStatus({ type: "error", message: error.message || "The crypto trading allocation could not be saved." });
     } finally {
       setSaving(false);
     }
@@ -333,7 +537,7 @@ function PackageWorkspace({ refreshKey, onRefresh }) {
       <div>
         <p className="text-xs font-bold uppercase tracking-widest text-sky-300">Investment packages</p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-white">Package investment workspace</h1>
-        <p className="mt-1 text-sm text-slate-400">Select a member, choose a package, and assign their BTC, ETH, LTC or BNB paper-trading capital.</p>
+        <p className="mt-1 text-sm text-slate-400">Select a member, choose a package, and assign their BTC, ETH, LTC or BNB crypto trading capital.</p>
       </div>
       {status.message && <FeedbackMessage type={status.type === "success" ? "success" : "error"}>{status.message}</FeedbackMessage>}
       <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.2fr)]">
@@ -351,14 +555,14 @@ function PackageWorkspace({ refreshKey, onRefresh }) {
               <button key={user.id} onClick={() => selectUser(user)} className={`w-full rounded-md border p-3 text-left transition ${selectedUserId === user.id ? "border-sky-300/60 bg-sky-300/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"}`}>
                 <div className="flex min-w-0 items-center justify-between gap-3"><span className="truncate text-sm font-semibold text-white">{user.displayName || user.username || user.email || user.id}</span><Status>{user.paperTrading?.enabled ? "Assigned" : "Not assigned"}</Status></div>
                 <p className="mt-1 truncate text-xs text-slate-400">{user.email || user.id}</p>
-                <p className="mt-1 text-[11px] text-slate-500">Active deposit: ${Number(user.activeDeposit || user.totalDeposit || 0).toLocaleString()}</p>
+                <p className="mt-1 text-[11px] text-slate-500">Active deposit (reference): ${Number(user.activeDeposit || user.totalDeposit || 0).toLocaleString()}</p>
               </button>
             ))}
           </div>
         </section>
         <section className="min-w-0 rounded-lg border border-white/10 bg-[#0b1626] p-4 shadow-[0_18px_50px_rgba(2,8,23,0.22)] sm:p-5">
-          <h2 className="font-semibold text-white">Paper-trading assignment</h2>
-          <p className="mt-1 text-sm text-slate-400">{selectedUser ? `Editing ${selectedUser.displayName || selectedUser.email || selectedUser.id}` : "Select a member to begin."}</p>
+          <h2 className="font-semibold text-white">Crypto trading assignment</h2>
+          <p className="mt-1 text-sm text-slate-400">{selectedUser ? `Editing ${selectedUser.displayName || selectedUser.email || selectedUser.id}. Crypto trading capital can be assigned independently of active deposit.` : "Select a member to begin."}</p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-semibold text-slate-200">Package
               <select value={selectedPackageId} onChange={selectPackage} disabled={!selectedUser} className="mt-1 w-full rounded-md border border-white/10 bg-[#081321] px-3 py-2 text-sm font-normal text-white outline-none focus:border-sky-300 disabled:opacity-50">
@@ -376,10 +580,62 @@ function PackageWorkspace({ refreshKey, onRefresh }) {
             <label className="text-sm font-semibold text-slate-200 sm:col-span-2">Admin password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} disabled={!selectedUser} className="mt-1 w-full rounded-md border border-white/10 bg-[#081321] px-3 py-2 text-sm font-normal text-white outline-none focus:border-sky-300 disabled:opacity-50" /></label>
           </div>
           <p className="mt-3 text-xs text-slate-500">Enter at least 10 characters explaining this assignment.</p>
-          <button onClick={saveAllocation} disabled={saving || !selectedUser || reason.trim().length < 10 || !password || !Object.values(allocations).some((amount) => Number(amount) > 0)} className="mt-5 w-full rounded-md bg-sky-300 px-4 py-3 text-sm font-bold text-[#081321] hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Saving assignment…" : "Save paper-trading assignment"}</button>
+          <button onClick={saveAllocation} disabled={saving || !selectedUser || reason.trim().length < 10 || !password || !Object.values(allocations).some((amount) => Number(amount) > 0)} className="mt-5 w-full rounded-md bg-sky-300 px-4 py-3 text-sm font-bold text-[#081321] hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Saving assignment…" : "Save crypto trading assignment"}</button>
         </section>
       </div>
     </div>
+  );
+}
+
+function AdminSecurityPanel() {
+  const [form, setForm] = useState({ current: "", next: "", confirmation: "" });
+  const [feedback, setFeedback] = useState({ type: "", message: "" });
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    setFeedback({ type: "", message: "" });
+    if (form.next.length < 8) {
+      setFeedback({ type: "error", message: "Your new password must be at least 8 characters." });
+      return;
+    }
+    if (form.next !== form.confirmation) {
+      setFeedback({ type: "error", message: "The new password and confirmation do not match." });
+      return;
+    }
+    setSaving(true);
+    try {
+      await changeAdminPassword(form.current, form.next);
+      setForm({ current: "", next: "", confirmation: "" });
+      setFeedback({ type: "success", message: "Your administrator password was changed successfully." });
+    } catch (error) {
+      setFeedback({ type: "error", message: getAuthErrorMessage(error, "Your password could not be changed.") });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-sky-300/20 bg-[#0b1626] p-5 shadow-[0_18px_50px_rgba(2,8,23,0.22)]">
+      <p className="text-xs font-bold uppercase tracking-widest text-sky-300">Your security</p>
+      <h2 className="mt-2 text-xl font-bold text-white">Change administrator password</h2>
+      <p className="mt-1 text-sm text-slate-400">Re-enter your current password to update the password for your signed-in Firebase account.</p>
+      {feedback.message && <FeedbackMessage type={feedback.type} className="mt-5">{feedback.message}</FeedbackMessage>}
+      <form onSubmit={submit} className="mt-5 grid max-w-2xl gap-4 sm:grid-cols-2">
+        <label className="text-sm font-semibold text-slate-200 sm:col-span-2">Current password
+          <input type="password" autoComplete="current-password" required value={form.current} onChange={(event) => setForm((current) => ({ ...current, current: event.target.value }))} className="mt-1 w-full rounded-md border border-white/15 bg-[#081321] px-3 py-2 text-sm font-normal text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20" />
+        </label>
+        <label className="text-sm font-semibold text-slate-200">New password
+          <input type="password" autoComplete="new-password" minLength={8} required value={form.next} onChange={(event) => setForm((current) => ({ ...current, next: event.target.value }))} className="mt-1 w-full rounded-md border border-white/15 bg-[#081321] px-3 py-2 text-sm font-normal text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20" />
+        </label>
+        <label className="text-sm font-semibold text-slate-200">Confirm new password
+          <input type="password" autoComplete="new-password" minLength={8} required value={form.confirmation} onChange={(event) => setForm((current) => ({ ...current, confirmation: event.target.value }))} className="mt-1 w-full rounded-md border border-white/15 bg-[#081321] px-3 py-2 text-sm font-normal text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20" />
+        </label>
+        <button type="submit" disabled={saving || !form.current || !form.next || !form.confirmation} className="rounded-md bg-sky-300 px-4 py-3 text-sm font-bold text-[#081321] hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2 sm:w-fit">
+          {saving ? "Updating password…" : "Update password"}
+        </button>
+      </form>
+    </section>
   );
 }
 
@@ -398,7 +654,11 @@ function ResourcePage({ resource, onAction, refreshKey, onRefresh }) {
     () =>
       (rows || []).map((row) => ({
         ...row,
-        __searchText: Object.values(row).join(" ").toLowerCase(),
+        __searchText: Object.entries(row)
+          .filter(([key]) => key !== "emailNotifications")
+          .map(([, value]) => value)
+          .join(" ")
+          .toLowerCase(),
       })),
     [rows],
   );
@@ -420,20 +680,23 @@ function ResourcePage({ resource, onAction, refreshKey, onRefresh }) {
           <div className="p-6">
             <FeedbackMessage type="error">{error}</FeedbackMessage>
           </div>
-        ) : !rows ? <div className="p-12 text-center text-sm text-slate-400">Loading live {title.toLowerCase()}…</div> : filtered.length ? <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-white/[0.04]"><tr className="border-b border-white/10 text-[11px] uppercase tracking-wider text-slate-400"><th className="px-5 py-3 font-bold">Record</th><th className="px-5 py-3 font-bold">Details</th><th className="px-5 py-3 font-bold">Status</th><th className="px-5 py-3" /></tr></thead><tbody>{filtered.map((row) => { const isDisabled = row.disabled === true || row.authDisabled === true || row.status === "Disabled"; const isAdmin = row.role === "admin"; const canManageAuth = resource !== "users" || row.authAccount === true;                         const actionPayload = { ...row, userId: resource === "users" ? (row.authUid || row.id) : row.userId, profileId: resource === "users" ? row.id : row.userId }; const depositStatus = String(row.status || "pending").toLowerCase(); const canDeleteDeposit = resource === "deposits" && !["approved", "completed", "settled", "credited"].includes(depositStatus) && !row.settlementId; return <tr className="border-b border-white/10 text-slate-300 last:border-0 hover:bg-white/[0.03]" key={row.id}><td className="px-5 py-4 font-semibold text-white">{row.id}</td><td className="max-w-xl px-5 py-4 text-xs">{resource === "deposits" && <div className="mb-2 grid gap-1 text-[11px]"><span><strong className="text-slate-200">Email:</strong> {row.profileEmail || row.email || "—"}</span><span><strong className="text-slate-200">Username:</strong> {row.profileUsername || row.username || "—"}</span></div>}{Object.entries(row).filter(([key]) => !["id", "__searchText", "authUid", "profileEmail", "profileUsername"].includes(key)).slice(0, 5).map(([key, value]) => <span className="mr-3 inline-block" key={key}><strong className="text-slate-200">{key}:</strong> {String(value ?? "—")}</span>)}{resource === "users" && !canManageAuth && <span className="mt-2 block text-amber-300">Firestore profile only — no Firebase Auth account</span>}</td><td className="px-5 py-4"><Status>{row.status || (canManageAuth ? (isDisabled ? "Suspended" : "Active") : "Profile only")}</Status></td><td className="px-5 py-4">{resource === "users" ? <div className="flex justify-end gap-3"><button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} aria-label={`${isAdmin ? "Remove admin access from" : "Grant admin access to"} ${row.email || row.id}`} onClick={() => onAction("set-role", { ...actionPayload, role: isAdmin ? "member" : "admin" })} className="text-xs font-bold text-slate-200 hover:text-white disabled:cursor-not-allowed disabled:text-slate-600">{isAdmin ? "Remove admin" : "Grant admin"}</button><button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} aria-label={`${isDisabled ? "Enable" : "Disable"} ${row.email || row.id}`} onClick={() => onAction("disable-user", { ...actionPayload, disabled: !isDisabled })} className={`text-xs font-bold ${isDisabled ? "text-emerald-300 hover:text-emerald-200" : "text-rose-300 hover:text-rose-200"} disabled:cursor-not-allowed disabled:text-slate-600`}>{isDisabled ? "Enable" : "Disable"}</button>                <button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} onClick={() => onAction("delete-user", actionPayload)} className="text-xs font-bold text-rose-300 hover:text-rose-200 disabled:cursor-not-allowed disabled:text-slate-600">Delete</button></div> : resource === "deposits" ? <div className="flex justify-end gap-3">{["pending", "approved"].includes(depositStatus) && <button onClick={() => onAction("settle-deposit", actionPayload)} className="text-xs font-bold text-emerald-300 hover:text-emerald-200">Credit offline payment</button>}{["pending", "rejected", "cancelled"].includes(depositStatus) && <button onClick={() => onAction("review", row)} className="text-xs font-bold text-slate-200 hover:text-white">Review</button>}{canDeleteDeposit && <button onClick={() => onAction("delete-deposit", actionPayload)} className="text-xs font-bold text-rose-300 hover:text-rose-200">Delete request</button>}</div>                 : resource === "transactions" ? <a href={`/control-room/transactions/${encodeURIComponent(row.userId)}/${encodeURIComponent(row.id)}?collection=${encodeURIComponent(row.collection || "transactions")}`} target="_blank" rel="noreferrer" className="float-right inline-flex items-center gap-1 text-xs font-bold text-sky-300 hover:text-sky-200">View details <ExternalLink size={13} /></a> : resource === "support" ? <a href={`/control-room/support/${encodeURIComponent(row.userId)}/${encodeURIComponent(row.id)}`} target="_blank" rel="noreferrer" className="float-right inline-flex items-center gap-1 text-xs font-bold text-sky-300 hover:text-sky-200">View details <ExternalLink size={13} /></a>         : resource === "packages" ? <button onClick={() => onAction("update-package", row)} className="float-right text-xs font-bold text-slate-200 hover:text-white">Edit package <ChevronRight size={14} className="inline" /></button> : resource !== "audit" && <button onClick={() => onAction("review", row)} className="float-right text-xs font-bold text-slate-200 hover:text-white">Review <ChevronRight size={14} className="inline" /></button>}</td></tr>; })}</tbody></table></div> : <div className="p-12 text-center text-sm text-slate-400"><FileText className="mx-auto mb-3 text-slate-500" />No records found.</div>}
+        ) : !rows ? <div className="p-12 text-center text-sm text-slate-400">Loading live {title.toLowerCase()}…</div> : filtered.length ? <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-white/[0.04]"><tr className="border-b border-white/10 text-[11px] uppercase tracking-wider text-slate-400"><th className="px-5 py-3 font-bold">Record</th><th className="px-5 py-3 font-bold">Details</th><th className="px-5 py-3 font-bold">Status</th><th className="px-5 py-3" /></tr></thead><tbody>{filtered.map((row) => { const isDisabled = row.disabled === true || row.authDisabled === true || row.status === "Disabled"; const isAdmin = row.role === "admin"; const canManageAuth = resource !== "users" || row.authAccount === true;                         const actionPayload = { ...row, userId: resource === "users" ? (row.authUid || row.id) : row.userId, profileId: resource === "users" ? row.id : row.userId }; const depositStatus = String(row.status || "pending").toLowerCase(); const canDeleteDeposit = resource === "deposits" && !["approved", "completed", "settled", "credited"].includes(depositStatus) && !row.settlementId; const canDeleteWithdrawal = resource === "withdrawals" && !row.settlementId && !row.settledAt && !row.completedAt && !row.paidAt && !["complete", "completed", "settled", "paid", "success"].includes(depositStatus); return <tr className="border-b border-white/10 text-slate-300 last:border-0 hover:bg-white/[0.03]" key={row.id}><td className="px-5 py-4 font-semibold text-white">{row.id}</td><td className="max-w-xl px-5 py-4 text-xs">{resource === "deposits" && <div className="mb-2 grid gap-1 text-[11px]"><span><strong className="text-slate-200">Email:</strong> {row.profileEmail || row.email || "—"}</span><span><strong className="text-slate-200">Username:</strong> {row.profileUsername || row.username || "—"}</span></div>}{Object.entries(row).filter(([key]) => !["id", "__searchText", "emailNotifications", "authUid", "profileEmail", "profileUsername"].includes(key)).slice(0, 5).map(([key, value]) => <span className="mr-3 inline-block" key={key}><strong className="text-slate-200">{key}:</strong> {String(value ?? "—")}</span>)}{resource === "users" && !canManageAuth && <span className="mt-2 block text-amber-300">Firestore profile only — no Firebase Auth account</span>}</td><td className="px-5 py-4"><Status>{row.status || (canManageAuth ? (isDisabled ? "Suspended" : "Active") : "Profile only")}</Status></td><td className="px-5 py-4">{resource === "admins" ? null : resource === "users" ? <div className="flex justify-end gap-3"><button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} aria-label={`${isAdmin ? "Remove admin access from" : "Grant admin access to"} ${row.email || row.id}`} onClick={() => onAction("set-role", { ...actionPayload, role: isAdmin ? "member" : "admin" })} className="text-xs font-bold text-slate-200 hover:text-white disabled:cursor-not-allowed disabled:text-slate-600">{isAdmin ? "Remove admin" : "Grant admin"}</button><button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} aria-label={`${isDisabled ? "Enable" : "Disable"} ${row.email || row.id}`} onClick={() => onAction("disable-user", { ...actionPayload, disabled: !isDisabled })} className={`text-xs font-bold ${isDisabled ? "text-emerald-300 hover:text-emerald-200" : "text-rose-300 hover:text-rose-200"} disabled:cursor-not-allowed disabled:text-slate-600`}>{isDisabled ? "Enable" : "Disable"}</button>                <button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} onClick={() => onAction("delete-user", actionPayload)} className="text-xs font-bold text-rose-300 hover:text-rose-200 disabled:cursor-not-allowed disabled:text-slate-600">Delete</button></div> : resource === "deposits" ? <div className="flex justify-end gap-3">{["pending", "approved"].includes(depositStatus) && <button onClick={() => onAction("settle-deposit", actionPayload)} className="text-xs font-bold text-emerald-300 hover:text-emerald-200">Credit offline payment</button>}{["pending", "rejected", "cancelled"].includes(depositStatus) && <button onClick={() => onAction("review", row)} className="text-xs font-bold text-slate-200 hover:text-white">Review</button>}{canDeleteDeposit && <button onClick={() => onAction("delete-deposit", actionPayload)} className="text-xs font-bold text-rose-300 hover:text-rose-200">Delete request</button>}</div>                                         : resource === "withdrawals" ? <div className="flex justify-end gap-3"><Link to={`/control-room/withdrawals/${encodeURIComponent(row.userId)}/${encodeURIComponent(row.id)}`} className="text-xs font-bold text-sky-300 hover:text-sky-200">Details</Link>{canDeleteWithdrawal && <button onClick={() => onAction("delete-withdrawal", actionPayload)} className="text-xs font-bold text-rose-300 hover:text-rose-200">Delete request</button>}</div> : resource === "transactions" ? <a href={`/control-room/transactions/${encodeURIComponent(row.userId)}/${encodeURIComponent(row.id)}?collection=${encodeURIComponent(row.collection || "transactions")}`} target="_blank" rel="noreferrer" className="float-right inline-flex items-center gap-1 text-xs font-bold text-sky-300 hover:text-sky-200">View details <ExternalLink size={13} /></a> : resource === "support" ? <a href={`/control-room/support/${encodeURIComponent(row.userId)}/${encodeURIComponent(row.id)}`} target="_blank" rel="noreferrer" className="float-right inline-flex items-center gap-1 text-xs font-bold text-sky-300 hover:text-sky-200">View details <ExternalLink size={13} /></a>         : resource === "packages" ? <button onClick={() => onAction("update-package", row)} className="float-right text-xs font-bold text-slate-200 hover:text-white">Edit package <ChevronRight size={14} className="inline" /></button> : resource !== "audit" && <button onClick={() => onAction("review", row)} className="float-right text-xs font-bold text-slate-200 hover:text-white">Review <ChevronRight size={14} className="inline" /></button>}</td></tr>; })}</tbody></table></div> : <div className="p-12 text-center text-sm text-slate-400"><FileText className="mx-auto mb-3 text-slate-500" />No records found.</div>}
       </section>
+      {resource === "admins" && <AdminSecurityPanel />}
     </div>
   );
 }
 
 export default function AdminPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, signOutUser } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [noticeType, setNoticeType] = useState("success");
   const [refreshKey, setRefreshKey] = useState(0);
   const [confirm, setConfirm] = useState(null);
+  const [actionSubmitting, setActionSubmitting] = useState(false);
   const noticeTimeoutRef = useRef(null);
   const confirmDialogRef = useRef(null);
   const previousFocusRef = useRef(null);
@@ -456,12 +719,23 @@ export default function AdminPage() {
   const pathParts = location.pathname.split("/").filter(Boolean);
   const resource = pathParts[1] || "overview";
   const transactionDetails = resource === "transactions" && pathParts.length >= 4;
-  const transactionUserId = transactionDetails ? decodeURIComponent(pathParts[2]) : "";
-  const transactionId = transactionDetails ? decodeURIComponent(pathParts[3]) : "";
+  const transactionUserId = transactionDetails ? decodePathPart(pathParts[2]) : "";
+  const transactionId = transactionDetails ? decodePathPart(pathParts[3]) : "";
   const transactionCollection = new URLSearchParams(location.search).get("collection") || "";
   const supportDetails = resource === "support" && pathParts.length >= 4;
-  const supportUserId = supportDetails ? decodeURIComponent(pathParts[2]) : "";
-  const supportTicketId = supportDetails ? decodeURIComponent(pathParts[3]) : "";
+  const supportUserId = supportDetails ? decodePathPart(pathParts[2]) : "";
+  const supportTicketId = supportDetails ? decodePathPart(pathParts[3]) : "";
+  const withdrawalDetails = resource === "withdrawals" && pathParts.length >= 4;
+  const withdrawalUserId = withdrawalDetails ? decodePathPart(pathParts[2]) : "";
+  const withdrawalId = withdrawalDetails ? decodePathPart(pathParts[3]) : "";
+  const invalidTransactionDetails =
+    transactionDetails && (!transactionUserId || !transactionId);
+  const invalidSupportDetails =
+    supportDetails && (!supportUserId || !supportTicketId);
+  const invalidWithdrawalDetails =
+    withdrawalDetails && (!withdrawalUserId || !withdrawalId);
+  const unknownResource =
+    resource !== "overview" && !Object.prototype.hasOwnProperty.call(resources, resource);
 
   function clearNoticeTimeout() {
     if (noticeTimeoutRef.current) {
@@ -504,8 +778,21 @@ export default function AdminPage() {
   }, [confirm]);
 
   async function confirmAction() {
+    if (actionSubmitting) return;
     const payload =
-      confirm.action === "review"
+      confirm.action === "approve-withdrawal"
+        ? {
+            profileId: confirm.payload.profileId || confirm.payload.userId,
+            withdrawalId: confirm.payload.id,
+            payoutSent: actionForm.payoutConfirmed,
+          }
+        : confirm.action === "withdrawal-decision"
+        ? {
+            ...confirm.payload,
+            resource: "withdrawals",
+            nextStatus: confirm.payload.nextStatus,
+          }
+        : confirm.action === "review"
         ? { ...confirm.payload, nextStatus: actionForm.status, reason: actionForm.reason }
         : confirm.action === "settle-deposit"
           ? {
@@ -522,14 +809,19 @@ export default function AdminPage() {
               profileEmail: confirm.payload.profileEmail,
               profileUsername: confirm.payload.profileUsername,
               confirmation: actionForm.confirmation,
-              reason: actionForm.reason,
+            }
+        : confirm.action === "delete-withdrawal"
+          ? {
+              profileId: confirm.payload.profileId || confirm.payload.userId,
+              withdrawalId: confirm.payload.id,
+              confirmation: actionForm.confirmation,
             }
         : confirm.action === "disable-user"
           ? { userId: confirm.payload.userId || confirm.payload.id, profileId: confirm.payload.profileId || confirm.payload.id, reason: actionForm.reason, disabled: confirm.payload.disabled === true }
           : confirm.action === "set-role"
             ? { userId: confirm.payload.userId || confirm.payload.id, profileId: confirm.payload.profileId || confirm.payload.id, role: confirm.payload.role, reason: actionForm.reason }
             : confirm.action === "delete-user"
-              ? { userId: confirm.payload.userId || confirm.payload.id, profileId: confirm.payload.profileId || confirm.payload.id, reason: actionForm.reason, confirmation: actionForm.confirmation }
+              ? { userId: confirm.payload.userId || confirm.payload.id, profileId: confirm.payload.profileId || confirm.payload.id, confirmation: actionForm.confirmation }
         : {
             id: confirm.payload.id,
             name: actionForm.name.trim(),
@@ -550,10 +842,28 @@ export default function AdminPage() {
           };
     let completed = false;
     try {
+      setActionSubmitting(true);
       await reauthenticateAdmin(actionForm.password);
-      await requestAdminAction(confirm.action, payload);
+      const result = await requestAdminAction(confirm.action === "withdrawal-decision" ? "review" : confirm.action, payload);
       setRefreshKey((current) => current + 1);
-      showNotice("success", "Admin request completed successfully.");
+      showNotice(
+        confirm.action === "approve-withdrawal" && result.email?.status === "failed" ? "error" : "success",
+        confirm.action === "approve-withdrawal" && result.email?.status === "failed"
+          ? "Withdrawal completed, but the success email failed. The failure is recorded; do not send the payout again."
+          : confirm.action === "approve-withdrawal"
+          ? result.alreadyCompleted
+            ? result.email?.status === "sent"
+              ? "This withdrawal was already completed and the success email is confirmed as sent."
+              : "This withdrawal was already completed."
+            : result.email?.status === "sent"
+              ? "Withdrawal approved and completed. The member has been notified."
+              : "Withdrawal approved and completed. Email delivery is being processed."
+          : confirm.action === "delete-withdrawal"
+          ? "Withdrawal request deleted."
+          : confirm.action === "withdrawal-decision"
+            ? `Withdrawal ${confirm.payload.nextStatus}.`
+            : "Admin request completed successfully.",
+      );
       completed = true;
     } catch (error) {
       showNotice(
@@ -561,14 +871,19 @@ export default function AdminPage() {
         error instanceof Error ? error.message : "The admin request failed.",
       );
     } finally {
+      setActionSubmitting(false);
       if (completed) setConfirm(null);
     }
   }
   const onAction = (action, payload) => {
+    if (action === "review" && payload.collection === "withdrawals") {
+      navigate(`/control-room/withdrawals/${encodeURIComponent(payload.userId)}/${encodeURIComponent(payload.id)}`);
+      return;
+    }
     clearNoticeTimeout();
     setNotice("");
     setActionForm({
-      status: payload.status === "pending" ? "approved" : payload.status || "approved",
+      status: payload.nextStatus || (payload.status === "pending" ? "approved" : payload.status || "approved"),
       name: String(payload.name || ""),
       description: String(payload.description || ""),
       minimum: String(payload.minimum || ""),
@@ -580,6 +895,7 @@ export default function AdminPage() {
       confirmation: "",
       amount: "",
       currency: "USD",
+      payoutConfirmed: false,
       paperBTC: String(payload.paperTrading?.allocations?.BTC || ""),
       paperETH: String(payload.paperTrading?.allocations?.ETH || ""),
       paperLTC: String(payload.paperTrading?.allocations?.LTC || ""),
@@ -595,7 +911,45 @@ export default function AdminPage() {
         <nav className="space-y-1 p-3">{nav.map(([path, label, Icon]) => <Link onClick={() => setMenuOpen(false)} className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium ${location.pathname === path ? "bg-sky-300 text-[#081321] shadow-sm" : "text-slate-300 hover:bg-white/[0.06] hover:text-white"}`} to={path} key={path}><Icon size={17} />{label}</Link>)}</nav>
         <div className="absolute bottom-0 left-0 right-0 border-t border-white/10 p-4"><div className="flex items-center gap-2"><span className="rounded-full bg-white/10 p-2 text-slate-300"><UserRound size={15} /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-100">{user?.displayName || "Administrator"}</p><p className="truncate text-[11px] text-slate-400">{user?.email || "Verified admin"}</p></div><button title="Sign out" aria-label="Sign out" onClick={() => { clearAdminLoginSession(); signOutUser(); }} className="grid h-9 w-9 place-items-center rounded-lg border border-white/15 text-slate-400 transition hover:border-rose-400/40 hover:bg-rose-400/10 hover:text-rose-300"><LogOut size={16} /></button></div></div>
       </aside>
-      <div className="lg:pl-64"><header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-white/10 bg-[#0b1626]/95 px-4 sm:px-7"><button className="text-slate-300 hover:text-white lg:hidden" onClick={() => setMenuOpen(true)}><Menu size={21} /></button><div className="ml-auto flex items-center gap-2 text-xs font-semibold text-slate-300"><ShieldCheck size={16} className="text-emerald-300" />Firebase admin console</div></header><main className="mx-auto max-w-[1500px] p-4 sm:p-7"><div className="mb-5 flex items-center gap-2 text-xs text-slate-400"><Link to="/control-room" className="hover:text-white">Admin</Link><ChevronRight size={13} /> <span>{transactionDetails ? "Transaction details" : supportDetails ? "Support ticket details" : resource === "overview" ? "Overview" : resources[resource]?.[0] || "Overview"}</span></div>{transactionDetails ? <TransactionDetails userId={transactionUserId} transactionId={transactionId} collection={transactionCollection} /> : supportDetails ? <SupportDetails userId={supportUserId} ticketId={supportTicketId} /> : resource === "overview" ? <Overview /> : resource === "packages" ?             <PackageWorkspace refreshKey={refreshKey} onRefresh={() => setRefreshKey((current) => current + 1)} /> : resources[resource] ?       <ResourcePage resource={resource} onAction={onAction} refreshKey={refreshKey} onRefresh={() => setRefreshKey((current) => current + 1)} /> : <Overview />}</main></div>
+      <div className="lg:pl-64">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-white/10 bg-[#0b1626]/95 px-4 sm:px-7">
+          <button className="text-slate-300 hover:text-white lg:hidden" onClick={() => setMenuOpen(true)}><Menu size={21} /></button>
+          <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-slate-300"><ShieldCheck size={16} className="text-emerald-300" />Firebase admin console</div>
+        </header>
+        <main className="mx-auto max-w-[1500px] p-4 sm:p-7">
+          <div className="mb-5 flex items-center gap-2 text-xs text-slate-400">
+            <Link to="/control-room" className="hover:text-white">Admin</Link>
+            <ChevronRight size={13} />
+            <span>{transactionDetails ? "Transaction details" : supportDetails ? "Support ticket details" : withdrawalDetails ? "Withdrawal review" : resource === "overview" ? "Overview" : resources[resource]?.[0] || "Not found"}</span>
+          </div>
+          {invalidTransactionDetails ? (
+            <AdminRouteMessage title="Invalid transaction link" description="The transaction URL contains an invalid record identifier." />
+          ) : invalidSupportDetails ? (
+            <AdminRouteMessage title="Invalid support link" description="The support URL contains an invalid ticket identifier." />
+          ) : invalidWithdrawalDetails ? (
+            <AdminRouteMessage title="Invalid withdrawal link" description="The withdrawal URL contains an invalid record identifier." />
+          ) : unknownResource ? (
+            <AdminRouteMessage title="Admin page not found" description="That admin resource does not exist." />
+          ) : transactionDetails ? (
+            <TransactionDetails userId={transactionUserId} transactionId={transactionId} collection={transactionCollection} />
+          ) : supportDetails ? (
+            <SupportDetails userId={supportUserId} ticketId={supportTicketId} />
+          ) : withdrawalDetails ? (
+            <WithdrawalDetails userId={withdrawalUserId} withdrawalId={withdrawalId} onAction={onAction} refreshKey={refreshKey} />
+          ) : resource === "overview" ? (
+            <Overview />
+          ) : resource === "packages" ? (
+            <PackageWorkspace refreshKey={refreshKey} onRefresh={() => setRefreshKey((current) => current + 1)} />
+          ) : resource === "withdrawals" ? (
+            <>
+              <WithdrawalDecisionQueue onAction={onAction} refreshKey={refreshKey} />
+              <ResourcePage resource={resource} onAction={onAction} refreshKey={refreshKey} onRefresh={() => setRefreshKey((current) => current + 1)} />
+            </>
+          ) : (
+            <ResourcePage resource={resource} onAction={onAction} refreshKey={refreshKey} onRefresh={() => setRefreshKey((current) => current + 1)} />
+          )}
+        </main>
+      </div>
       {notice && <div role={noticeType === "error" ? "alert" : "status"} className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-md border bg-[#0b1626] px-4 py-3 text-sm shadow-lg ${noticeType === "error" ? "border-rose-400/30 text-rose-300" : "border-emerald-400/30 text-emerald-300"}`}><CheckCircle2 size={17} />{notice}</div>}
       {confirm && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
@@ -608,10 +962,16 @@ export default function AdminPage() {
             className="w-full max-w-md rounded-lg border border-white/10 bg-[#0b1626] p-6 text-slate-100 shadow-2xl"
           >
             <h2 id="admin-confirm-title" className="text-lg font-bold text-white">
-              {confirm.action === "review" ? "Update record status" : confirm.action === "settle-deposit" ? "Credit offline payment" : confirm.action === "delete-deposit" ? "Delete deposit request" : confirm.action === "disable-user" ? (confirm.payload.disabled ? "Enable user access" : "Disable user access") : confirm.action === "set-role" ? "Change user role" : confirm.action === "delete-user" ? "Permanently delete user" : confirm.action === "update-package" ? "Edit investment package" : "Create investment package"}
+              {confirm.action === "approve-withdrawal" ? "Approve and complete withdrawal" : confirm.action === "withdrawal-decision" ? `${confirm.payload.nextStatus === "approved" ? "Approve" : "Reject"} withdrawal request` : confirm.action === "review" ? "Update record status" : confirm.action === "settle-deposit" ? "Credit offline payment" : confirm.action === "delete-deposit" ? "Delete deposit request" : confirm.action === "delete-withdrawal" ? "Delete withdrawal request" : confirm.action === "disable-user" ? (confirm.payload.disabled ? "Enable user access" : "Disable user access") : confirm.action === "set-role" ? "Change user role" : confirm.action === "delete-user" ? "Permanently delete user" : confirm.action === "update-package" ? "Edit investment package" : "Create investment package"}
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-400">
-              This request will be validated and recorded by the secure Firebase admin API.
+              {confirm.action === "approve-withdrawal"
+                ? "This action completes the withdrawal, updates the balance and ledger, and sends the success email. Only continue after you have sent the payout externally."
+                : confirm.action === "withdrawal-decision"
+                ? `Confirm that you want to ${confirm.payload.nextStatus === "approved" ? "approve" : "reject"} this withdrawal request.`
+                : ["delete-user", "delete-deposit", "delete-withdrawal"].includes(confirm.action)
+                ? "To confirm this deletion, re-enter your administrator password. The action will be recorded in the audit history."
+                : "Re-enter your administrator password to confirm. This action will be recorded in the audit history."}
             </p>
             {confirm.action === "delete-deposit" ? (
               <div className="mt-5 space-y-3 rounded-md border border-rose-400/25 bg-rose-400/10 p-4 text-sm text-rose-100">
@@ -620,6 +980,16 @@ export default function AdminPage() {
                 <p>This removes only the request. It cannot be undone and does not change any balance or ledger history. Approved or credited requests are locked.</p>
                 <label className="block font-semibold">
                   Type DELETE DEPOSIT to confirm
+                  <input value={actionForm.confirmation} onChange={(event) => setActionForm((current) => ({ ...current, confirmation: event.target.value }))} autoComplete="off" className="mt-1 w-full rounded-md border border-rose-400/40 bg-[#081321] px-3 py-2 font-normal text-white outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-300/20" />
+                </label>
+              </div>
+            ) : confirm.action === "delete-withdrawal" ? (
+              <div className="mt-5 space-y-3 rounded-md border border-rose-400/25 bg-rose-400/10 p-4 text-sm text-rose-100">
+                <p className="font-bold">Delete withdrawal request</p>
+                <p>Requester: {confirm.payload.profileEmail || confirm.payload.email || "No email"} · @{confirm.payload.profileUsername || confirm.payload.username || "No username"}</p>
+                <p>This removes only the request and cannot be undone. Paid or settled withdrawals are locked. The deletion is recorded in the audit history.</p>
+                <label className="block font-semibold">
+                  Type DELETE WITHDRAWAL to confirm
                   <input value={actionForm.confirmation} onChange={(event) => setActionForm((current) => ({ ...current, confirmation: event.target.value }))} autoComplete="off" className="mt-1 w-full rounded-md border border-rose-400/40 bg-[#081321] px-3 py-2 font-normal text-white outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-300/20" />
                 </label>
               </div>
@@ -632,6 +1002,36 @@ export default function AdminPage() {
                   Amount received (USD)
                   <input type="number" min="0.01" step="0.01" value={actionForm.amount} onChange={(event) => setActionForm((current) => ({ ...current, amount: event.target.value }))} className="mt-1 w-full rounded-md border border-white/15 bg-[#081321] px-3 py-2 font-normal text-white outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/20" />
                 </label>
+              </div>
+            ) : confirm.action === "approve-withdrawal" ? (
+              <div className="mt-5 space-y-3 rounded-md border border-emerald-400/25 bg-emerald-400/10 p-4 text-sm text-emerald-100">
+                <p className="font-bold">Confirm external payout</p>
+                <p>
+                  {confirm.payload.profileUsername || confirm.payload.username || "Member"} ·{" "}
+                  {confirm.payload.profileEmail || confirm.payload.email || "No email recorded"}
+                </p>
+                <p>
+                  {confirm.payload.method || confirm.payload.asset || "Payout asset"} ·{" "}
+                  {Number.isFinite(Number(confirm.payload.amount))
+                    ? `$${Number(confirm.payload.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+                    : "Amount not recorded"}
+                </p>
+                <p className="break-all font-mono text-xs leading-5">{confirm.payload.wallet || "No destination wallet was saved on this request."}</p>
+                <label className="flex items-start gap-2 pt-1 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={actionForm.payoutConfirmed}
+                    onChange={(event) => setActionForm((current) => ({ ...current, payoutConfirmed: event.target.checked }))}
+                    className="mt-1 accent-emerald-300"
+                  />
+                  <span>I have already sent the payout to the wallet address shown above.</span>
+                </label>
+              </div>
+            ) : confirm.action === "withdrawal-decision" ? (
+              <div className={`mt-5 rounded-md border p-4 text-sm ${confirm.payload.nextStatus === "approved" ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-100" : "border-rose-400/25 bg-rose-400/10 text-rose-100"}`}>
+                <p className="font-bold">{confirm.payload.nextStatus === "approved" ? "Approve request" : "Reject request"}</p>
+                <p className="mt-2">Member: {confirm.payload.profileUsername || confirm.payload.username || "No username"} · {confirm.payload.profileEmail || confirm.payload.email || "No email"}</p>
+                <p className="mt-2">Rejecting this request does not change the member’s balance or ledger.</p>
               </div>
             ) : confirm.action === "review" ? (
               <label className="mt-5 block text-sm font-semibold text-slate-200">
@@ -667,7 +1067,7 @@ export default function AdminPage() {
                   </label>
                 ))}
                 <div className="rounded-md border border-sky-400/25 bg-sky-400/10 p-4">
-                  <p className="text-sm font-bold text-sky-100">Paper-trading allocation (USD)</p>
+                  <p className="text-sm font-bold text-sky-100">Crypto trading allocation (USD)</p>
                   <p className="mt-1 text-xs text-sky-200/80">This package controls which crypto positions are assigned when a member deposit using this package is credited.</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     {[
@@ -695,17 +1095,20 @@ export default function AdminPage() {
                 </label>
               </div>
             ) : <p className={`mt-5 rounded-md p-3 text-sm ${confirm.action === "disable-user" && confirm.payload.disabled ? "bg-emerald-400/10 text-emerald-200" : "bg-rose-400/10 text-rose-200"}`}>{confirm.action === "set-role" ? "This changes Firebase custom claims and the profile role. The target must sign in again." : confirm.payload.disabled ? "This restores the target Firebase account and allows the user to sign in again." : "This disables the target Firebase account and its access until an administrator enables it."}</p>}
-            <label className="mt-4 block text-sm font-semibold text-slate-200">
-              Reason (required)
-              <textarea value={actionForm.reason} onChange={(event) => setActionForm((current) => ({ ...current, reason: event.target.value }))} rows={3} className="mt-1 w-full rounded-md border border-white/15 bg-[#081321] px-3 py-2 text-sm font-normal text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20" />
-            </label>
+            {!(confirm.action === "review" && confirm.payload.resource === "withdrawals")
+              && !["approve-withdrawal", "withdrawal-decision", "delete-user", "delete-deposit", "delete-withdrawal"].includes(confirm.action) && (
+              <label className="mt-4 block text-sm font-semibold text-slate-200">
+                Reason (required)
+                <textarea value={actionForm.reason} onChange={(event) => setActionForm((current) => ({ ...current, reason: event.target.value }))} rows={3} className="mt-1 w-full rounded-md border border-white/15 bg-[#081321] px-3 py-2 text-sm font-normal text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20" />
+              </label>
+            )}
             <label className="mt-4 block text-sm font-semibold text-slate-200">
               Re-enter administrator password
               <input type="password" autoComplete="current-password" value={actionForm.password} onChange={(event) => setActionForm((current) => ({ ...current, password: event.target.value }))} className="mt-1 w-full rounded-md border border-white/15 bg-[#081321] px-3 py-2 text-sm font-normal text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20" />
             </label>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setConfirm(null)} className="rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/[0.06] hover:text-white">Cancel</button>
-              <button onClick={confirmAction} disabled={!actionForm.reason.trim() || !actionForm.password || (confirm.action === "settle-deposit" && !(Number(actionForm.amount) > 0)) || (confirm.action === "delete-user" && actionForm.confirmation !== "DELETE USER") || (confirm.action === "delete-deposit" && actionForm.confirmation !== "DELETE DEPOSIT") || (["create", "update-package"].includes(confirm.action) && ![actionForm.paperBTC, actionForm.paperETH, actionForm.paperLTC, actionForm.paperBNB].some((amount) => Number(amount) > 0))} className={`rounded-md px-4 py-2 text-sm font-semibold ${["delete-user", "delete-deposit"].includes(confirm.action) ? "bg-rose-500 text-white hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50" : "bg-sky-300 text-[#081321] hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50"}`}>Confirm</button>
+              <button disabled={actionSubmitting} onClick={() => setConfirm(null)} className="rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-50">Cancel</button>
+              <button onClick={confirmAction} disabled={actionSubmitting || (confirm.action === "review" && confirm.payload.resource !== "withdrawals" && actionForm.reason.trim().length < 10) || (!["review", "approve-withdrawal", "withdrawal-decision", "delete-user", "delete-deposit", "delete-withdrawal"].includes(confirm.action) && actionForm.reason.trim().length < 10) || !actionForm.password || (confirm.action === "approve-withdrawal" && !actionForm.payoutConfirmed) || (confirm.action === "settle-deposit" && !(Number(actionForm.amount) > 0)) || (confirm.action === "delete-user" && actionForm.confirmation !== "DELETE USER") || (confirm.action === "delete-deposit" && actionForm.confirmation !== "DELETE DEPOSIT") || (confirm.action === "delete-withdrawal" && actionForm.confirmation !== "DELETE WITHDRAWAL") || (["create", "update-package"].includes(confirm.action) && ![actionForm.paperBTC, actionForm.paperETH, actionForm.paperLTC, actionForm.paperBNB].some((amount) => Number(amount) > 0))} className={`rounded-md px-4 py-2 text-sm font-semibold ${["delete-user", "delete-deposit", "delete-withdrawal"].includes(confirm.action) ? "bg-rose-500 text-white hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50" : "bg-sky-300 text-[#081321] hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50"}`}>{actionSubmitting ? "Processing…" : confirm.action === "approve-withdrawal" ? "Approve and complete" : confirm.action === "withdrawal-decision" ? (confirm.payload.nextStatus === "approved" ? "Approve request" : "Reject request") : "Confirm"}</button>
             </div>
           </div>
         </div>

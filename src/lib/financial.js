@@ -1,7 +1,9 @@
 import { collection, doc, getDoc, getDocs, limit, orderBy, query } from "firebase/firestore";
-import { firestoreDb } from "./firebase";
+import { firestoreDb } from "./firebaseFirestore";
+import { calculateWithdrawableBalance, getPaperTradingCapital } from "./financialMath";
 
 const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const CRYPTO_SYMBOLS = ["BTC", "ETH", "LTC", "BNB"];
 export const formatMoney = (value = 0) => moneyFormatter.format(Number(value) || 0);
 export function formatTransactionType(type, fallback = "Transaction") {
   if (String(type || "").toLowerCase() === "paper-trading-valuation") {
@@ -10,7 +12,7 @@ export function formatTransactionType(type, fallback = "Transaction") {
   return type || fallback;
 }
 export function buildEmptyFinancialSummary() {
-  return { availableBalance: 0, withdrawableBalance: 0, promotionalCredit: 0, lockedBonus: 0, activeDeposit: 0, totalDeposit: 0, totalWithdrawal: 0, totalEarnings: 0, lastDeposit: 0, lastWithdrawal: 0, referralCount: 0, commission: 0, transactions: [], referralRewards: 0 };
+  return { availableBalance: 0, withdrawableBalance: 0, promotionalCredit: 0, lockedBonus: 0, activeDeposit: 0, totalDeposit: 0, totalWithdrawal: 0, totalEarnings: 0, lastDeposit: 0, lastWithdrawal: 0, referralCount: 0, commission: 0, transactions: [], referralRewards: 0, depositCryptoCapital: 0, administratorCryptoCapital: 0, cryptoTradingCapital: 0 };
 }
 function completed(item) { return ["completed", "complete", "approved", "settled", "success"].includes(String(item.status || "completed").toLowerCase()); }
 function isTradingValuation(item) {
@@ -58,13 +60,36 @@ export async function loadAccountData(userId) {
     if (type.includes("earn") || type.includes("profit") || type.includes("referral") || type.includes("commission")) summary.totalEarnings += amount;
     if (item.locked === true) summary.lockedBonus += amount;
   }
-  summary.totalDeposit ||= Number(profile.totalDeposit) || 0;
-  summary.totalWithdrawal ||= Number(profile.totalWithdrawal) || 0;
-  const ledgerEarnings = summary.totalEarnings || Number(profile.totalEarnings) || 0;
+  const hasLedgerValue = (field) =>
+    Object.prototype.hasOwnProperty.call(profile, field) &&
+    Number.isFinite(Number(profile[field]));
+  const ledgerTotalDeposit = hasLedgerValue("totalDeposit")
+    ? Math.max(Number(profile.totalDeposit), 0)
+    : summary.totalDeposit;
+  const ledgerTotalWithdrawal = hasLedgerValue("totalWithdrawal")
+    ? Math.max(Number(profile.totalWithdrawal), 0)
+    : summary.totalWithdrawal;
+  const ledgerEarnings = hasLedgerValue("totalEarnings")
+    ? Math.max(Number(profile.totalEarnings), 0)
+    : summary.totalEarnings;
+  summary.totalDeposit = ledgerTotalDeposit;
+  summary.totalWithdrawal = ledgerTotalWithdrawal;
   const paperTradingProfit = Number(profile.paperTradingProfit) || 0;
+  const administratorCryptoCapital = getPaperTradingCapital(profile);
+  const depositCryptoCapital = Math.max(summary.totalDeposit, 0);
   summary.totalEarnings = ledgerEarnings + paperTradingProfit;
-  summary.activeDeposit = Math.max(summary.totalDeposit - summary.totalWithdrawal + paperTradingProfit, 0);
-  summary.withdrawableBalance = Math.max(summary.totalDeposit + summary.totalEarnings - summary.totalWithdrawal - summary.commission, 0);
+  summary.depositCryptoCapital = depositCryptoCapital;
+  summary.administratorCryptoCapital = administratorCryptoCapital;
+  summary.cryptoTradingCapital = depositCryptoCapital + administratorCryptoCapital;
+  summary.activeDeposit = Math.max(summary.totalDeposit - summary.totalWithdrawal + administratorCryptoCapital + paperTradingProfit, 0);
+  summary.withdrawableBalance = calculateWithdrawableBalance({
+    totalDeposit: summary.totalDeposit,
+    totalEarnings: summary.totalEarnings,
+    totalWithdrawal: summary.totalWithdrawal,
+    commission: summary.commission,
+    paperTradingWithdrawals: profile.paperTradingWithdrawals,
+    paperTradingCapital: administratorCryptoCapital,
+  });
   summary.availableBalance = summary.withdrawableBalance + summary.promotionalCredit;
   return { profile, summary };
 }

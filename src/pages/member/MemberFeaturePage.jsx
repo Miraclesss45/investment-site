@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../../lib/authContext";
-import { createMemberRequest, sendDepositRequestEmail, updateUserProfile } from "../../lib/firebaseData";
+import { createMemberRequest, sendDepositRequestEmail, sendWithdrawalProcessingEmail, updateUserProfile } from "../../lib/firebaseData";
 import useAccountData from "../../lib/useAccountData";
 import CountrySelect from "../../components/ui/CountrySelect";
 import {
@@ -317,6 +317,14 @@ export default function MemberFeaturePage() {
   const [withdrawalToDate, setWithdrawalToDate] = useState("");
 
   const selectedDepositAddress = depositWalletAddresses[selectedAsset] || "";
+  const selectedWithdrawal =
+    withdrawalAssets.find(([asset]) => asset === selectedAsset) ||
+    withdrawalAssets[0];
+  const [selectedWithdrawalAsset, selectedWithdrawalWalletField, selectedWithdrawalFee] =
+    selectedWithdrawal;
+  const selectedWithdrawalWallet = String(
+    profile[selectedWithdrawalWalletField] || "",
+  ).trim();
 
   function handleDepositAssetChange(event) {
     setSelectedAsset(event.target.value);
@@ -484,11 +492,8 @@ export default function MemberFeaturePage() {
       }
 
       const amount = Number(withdrawalAmount);
-      const selectedWithdrawal =
-        withdrawalAssets.find(([asset]) => asset === selectedAsset) ||
-        withdrawalAssets[0];
-      const [, walletField, fee] = selectedWithdrawal;
-      const wallet = String(profile[walletField] || "").trim();
+      const wallet = selectedWithdrawalWallet;
+      const fee = selectedWithdrawalFee;
 
       if (!Number.isFinite(amount) || amount <= 0) {
         setMessage("Enter a valid withdrawal amount.");
@@ -501,16 +506,31 @@ export default function MemberFeaturePage() {
         return;
       }
       if (!wallet) {
-        setMessage(`Add your ${selectedAsset} wallet address in your profile first.`);
+        setMessage(`Add your ${selectedWithdrawalAsset} wallet address in your profile first.`);
         return;
       }
 
       setWithdrawalSubmitting(true);
       try {
-        await createMemberRequest(user.uid, "withdrawals", { amount, method: selectedAsset, wallet, fee, email: user.email || "" });
+        const request = await createMemberRequest(user.uid, "withdrawals", { amount, method: selectedAsset, wallet, fee, email: user.email || "" });
+        let emailFailed = false;
+        let emailFailureCode = "";
+        try {
+          await sendWithdrawalProcessingEmail(request.id);
+        } catch (error) {
+          emailFailed = true;
+          emailFailureCode = error?.code || "email-delivery-failed";
+        }
         navigate("/withdrawal-pending", {
           replace: true,
-          state: { amount, asset: selectedAsset, fee },
+          state: {
+            amount,
+            asset: selectedWithdrawalAsset,
+            wallet,
+            fee,
+            emailFailed,
+            emailFailureCode,
+          },
         });
       } catch {
         setMessage(
@@ -899,12 +919,19 @@ export default function MemberFeaturePage() {
                       Available to withdraw: {formatMoney(summary.withdrawableBalance)}
                     </span>
                   </label>
-                  <div className="mt-4 rounded-xl border border-yellow-300/15 bg-yellow-300/[0.06] p-4 text-xs leading-5 text-slate-300">
-                    Confirm your saved wallet address in{" "}
-                    <Link to="/profile" className="font-bold text-yellow-200 hover:text-white">
-                      Wallet / Profile
-                    </Link>{" "}
-                    before submitting.
+                  <div className={`mt-4 rounded-xl border p-4 text-xs leading-5 ${selectedWithdrawalWallet ? "border-white/10 bg-[#081321] text-slate-300" : "border-amber-300/25 bg-amber-300/[0.07] text-amber-100"}`}>
+                    <p className="font-bold text-white">Saved {selectedWithdrawalAsset} wallet</p>
+                    {selectedWithdrawalWallet ? (
+                      <p className="mt-2 break-all font-['IBM_Plex_Mono'] text-slate-300">{selectedWithdrawalWallet}</p>
+                    ) : (
+                      <p className="mt-2">
+                        Add a {selectedWithdrawalAsset} wallet address in{" "}
+                        <Link to="/profile" className="font-bold text-amber-200 underline hover:text-white">
+                          Wallet / Profile
+                        </Link>{" "}
+                        before submitting your request.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -918,14 +945,18 @@ export default function MemberFeaturePage() {
                   <dl className="mt-6 space-y-4 text-sm">
                     <div className="flex justify-between gap-4">
                       <dt className="text-slate-500">Asset</dt>
-                      <dd className="font-bold text-white">{selectedAsset}</dd>
+                      <dd className="font-bold text-white">{selectedWithdrawalAsset}</dd>
+                    </div>
+                    <div className="space-y-2">
+                      <dt className="text-slate-500">Destination wallet</dt>
+                      <dd className="break-all font-['IBM_Plex_Mono'] text-xs leading-5 text-white">
+                        {selectedWithdrawalWallet || "Add this wallet in your profile to continue"}
+                      </dd>
                     </div>
                     <div className="flex justify-between gap-4">
                       <dt className="text-slate-500">Network fee</dt>
                       <dd className="font-['IBM_Plex_Mono'] font-semibold text-white">
-                        {formatMoney(
-                          withdrawalAssets.find(([asset]) => asset === selectedAsset)?.[2] || 0,
-                        )}
+                        {formatMoney(selectedWithdrawalFee)}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-4 border-t border-white/10 pt-4">
@@ -938,7 +969,9 @@ export default function MemberFeaturePage() {
                   <button
                     type="submit"
                     disabled={
-                      withdrawalSubmitting || summary.withdrawableBalance <= 0
+                      withdrawalSubmitting ||
+                      summary.withdrawableBalance <= 0 ||
+                      !selectedWithdrawalWallet
                     }
                     className="mt-7 w-full rounded-lg bg-gradient-to-r from-sky-400 to-cyan-300 px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-slate-950 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -1115,7 +1148,7 @@ export default function MemberFeaturePage() {
                   [
                     "Available balance",
                     summary.availableBalance,
-                    "Includes promotional credit",
+                    "Includes non-withdrawable crypto capital and promotional credit",
                   ],
                   ["Total deposited", summary.totalDeposit, "Completed deposits"],
                   ["Total earnings", summary.totalEarnings, "Recorded earnings"],

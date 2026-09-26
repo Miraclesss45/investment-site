@@ -1,36 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { getIdTokenResult, onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { firebaseAuth, firestoreDb } from "./firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { firebaseAuth } from "./firebase";
 import { AuthContext } from "./authContext";
-
-function normalizeRole(value) {
-  const role = String(value ?? "member").trim().toLowerCase();
-  return role === "admin" ? "admin" : "member";
-}
-
-async function resolveUserRole(nextUser) {
-  if (!nextUser) return "member";
-
-  try {
-    const tokenResult = await getIdTokenResult(nextUser, true);
-    const claimRole = String(tokenResult?.claims?.role ?? "").trim().toLowerCase();
-    if (claimRole === "admin" || tokenResult?.claims?.admin === true) {
-      return "admin";
-    }
-  } catch {
-    // Fall back to the Firestore profile when custom claims are not yet available.
-  }
-
-  if (!firestoreDb) return "member";
-
-  try {
-    const userDoc = await getDoc(doc(firestoreDb, "users", nextUser.uid));
-    return userDoc.exists() ? normalizeRole(userDoc.data().role) : "member";
-  } catch {
-    return "member";
-  }
-}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -50,11 +21,12 @@ export function AuthProvider({ children }) {
       setLoading(false);
       setError("Firebase took too long to restore your session. Check your connection and try again.");
     }, 10000);
+    let active = true;
 
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (nextUser) => {
-      window.clearTimeout(timeoutId);
-
       if (!nextUser) {
+        window.clearTimeout(timeoutId);
+        if (!active) return;
         setUser(null);
         setRole("member");
         setLoading(false);
@@ -62,21 +34,30 @@ export function AuthProvider({ children }) {
         return;
       }
 
+      if (!active) return;
       setUser(nextUser);
       setLoading(true);
       setError("");
 
       try {
+        const { resolveUserRole } = await import("./userRole");
         const nextRole = await resolveUserRole(nextUser);
+        if (!active) return;
         setRole(nextRole);
-      } catch {
+      } catch (roleError) {
+        if (!active) return;
         setRole("member");
+        setError(roleError.message || "Your account role could not be verified. Please try again.");
       } finally {
-        setLoading(false);
+        if (active) {
+          window.clearTimeout(timeoutId);
+          setLoading(false);
+        }
       }
     });
 
     return () => {
+      active = false;
       window.clearTimeout(timeoutId);
       unsubscribe();
     };

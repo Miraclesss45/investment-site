@@ -4,11 +4,10 @@ import { Eye, EyeOff, LoaderCircle, ShieldCheck, UserRound } from "lucide-react"
 import { doc, getDoc } from "firebase/firestore";
 import {
   firebaseAuth,
-  firestoreDb,
   getFirebaseStatus,
 } from "../../lib/firebase";
+import { firestoreDb } from "../../lib/firebaseFirestore";
 import {
-  getIdTokenResult,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -17,10 +16,20 @@ import {
 import { getAuthErrorMessage, resolveLoginEmail } from "../../lib/authHelpers";
 import { createReferralReward } from "../../lib/firebaseData";
 import FeedbackMessage from "../../components/ui/FeedbackMessage";
+import { resolveUserRole } from "../../lib/userRole";
+
+function isSafeInternalPath(path) {
+  return (
+    typeof path === "string" &&
+    path.startsWith("/") &&
+    !path.startsWith("//") &&
+    path !== "/control-room/login"
+  );
+}
 
 function getSafeReturnPath(location) {
   const from = location.state?.from;
-  return typeof from === "string" && from.startsWith("/")
+  return isSafeInternalPath(from)
     ? from
     : location.pathname.startsWith("/control-room")
       ? "/control-room"
@@ -29,37 +38,11 @@ function getSafeReturnPath(location) {
 
 function getDestination(location, role) {
   const requestedPath = getSafeReturnPath(location);
-  const isAdminPath = requestedPath.startsWith("/control-room");
+  const isAdminPath =
+    requestedPath === "/control-room" ||
+    requestedPath.startsWith("/control-room/");
   if (role === "admin") return isAdminPath ? requestedPath : "/control-room";
   return isAdminPath ? "/dashboard" : requestedPath;
-}
-
-async function resolveUserRole(user) {
-  if (!user) return "member";
-
-  try {
-    const tokenResult = await getIdTokenResult(user, true);
-    const claimRole = String(tokenResult?.claims?.role ?? "").trim().toLowerCase();
-    if (claimRole === "admin" || tokenResult?.claims?.admin === true) {
-      return "admin";
-    }
-  } catch {
-    // Fall through to Firestore role checks when claims are not available yet.
-  }
-
-  if (!firestoreDb) return "member";
-
-  try {
-    const userDoc = await getDoc(doc(firestoreDb, "users", user.uid));
-    if (userDoc.exists()) {
-      const storedRole = String(userDoc.data().role ?? "member").trim().toLowerCase();
-      return storedRole === "admin" ? "admin" : "member";
-    }
-  } catch {
-    // Stay conservative and treat unclear role data as member access.
-  }
-
-  return "member";
 }
 
 export default function LoginPage() {
@@ -195,7 +178,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050b14] font-['DM_Sans'] text-white">
+    <div className="relative min-h-screen overflow-hidden bg-[#050b14] text-white">
       <div className="pointer-events-none absolute left-[-14rem] top-[-14rem] h-[38rem] w-[38rem] rounded-full bg-sky-500/15 blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-16rem] right-[-10rem] h-[38rem] w-[38rem] rounded-full bg-cyan-400/10 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(56,189,248,0.08),transparent_38%)]" />

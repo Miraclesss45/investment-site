@@ -29,6 +29,8 @@ export function getAuthErrorMessage(error, fallback = "Something went wrong.") {
       "Too many attempts. Wait a moment and try again.",
     "auth/requires-recent-login":
       "For your security, sign in again and retry this action.",
+    "auth/password-does-not-meet-requirements":
+      "Use a stronger password that meets Firebase's password requirements.",
     "auth/invalid-credential":
       "The email or password is incorrect. Check both values and try again.",
     "auth/invalid-login-credentials":

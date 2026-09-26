@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./authContext";
 import {
   buildEmptyFinancialSummary,
@@ -13,6 +13,7 @@ export default function useAccountData() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(Boolean(user));
+  const requestRef = useRef(null);
 
   useEffect(() => {
     if (!user) {
@@ -26,18 +27,31 @@ export default function useAccountData() {
     setLoading(true);
     setError("");
 
-    const timeout = new Promise((_, reject) => {
-      window.setTimeout(() => {
-        const timeoutError = new Error("Account data request timed out.");
-        timeoutError.code = "account-data-timeout";
-        reject(timeoutError);
-      }, 12000);
-    });
+    const refreshAccount = async () => {
+      if (document.visibilityState !== "visible" || requestRef.current) return;
+      const request = loadAccountData(user.uid);
+      requestRef.current = request;
+      let timeoutId;
+      const timeout = new Promise((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          const timeoutError = new Error("Account data request timed out.");
+          timeoutError.code = "account-data-timeout";
+          reject(timeoutError);
+        }, 12000);
+      });
+      try {
+        const nextAccount = await Promise.race([request, timeout]);
+        if (active) setAccount(nextAccount);
+      } finally {
+        window.clearTimeout(timeoutId);
+        if (requestRef.current === request) requestRef.current = null;
+      }
+      return request;
+    };
 
-    Promise.race([loadAccountData(user.uid), timeout])
-      .then((nextAccount) => {
+    refreshAccount()
+      .then(() => {
         if (!active) return;
-        setAccount(nextAccount);
         setLoading(false);
       })
       .catch((reason) => {
@@ -52,24 +66,44 @@ export default function useAccountData() {
         setLoading(false);
       });
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        setLoading(true);
+        setError("");
+        refreshAccount()
+          .catch((reason) => {
+            if (active) setError(reason?.message || "We could not refresh your account data.");
+          })
+          .finally(() => {
+            if (active) setLoading(false);
+          });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     const refreshTimer = window.setInterval(() => {
-      loadAccountData(user.uid)
-        .then((nextAccount) => {
-          if (active) setAccount(nextAccount);
-        })
-        .catch(() => {});
+      refreshAccount().catch(() => {});
     }, 30000);
 
     return () => {
       active = false;
+      requestRef.current = null;
       window.clearInterval(refreshTimer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [user]);
 
   const refresh = useCallback(async () => {
-    if (!user) return;
-    const nextAccount = await loadAccountData(user.uid);
-    setAccount(nextAccount);
+    if (!user || requestRef.current) return;
+    const request = loadAccountData(user.uid);
+    requestRef.current = request;
+    try {
+      const nextAccount = await request;
+      setAccount(nextAccount);
+    } finally {
+      if (requestRef.current === request) requestRef.current = null;
+    }
   }, [user]);
 
   return {

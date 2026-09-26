@@ -76,10 +76,10 @@ async function findOrCreateUser(email) {
   }
 
   const password = flags.password || (await input.question(
-    "Enter a password for the new user (min 6 chars): ",
+    "Enter a password for the new user (min 8 chars): ",
   )).trim();
-  if (password.length < 6) {
-    throw new Error("Password must be at least 6 characters.");
+  if (password.length < 8) {
+    throw new Error("Password must be at least 8 characters.");
   }
   const emailVerified = flags.emailVerified || (await input.question(
     "Mark email as verified? (y/N): ",

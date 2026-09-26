@@ -1,7 +1,8 @@
 ﻿import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LoaderCircle, Mail, MapPin } from "lucide-react";
-import { firebaseAuth, firestoreDb, getFirebaseStatus } from "../../lib/firebase";
+import { firebaseAuth, getFirebaseStatus } from "../../lib/firebase";
+import { firestoreDb } from "../../lib/firebaseFirestore";
 import { sendEmailVerification, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getAuthErrorMessage } from "../../lib/authHelpers";
 import { createAccount } from "../../lib/firebaseData";
@@ -87,7 +88,6 @@ export default function SignupPage() {
       createdUser = signupData.user;
       if (!createdUser) throw new Error("Unable to create your account right now.");
       await sendEmailVerification(createdUser);
-      await signOut(firebaseAuth);
       navigate(`/verify-email?email=${encodeURIComponent(email)}`, {
         replace: true,
         state: { email },
@@ -125,7 +125,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050b14] px-4 pb-16 pt-8 font-['DM_Sans'] text-slate-200 sm:px-6">
+    <div className="relative min-h-screen overflow-hidden bg-[#050b14] px-4 pb-16 pt-8 text-slate-200 sm:px-6">
       <div className="pointer-events-none absolute right-[-12rem] top-[-14rem] h-[34rem] w-[34rem] rounded-full bg-sky-500/15 blur-3xl" />
       <div className="relative mx-auto flex w-full max-w-[1120px] items-center justify-between">
         <Link

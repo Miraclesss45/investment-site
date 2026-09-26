@@ -2,7 +2,7 @@
 
 ## Overview
 
-The MeridianVest project has been fully migrated from Netlify to Vercel. All Netlify references have been removed, and the three backend functions are now standalone Vercel API routes.
+The MeridianVest project has been fully migrated from Netlify to Vercel. All Netlify references have been removed, and the backend functions are standalone Vercel API routes.
 
 ## What's Changed
 
@@ -15,6 +15,7 @@ The MeridianVest project has been fully migrated from Netlify to Vercel. All Net
 - `api/admin-data.js` - Admin operations and audit logging
 - `api/create-referral-reward.js` - Referral reward verification
 - `api/send-deposit-telegram.js` - Deposit notifications
+- `api/send-withdrawal-email.js` and `api/withdrawal-mailer.js` - Branded withdrawal email delivery over Truehost SMTP
 - `vercel.json` - Vercel build and function configuration
 
 ### Updated
@@ -36,6 +37,12 @@ This will prompt you to:
 
 ### 2. Configure Environment Variables
 
+In the Truehost hosting panel, create a mailbox on your domain. Open that mailbox's
+**Connect Devices**, **Set Up Mail Client**, or similarly named configuration page
+and use the displayed outgoing SMTP hostname, port, and encryption setting. Truehost
+may show different values for different mail hosting plans, so use the values shown
+for your specific mailbox rather than copying a generic server name.
+
 In Vercel project dashboard, add these variables for `Production`, `Preview`, and `Development`:
 
 ```
@@ -48,9 +55,35 @@ VITE_FIREBASE_APP_ID=<value>
 FIREBASE_SERVICE_ACCOUNT=<complete JSON object>
 TELEGRAM_BOT_TOKEN=<value>
 TELEGRAM_CHAT_ID=<value>
+SMTP_HOST=<outgoing SMTP hostname shown by Truehost>
+SMTP_PORT=<outgoing SMTP port shown by Truehost>
+SMTP_SECURE=<true for implicit TLS, false for STARTTLS>
+SMTP_USER=<full Truehost mailbox address>
+SMTP_PASS=<Truehost mailbox password>
+MAIL_FROM=<MeridianVest <same mailbox address>>
 ```
 
 **Important:** Store `FIREBASE_SERVICE_ACCOUNT` as the complete JSON string from your Firebase service account key.
+SMTP variables are server-only: do not prefix them with `VITE_`, place them in frontend code, or commit their real values. `MAIL_FROM` should use the Truehost mailbox/domain that is authorized to send. After changing Vercel variables, redeploy for them to take effect.
+
+`vercel env add` saves a variable to the Vercel project; it does not update an
+already-running local `vercel dev` process or redeploy an existing Production
+deployment. For local API testing, make the Development variables available in
+`.env.local` (the file Vercel Dev loads), then restart `vercel dev`. If
+`.env.local` already exists, do not overwrite it with `vercel env pull
+.env.local --yes`; pull to another ignored file and merge the required keys
+without removing existing Firebase settings. Create a new Production deployment
+after changing Production variables. `vercel env ls` confirms that variable
+names are configured, but does not verify that Truehost accepts SMTP connections
+from the runtime.
+
+To find the SMTP settings in Truehost:
+
+1. Sign in to the Truehost client area or hosting control panel for your domain.
+2. Open **Email Accounts/Mailboxes**, create the sender mailbox, or select an existing one.
+3. Choose **Connect Devices**, **Set Up Mail Client**, or **Configure Mail Client**.
+4. Copy its outgoing mail server, SMTP port, and SSL/TLS or STARTTLS setting into Vercel. Use the full mailbox address for `SMTP_USER`.
+5. Set `SMTP_SECURE=true` when the displayed port uses implicit SSL/TLS (commonly port 465); set it to `false` when the displayed setting is STARTTLS (commonly port 587). Follow the settings shown for your account.
 
 ### 3. Deploy to Production
 
@@ -82,15 +115,46 @@ In Firebase Console:
 
 ## API Routes
 
-All three backend functions are available at:
+Backend functions are available at:
 
 - `POST /api/admin-data` - Admin dashboard data and operations
+- `GET /api/admin-data?resource=admins` - Read-only current administrator directory
 - `POST /api/create-referral-reward` - Referral reward processing
 - `POST /api/send-deposit-telegram` - Deposit notification sending
+- `POST /api/send-withdrawal-email` - Sends the authenticated member's withdrawal-processing email
+
+The member receives the first email after the pending request is saved. Both
+withdrawal emails include the USD request amount and selected payout asset, and
+display `(n/a)` for the wallet address. The actual payout wallet remains saved as an
+immutable request snapshot for administrator review and payout. Firestore rules
+require it to match the member's saved wallet for the selected asset when the request
+is created.
+
+Pending and on-hold requests appear in the decision queue on the admin Withdrawals
+page, where administrators can reject a request or approve it after sending the
+payout externally to the displayed wallet. Approval is the final in-app action: it
+atomically completes the withdrawal, updates the member balance and ledger once,
+records the audit event, and attempts the branded success email. Administrators must
+not approve before sending the payout. The action requires recent password
+reauthentication and a confirmation that the payout was already sent. If SMTP
+delivery fails, the completed withdrawal remains recorded and the failed notification
+is saved on the request.
+
+Administrators can delete unpaid withdrawal requests from that page. Deletion
+requires recent password reauthentication and typing `DELETE WITHDRAWAL`; no
+separate reason is required. Paid or settled withdrawals are protected and
+deletions are written to the audit log. Reviewing a withdrawal opens its
+dedicated details page, including the member username and email, with the same
+withdrawal approval and rejection actions. Deposit-request and user deletions use the same password-confirmation
+flow with their respective confirmation phrases.
 
 Each route requires:
 - Valid Firebase ID token in `Authorization: Bearer <token>` header
 - Appropriate admin claims for admin routes
+
+Passwords remain managed by Firebase Authentication. Administrators change their own
+password from the Admins tab in the control room; plaintext passwords are never sent
+to the admin API or written to audit records.
 - Valid request body with required fields
 
 ## Service Account Security

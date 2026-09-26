@@ -3,9 +3,16 @@
   "outputDirectory": "dist",
   "functions": {
     "api/*.js": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "public/meridianvest-favicon.png"
     }
   },
+  "crons": [
+    {
+      "path": "/api/recover-provisioning",
+      "schedule": "0 3 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!api/|@vite/|@react-refresh|src/|node_modules/|assets/).*)",

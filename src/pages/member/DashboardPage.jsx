@@ -3,8 +3,9 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Check, Copy, LogOut, Menu, TrendingDown, TrendingUp, X } from "lucide-react";
 import { useAuth } from "../../lib/authContext";
 import useAccountData from "../../lib/useAccountData";
-import { buildEmptyFinancialSummary, formatMoney, formatTransactionType } from "../../lib/financial";
-import { CRYPTO_ASSETS, useCryptoMarketData } from "../../lib/cryptoMarket";
+import { buildEmptyFinancialSummary, CRYPTO_SYMBOLS, formatMoney, formatTransactionType } from "../../lib/financial";
+import { CHART_RANGES, CRYPTO_ASSETS, useCryptoChartData, useCryptoMarketData } from "../../lib/cryptoMarket";
+import { getAssetAllocation, hasUsableMarketPrice, safeNumber } from "../../lib/cryptoUtils";
 import { syncPaperTradingMarket } from "../../lib/firebaseData";
 import FeedbackMessage from "../../components/ui/FeedbackMessage";
 
@@ -28,11 +29,13 @@ export default function DashboardPage() {
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState("");
   const [selectedAsset, setSelectedAsset] = useState("BTC");
+  const [chartRange, setChartRange] = useState("1");
   const mobileMenuRef = useRef(null);
   const mobileMenuButtonRef = useRef(null);
   const firstMobileLinkRef = useRef(null);
   const lastPaperTradingSyncRef = useRef(0);
   const marketData = useCryptoMarketData();
+  const chartData = useCryptoChartData(selectedAsset, chartRange);
 
   const loading = account.loading;
   const accountError = account.error;
@@ -44,57 +47,67 @@ export default function DashboardPage() {
         : null;
   const summary = account?.summary || buildEmptyFinancialSummary();
   const paperTrading = profile?.paperTrading;
-  const persistedPaperTradingProfit = Number(profile?.paperTradingProfit) || 0;
-  const livePaperTradingProfit = useMemo(() => {
-    if (!paperTrading?.enabled) return persistedPaperTradingProfit;
-
+  const depositCryptoCapital = Math.max(safeNumber(summary.totalDeposit, 0), 0);
+  const depositCryptoAllocation = depositCryptoCapital / CRYPTO_SYMBOLS.length;
+  const persistedPaperTradingProfit = safeNumber(profile?.paperTradingProfit, 0);
+  const liveTradingValuation = useMemo(() => {
     let capital = 0;
     let currentValue = 0;
+    let hasPosition = false;
+    let stale = false;
     for (const asset of CRYPTO_ASSETS) {
-      const allocation = Math.max(Number(paperTrading.allocations?.[asset.symbol]) || 0, 0);
+      const depositAllocation = depositCryptoAllocation;
+      const administratorAllocation = paperTrading?.enabled ? getAssetAllocation(paperTrading.allocations, asset.symbol) : 0;
+      const allocation = depositAllocation + administratorAllocation;
       if (!allocation) continue;
-      const livePrice = Number(marketData[asset.symbol]?.price);
-      const entryPrice = Number(
-        paperTrading.marketEntryPrices?.[asset.symbol] ||
-          marketData[asset.symbol]?.entryPrice,
-      );
-      if (!Number.isFinite(livePrice) || livePrice <= 0 || !Number.isFinite(entryPrice) || entryPrice <= 0) {
-        return persistedPaperTradingProfit;
+      hasPosition = true;
+      const liveAsset = marketData[asset.symbol];
+      const livePrice = safeNumber(liveAsset?.price, 0);
+      const entryPrice = safeNumber(paperTrading?.marketEntryPrices?.[asset.symbol], 0);
+      if (!hasUsableMarketPrice(livePrice) || (administratorAllocation > 0 && !hasUsableMarketPrice(entryPrice))) {
+        return { capital, currentValue, profit: persistedPaperTradingProfit, ready: false, stale: true };
       }
       capital += allocation;
-      currentValue += (allocation / entryPrice) * livePrice;
+      currentValue += depositAllocation + (administratorAllocation / entryPrice) * livePrice;
+      stale = stale || liveAsset?.stale === true;
     }
-    return capital > 0 ? currentValue - capital : persistedPaperTradingProfit;
-  }, [marketData, paperTrading, persistedPaperTradingProfit]);
+    if (!hasPosition || stale) {
+      return { capital, currentValue, profit: persistedPaperTradingProfit, ready: false, stale };
+    }
+    return { capital, currentValue, profit: currentValue - capital, ready: true, stale: false };
+  }, [depositCryptoAllocation, marketData, paperTrading, persistedPaperTradingProfit]);
+  const livePaperTradingProfit = liveTradingValuation.profit;
   const liveSummary = useMemo(() => {
-    const profitDelta = livePaperTradingProfit - persistedPaperTradingProfit;
+    const profitDelta = liveTradingValuation.ready
+      ? livePaperTradingProfit - persistedPaperTradingProfit
+      : 0;
     return {
       ...summary,
       totalEarnings: summary.totalEarnings + profitDelta,
       activeDeposit: Math.max(summary.activeDeposit + profitDelta, 0),
       availableBalance: Math.max(summary.availableBalance + profitDelta, 0),
     };
-  }, [livePaperTradingProfit, persistedPaperTradingProfit, summary]);
+  }, [livePaperTradingProfit, liveTradingValuation.ready, persistedPaperTradingProfit, summary]);
   const assignedAssets = useMemo(
-    () =>
-      paperTrading?.enabled
-        ? CRYPTO_ASSETS.filter(
-            (asset) => Number(paperTrading.allocations?.[asset.symbol]) > 0,
-          )
-        : [],
-    [paperTrading],
+    () => (depositCryptoCapital > 0 || paperTrading?.enabled
+      ? CRYPTO_ASSETS.filter((asset) => depositCryptoAllocation > 0 || Number(paperTrading?.allocations?.[asset.symbol]) > 0)
+      : []),
+    [depositCryptoAllocation, depositCryptoCapital, paperTrading],
   );
   const selectedAssetData = marketData[selectedAsset] || null;
 
-  const simCapital = Math.max(Number(paperTrading?.allocations?.[selectedAsset]) || 0, 0);
+  const simCapital = depositCryptoAllocation + (paperTrading?.enabled
+    ? getAssetAllocation(paperTrading.allocations, selectedAsset)
+    : 0);
   const selectedAssetMeta = CRYPTO_ASSETS.find((asset) => asset.symbol === selectedAsset) || CRYPTO_ASSETS[0];
 
   const positionMetrics = useMemo(() => {
-    const livePrice = Number(selectedAssetData?.price || 0);
-    const entryPrice = Number(selectedAssetData?.entryPrice || selectedAssetData?.price || 0);
+    const livePrice = safeNumber(selectedAssetData?.price, 0);
+    const administratorCapital = paperTrading?.enabled ? getAssetAllocation(paperTrading.allocations, selectedAsset) : 0;
+    const administratorEntryPrice = safeNumber(paperTrading?.marketEntryPrices?.[selectedAsset], 0);
     const capital = simCapital;
 
-    if (!Number.isFinite(livePrice) || livePrice <= 0 || !Number.isFinite(entryPrice) || entryPrice <= 0) {
+    if (!hasUsableMarketPrice(livePrice) || (administratorCapital > 0 && !hasUsableMarketPrice(administratorEntryPrice))) {
       return {
         quantity: 0,
         currentValue: 0,
@@ -104,10 +117,12 @@ export default function DashboardPage() {
       };
     }
 
-    const quantity = capital / entryPrice;
-    const currentValue = quantity * livePrice;
+    const depositQuantity = depositCryptoAllocation / livePrice;
+    const administratorQuantity = administratorCapital > 0 ? administratorCapital / administratorEntryPrice : 0;
+    const quantity = depositQuantity + administratorQuantity;
+    const currentValue = depositCryptoAllocation + administratorQuantity * livePrice;
     const pnl = currentValue - capital;
-    const priceChange = (livePrice - entryPrice) / entryPrice;
+    const priceChange = capital > 0 ? pnl / capital : 0;
 
     return {
       quantity,
@@ -116,9 +131,9 @@ export default function DashboardPage() {
       percentChange: priceChange * 100,
       priceChange,
     };
-  }, [selectedAssetData, simCapital]);
+  }, [depositCryptoAllocation, paperTrading, selectedAsset, selectedAssetData, simCapital]);
 
-  const chartPoints = selectedAssetData?.history || [];
+  const chartPoints = chartData.points.length > 0 ? chartData.points : selectedAssetData?.history || [];
   const priceTrend = chartPoints.length >= 2 ? chartPoints[chartPoints.length - 1].price - chartPoints[0].price : 0;
   const priceTrendPercent = chartPoints.length >= 2 && chartPoints[0].price > 0 ? (priceTrend / chartPoints[0].price) * 100 : 0;
 
@@ -126,15 +141,10 @@ export default function DashboardPage() {
     if (!paperTrading?.enabled) return undefined;
     const now = Date.now();
     if (now - lastPaperTradingSyncRef.current < 30000) return undefined;
-    const prices = Object.fromEntries(
-      CRYPTO_ASSETS
-        .map((asset) => [asset.symbol, Number(marketData[asset.symbol]?.price)])
-        .filter(([, price]) => Number.isFinite(price) && price > 0),
-    );
-    if (!Object.keys(prices).length) return undefined;
+    if (!Object.values(marketData).some((asset) => Number.isFinite(Number(asset?.price)) && Number(asset.price) > 0)) return undefined;
     lastPaperTradingSyncRef.current = now;
     let active = true;
-    syncPaperTradingMarket(prices)
+    syncPaperTradingMarket()
       .then(() => {
       if (active) refreshAccount().catch(() => {});
       })
@@ -391,17 +401,17 @@ export default function DashboardPage() {
               [
                 "Available balance",
                 liveSummary.availableBalance,
-                "Includes promotional credit",
+                liveTradingValuation.ready ? "Includes non-withdrawable crypto capital and live P/L" : "Includes non-withdrawable crypto capital and confirmed P/L",
               ],
               [
                 "Active deposit",
                 liveSummary.activeDeposit,
-                "Deposits less withdrawals",
+                liveTradingValuation.ready ? "Deposits plus crypto capital, less withdrawals and live P/L" : "Deposits plus crypto capital, less withdrawals and confirmed P/L",
               ],
               [
                 "Total deposit",
                 summary.totalDeposit,
-                "Completed ledger deposits",
+                "Completed deposits only; crypto capital excluded",
               ],
               [
                 "Total withdrawal",
@@ -532,7 +542,7 @@ export default function DashboardPage() {
 
             {assignedAssets.length === 0 ? (
               <div className="mt-6 rounded-2xl border border-dashed border-white/15 bg-[#091321] p-8 text-sm text-slate-400">
-                Paper trading has not been assigned to this account by an administrator.
+                Crypto trading has not been assigned to this account by an administrator.
               </div>
             ) : (
             <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[#091321] p-5">
@@ -558,14 +568,17 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Simulated value</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Live simulated value</p>
                   <p className="mt-2 font-['IBM_Plex_Mono'] text-2xl font-semibold tracking-[-0.04em]">
                     {formatMoney(positionMetrics.currentValue)}
                   </p>
+                    <p className={`mt-1 text-xs ${liveTradingValuation.ready ? "text-emerald-300" : "text-amber-300"}`}>
+                      {liveTradingValuation.ready ? "All assigned prices current" : "Using last confirmed valuation"}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-xl border border-white/10 bg-[#0d1728] p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">P/L</p>
                   <p className={`mt-3 font-['IBM_Plex_Mono'] text-xl font-semibold ${positionMetrics.pnl >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
@@ -583,20 +596,36 @@ export default function DashboardPage() {
                     {positionMetrics.quantity ? `${positionMetrics.quantity.toFixed(6)} ${selectedAsset}` : "—"}
                   </p>
                 </div>
+                <div className="rounded-xl border border-white/10 bg-[#0d1728] p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Portfolio value</p>
+                  <p className="mt-3 font-['IBM_Plex_Mono'] text-xl font-semibold">
+                    {liveTradingValuation.ready ? formatMoney(liveTradingValuation.currentValue) : "—"}
+                  </p>
+                </div>
               </div>
 
               <div className="mt-6 rounded-xl border border-white/10 bg-[#0d1728] p-4">
                 <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.18em] text-slate-400">
-                  <span>{selectedAsset} live chart</span>
-                  <span>{selectedAssetData?.timestamp ? new Date(selectedAssetData.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "Waiting..."}</span>
+                  <span>{selectedAsset} CoinGecko chart</span>
+                  <span>{chartData.timestamp ? `Updated ${new Date(chartData.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Waiting..."}</span>
                 </div>
 
-                {selectedAssetData?.error && (
-                  <p className="mb-3 text-sm text-amber-300">{selectedAssetData.error}</p>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1 rounded-full border border-white/10 bg-[#101d30] p-1">
+                    {CHART_RANGES.map((range) => (
+                      <button key={range.key} type="button" onClick={() => setChartRange(range.key)} className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${chartRange === range.key ? "bg-sky-400 text-slate-950" : "text-slate-300 hover:bg-white/10"}`}>
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Display only</span>
+                </div>
+                {chartData.error && (
+                  <p className="mb-3 text-sm text-amber-300">{chartData.error}</p>
                 )}
-                {selectedAssetData?.loading && chartPoints.length === 0 ? (
+                {chartData.loading && chartPoints.length === 0 ? (
                   <div className="flex h-36 items-center justify-center text-sm text-slate-400">
-                    Loading live crypto price…
+                    Loading CoinGecko chart…
                   </div>
                 ) : chartPoints.length > 0 ? (
                   <div className="relative h-44 w-full overflow-hidden rounded-lg bg-[#091321]">

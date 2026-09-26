@@ -1,8 +1,13 @@
-import admin from "firebase-admin";
+import { cert, getApp as getAdminApp, getApps, initializeApp } from "firebase-admin/app";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
+import { requireVerifiedUser } from "./auth.js";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { parseFirebaseServiceAccount } from "./firebase-service-account.js";
 
 const SUPPORTED = ["BTC", "ETH", "LTC", "BNB"];
 const COIN_IDS = { BTC: "bitcoin", ETH: "ethereum", LTC: "litecoin", BNB: "binancecoin" };
+const MARKET_TIMEOUT_MS = 8000;
 
 function sendJson(res, statusCode, body) {
   res.setHeader("Content-Type", "application/json");
@@ -10,32 +15,70 @@ function sendJson(res, statusCode, body) {
   return res.status(statusCode).json(body);
 }
 
+function getValuationSnapshotId(prices, allocations, entryPrices, currentValue, previousProfit, nextProfit) {
+  const snapshot = JSON.stringify({
+    prices: Object.fromEntries(SUPPORTED.map((symbol) => [symbol, Number(Number(prices[symbol]).toFixed(8))])),
+    allocations: Object.fromEntries(SUPPORTED.map((symbol) => [symbol, Number(Number(allocations[symbol] || 0).toFixed(8))])),
+    entryPrices: Object.fromEntries(SUPPORTED.map((symbol) => [symbol, Number(Number(entryPrices[symbol] || 0).toFixed(8))])),
+    currentValue: Number(currentValue.toFixed(8)),
+    previousProfit: Number(previousProfit.toFixed(8)),
+    nextProfit: Number(nextProfit.toFixed(8)),
+  });
+  return createHash("sha256").update(snapshot).digest("hex").slice(0, 32);
+}
+
 function getApp() {
-  if (admin.apps.length) return admin.app();
+  if (getApps().length) return getAdminApp();
   let raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw && process.env.FIREBASE_SERVICE_ACCOUNT_FILE) {
     raw = fs.readFileSync(process.env.FIREBASE_SERVICE_ACCOUNT_FILE, "utf8");
   }
   if (!raw) throw new Error("Firebase service account is not configured.");
-  return admin.initializeApp({ credential: admin.credential.cert(JSON.parse(raw)) });
+  return initializeApp({ credential: cert(parseFirebaseServiceAccount(raw)) });
 }
 
-async function authenticate(req, app) {
-  const header = req.headers?.authorization || "";
-  if (!header.startsWith("Bearer ")) {
-    throw Object.assign(new Error("Authentication is required."), { statusCode: 401, code: "auth-required" });
+async function fetchTrustedPrices() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), MARKET_TIMEOUT_MS);
+  try {
+    const url = new URL("https://api.coingecko.com/api/v3/simple/price");
+    url.searchParams.set("ids", Object.values(COIN_IDS).join(","));
+    url.searchParams.set("vs_currencies", "usd");
+    url.searchParams.set("precision", "full");
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      throw Object.assign(new Error("Trusted market data is temporarily unavailable."), {
+        statusCode: 502,
+        code: "market-data-unavailable",
+      });
+    }
+    const payload = await response.json();
+    const prices = Object.fromEntries(
+      SUPPORTED.map((symbol) => [symbol, Number(payload?.[COIN_IDS[symbol]]?.usd)])
+        .filter(([, price]) => Number.isFinite(price) && price > 0),
+    );
+    if (Object.keys(prices).length !== SUPPORTED.length) {
+      throw Object.assign(new Error("Trusted market data did not include all supported assets."), {
+        statusCode: 502,
+        code: "market-data-incomplete",
+      });
+    }
+    return prices;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return app.auth().verifyIdToken(header.slice(7));
 }
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return sendJson(res, 405, { error: "Method not allowed." });
   try {
     const app = getApp();
-    const token = await authenticate(req, app);
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
-    const prices = body.prices || {};
-    const db = app.firestore();
+    const token = await requireVerifiedUser(req, app);
+    const prices = await fetchTrustedPrices();
+    const db = getFirestore(app);
     const profileRef = db.collection("users").doc(token.uid);
     let result;
 
@@ -76,27 +119,33 @@ export default async function handler(req, res) {
       const nextProfit = currentValue - capital;
       const previousProfit = Number(paperTradingProfit(profile)) || 0;
       const delta = nextProfit - previousProfit;
+      const valuationId = getValuationSnapshotId(prices, allocations, entryPrices, currentValue, previousProfit, nextProfit);
       const nextPaperTrading = {
         ...paperTrading,
         marketEntryPrices: entryPrices,
         paperTradingProfit: nextProfit,
         lastMarketValue: currentValue,
-        lastMarketSyncAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastMarketSyncAt: FieldValue.serverTimestamp(),
       };
       transaction.update(profileRef, {
         paperTrading: nextPaperTrading,
         paperTradingProfit: nextProfit,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       if (Math.abs(delta) >= 0.005) {
-        transaction.create(profileRef.collection("transactions").doc(`paper-trading-${Date.now()}`), {
+        transaction.set(profileRef.collection("transactions").doc(`paper-trading-${valuationId}`), {
           type: "paper-trading-valuation",
           amount: delta,
           currency: "USD",
           status: "completed",
           source: "paper-trading-market-sync",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+          valuationId,
+          marketPrices: prices,
+          capital,
+          currentValue,
+          profit: nextProfit,
+          createdAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
       }
       result = { synced: true, capital, currentValue, profit: nextProfit, delta };
     });

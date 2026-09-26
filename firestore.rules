@@ -4,7 +4,9 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
       allow read: if request.auth != null
-        && (request.auth.uid == userId || request.auth.token.admin == true);
+        && (request.auth.uid == userId
+          || request.auth.token.admin == true
+          || request.auth.token.role == "admin");
       allow create: if request.auth != null
         && request.auth.uid == userId
         && request.resource.data.uid == userId
@@ -22,35 +24,46 @@ service cloud.firestore {
           "ethereumWallet",
           "litecoinWallet"
         ]);
-      allow delete: if request.auth != null && request.auth.token.admin == true;
+      allow delete: if request.auth != null
+        && (request.auth.token.admin == true || request.auth.token.role == "admin");
 
       match /notifications/{notificationId} {
         allow read: if request.auth != null
-          && (request.auth.uid == userId || request.auth.token.admin == true);
+          && (request.auth.uid == userId
+            || request.auth.token.admin == true
+            || request.auth.token.role == "admin");
         allow write: if false;
       }
 
       match /transactions/{transactionId} {
         allow read: if request.auth != null
-          && (request.auth.uid == userId || request.auth.token.admin == true);
+          && (request.auth.uid == userId
+            || request.auth.token.admin == true
+            || request.auth.token.role == "admin");
         allow write: if false;
       }
 
       match /investments/{investmentId} {
         allow read: if request.auth != null
-          && (request.auth.uid == userId || request.auth.token.admin == true);
+          && (request.auth.uid == userId
+            || request.auth.token.admin == true
+            || request.auth.token.role == "admin");
         allow write: if false;
       }
 
       match /referralRewards/{rewardId} {
         allow read: if request.auth != null
-          && (request.auth.uid == userId || request.auth.token.admin == true);
+          && (request.auth.uid == userId
+            || request.auth.token.admin == true
+            || request.auth.token.role == "admin");
         allow write: if false;
       }
 
       match /deposits/{depositId} {
         allow read: if request.auth != null
-          && (request.auth.uid == userId || request.auth.token.admin == true);
+          && (request.auth.uid == userId
+            || request.auth.token.admin == true
+            || request.auth.token.role == "admin");
         allow create: if request.auth != null
           && request.auth.uid == userId
           && request.resource.data.status == "pending";
@@ -59,16 +72,30 @@ service cloud.firestore {
 
       match /withdrawals/{withdrawalId} {
         allow read: if request.auth != null
-          && (request.auth.uid == userId || request.auth.token.admin == true);
+          && (request.auth.uid == userId
+            || request.auth.token.admin == true
+            || request.auth.token.role == "admin");
         allow create: if request.auth != null
           && request.auth.uid == userId
-          && request.resource.data.status == "pending";
+          && request.resource.data.status == "pending"
+          && request.resource.data.wallet is string
+          && request.resource.data.wallet.size() > 0
+          && ((request.resource.data.method == "Litecoin"
+              && request.resource.data.wallet == get(/databases/$(database)/documents/users/$(userId)).data.litecoinWallet)
+            || (request.resource.data.method == "Bitcoin"
+              && request.resource.data.wallet == get(/databases/$(database)/documents/users/$(userId)).data.bitcoinWallet)
+            || (request.resource.data.method == "BNB"
+              && request.resource.data.wallet == get(/databases/$(database)/documents/users/$(userId)).data.bnbWallet)
+            || (request.resource.data.method == "Ethereum"
+              && request.resource.data.wallet == get(/databases/$(database)/documents/users/$(userId)).data.ethereumWallet));
         allow update, delete: if false;
       }
 
       match /supportTickets/{ticketId} {
         allow read: if request.auth != null
-          && (request.auth.uid == userId || request.auth.token.admin == true);
+          && (request.auth.uid == userId
+            || request.auth.token.admin == true
+            || request.auth.token.role == "admin");
         allow create: if request.auth != null
           && request.auth.uid == userId
           && request.resource.data.status == "open";
@@ -93,19 +120,22 @@ service cloud.firestore {
     }
 
     match /audit/{auditId} {
-      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow read: if request.auth != null
+        && (request.auth.token.admin == true || request.auth.token.role == "admin");
       allow write: if false;
     }
 
     match /adminActions/{actionId} {
-      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow read: if request.auth != null
+        && (request.auth.token.admin == true || request.auth.token.role == "admin");
       allow write: if false;
     }
 
     // Ledger entries and audit records are append-only server records. The
     // Admin SDK is the only writer; clients must never manufacture balances.
     match /ledger/{entryId} {
-      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow read: if request.auth != null
+        && (request.auth.token.admin == true || request.auth.token.role == "admin");
       allow write: if false;
     }
 
@@ -117,7 +147,8 @@ service cloud.firestore {
     // - "cleanup-failed": Auth account was meant to be deleted but deletion failed
     // - "auth-deleted": Orphaned Auth account successfully cleaned up
     match /accountProvisioning/{entryId} {
-      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow read: if request.auth != null
+        && (request.auth.token.admin == true || request.auth.token.role == "admin");
       allow write: if false;
     }
   }

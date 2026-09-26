@@ -1,4 +1,9 @@
-import admin from "firebase-admin";
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { parseFirebaseServiceAccount } from "./firebase-service-account.js";
+
+const MINIMUM_ORPHAN_AGE_MS = 15 * 60 * 1000;
 
 function sendJson(res, statusCode, body) {
   res.setHeader("Content-Type", "application/json");
@@ -7,12 +12,36 @@ function sendJson(res, statusCode, body) {
 }
 
 function getFirebaseAdmin() {
-  if (admin.apps.length) return admin.app();
+  if (getApps().length) return getApp();
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!serviceAccount) throw new Error("Firebase service account is not configured.");
-  return admin.initializeApp({
-    credential: admin.credential.cert(JSON.parse(serviceAccount)),
-  });
+  return initializeApp({ credential: cert(parseFirebaseServiceAccount(serviceAccount)) });
+}
+
+async function authorize(req, app) {
+  const authorization = req.headers?.authorization || req.headers?.Authorization || "";
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && (
+    req.headers?.["x-cron-secret"] === cronSecret ||
+    authorization === `Bearer ${cronSecret}`
+  )) return;
+  if (!authorization.startsWith("Bearer ")) {
+    const error = new Error("Authentication is required.");
+    error.statusCode = 401;
+    throw error;
+  }
+  const token = await getAuth(app).verifyIdToken(authorization.slice(7));
+  if (token.admin !== true && String(token.role || "").trim().toLowerCase() !== "admin") {
+    const error = new Error("Administrator privileges are required.");
+    error.statusCode = 403;
+    throw error;
+  }
+}
+
+function timestampMillis(value) {
+  if (value?.toMillis instanceof Function) return value.toMillis();
+  if (value?.toDate instanceof Function) return value.toDate().getTime();
+  return 0;
 }
 
 export default async function handler(req, res) {
@@ -20,82 +49,67 @@ export default async function handler(req, res) {
 
   try {
     const app = getFirebaseAdmin();
-    const auth = app.auth();
-    const db = app.firestore();
-    const recovered = [];
-    const orphaned = [];
-
-    const provisioning = await db.collection("accountProvisioning")
-      .where("status", "==", "failed")
-      .where("stage", "==", "cleanup-failed")
-      .limit(50)
+    await authorize(req, app);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const cutoff = Date.now() - MINIMUM_ORPHAN_AGE_MS;
+    const candidates = await db.collection("accountProvisioning")
+      .where("status", "==", "pending")
+      .limit(100)
       .get();
+    const recovered = [];
 
-    for (const doc of provisioning.docs) {
-      const entry = doc.data();
-      const { uid, email, username } = entry;
+    for (const journal of candidates.docs) {
+      const entry = journal.data();
+      if (!["start", "auth-created"].includes(entry.stage)) continue;
+      if (timestampMillis(entry.updatedAt || entry.timestamp) > cutoff) continue;
+      if (!entry.email) continue;
 
-      if (!uid || !email) continue;
-
+      let authUser;
       try {
-        const authUser = await auth.getUser(uid);
-        if (authUser.disabled) {
-          recovered.push({
-            uid,
-            email,
-            username,
-            action: "skipped-disabled",
-            reason: "Auth account already disabled",
-          });
-          continue;
-        }
-
-        const userProfile = await db.doc(`users/${uid}`).get();
-        if (userProfile.exists) {
-          recovered.push({
-            uid,
-            email,
-            username,
-            action: "recovered",
-            reason: "Profile exists and is intact",
-          });
-          continue;
-        }
-
-        orphaned.push({
-          uid,
-          email,
-          username,
-          reason: "Auth account exists but profile is missing",
-          canDelete: true,
-        });
+        authUser = entry.uid
+          ? await auth.getUser(entry.uid)
+          : await auth.getUserByEmail(entry.email);
       } catch (error) {
         if (error?.code === "auth/user-not-found") {
-          recovered.push({
-            uid,
-            email,
-            username,
-            action: "cleaned-up",
-            reason: "Auth account already deleted by cleanup",
+          await journal.ref.update({
+            stage: "auth-deleted",
+            status: "recovered",
+            updatedAt: FieldValue.serverTimestamp(),
           });
-          await doc.ref.update({ status: "recovered" });
-        } else {
-          throw error;
+          recovered.push({ email: entry.email, action: "already-cleaned" });
+          continue;
         }
+        throw error;
       }
+
+      const profile = await db.doc(`users/${authUser.uid}`).get();
+      if (profile.exists) {
+        await journal.ref.update({
+          uid: authUser.uid,
+          stage: "profile-created",
+          status: "success",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        recovered.push({ uid: authUser.uid, email: entry.email, action: "profile-confirmed" });
+        continue;
+      }
+
+      await auth.deleteUser(authUser.uid);
+      await journal.ref.update({
+        uid: authUser.uid,
+        stage: "auth-deleted",
+        status: "recovered",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      recovered.push({ uid: authUser.uid, email: entry.email, action: "orphan-deleted" });
     }
 
-    return sendJson(res, 200, {
-      checked: provisioning.docs.length,
-      recovered: recovered.length,
-      orphaned: orphaned.length,
-      details: {
-        recovered,
-        orphaned,
-      },
-    });
+    return sendJson(res, 200, { checked: candidates.size, recovered: recovered.length, details: recovered });
   } catch (error) {
+    const statusCode = Number(error?.statusCode) || 500;
+    if (statusCode < 500) return sendJson(res, statusCode, { error: error.message });
     console.error("recover-provisioning failed", error);
-    return sendJson(res, 500, { error: "Provisioning recovery check failed." });
+    return sendJson(res, 500, { error: "Provisioning recovery failed." });
   }
 }

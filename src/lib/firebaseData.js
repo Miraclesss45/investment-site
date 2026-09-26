@@ -1,6 +1,7 @@
-import { addDoc, collection, doc, getDocs, serverTimestamp, updateDoc } from "firebase/firestore";
-import { EmailAuthProvider, getIdToken, reauthenticateWithCredential } from "firebase/auth";
-import { firebaseAuth, firestoreDb } from "./firebase";
+import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { EmailAuthProvider, getIdToken, reauthenticateWithCredential, updatePassword } from "firebase/auth";
+import { firebaseAuth } from "./firebase";
+import { firestoreDb } from "./firebaseFirestore";
 
 export async function createReferralReward(referralUsername, user = firebaseAuth?.currentUser) {
   if (!referralUsername || !user) return null;
@@ -24,31 +25,13 @@ export async function createReferralReward(referralUsername, user = firebaseAuth
   return data;
 }
 
-export async function provisionAccount(user, values) {
-  if (!user) throw new Error("Your authentication session is missing.");
-  const token = await getIdToken(user);
-  const result = await fetch("/api/provision-account", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(values),
-  });
-  const data = await result.json().catch(() => ({}));
-  if (!result.ok) {
-    const error = new Error(data.error || "Your account could not be provisioned.");
-    error.code = data.code || (result.status === 503 ? "provisioning-not-configured" : `provisioning-${result.status}`);
-    throw error;
-  }
-  return data;
-}
-
 export async function createAccount(values) {
+  const requestId = globalThis.crypto?.randomUUID?.()
+    || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const result = await fetch("/api/create-account", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(values),
+    body: JSON.stringify({ ...values, requestId }),
   });
   const data = await result.json().catch(() => ({}));
   if (!result.ok) {
@@ -77,6 +60,28 @@ export async function createMemberRequest(userId, type, values) {
     status: "pending",
     createdAt: serverTimestamp(),
   });
+}
+
+export async function sendWithdrawalProcessingEmail(withdrawalId) {
+  const user = firebaseAuth?.currentUser;
+  if (!user) {
+    const error = new Error("You must be signed in to request a withdrawal email.");
+    error.code = "auth-required";
+    throw error;
+  }
+  const token = await getIdToken(user);
+  const result = await fetch("/api/send-withdrawal-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ withdrawalId }),
+  });
+  const data = await result.json().catch(() => ({}));
+  if (!result.ok) {
+    const error = new Error(data.error || "The withdrawal request email could not be sent.");
+    error.code = data.code || `withdrawal-email-${result.status}`;
+    throw error;
+  }
+  return data;
 }
 
 export async function sendDepositRequestEmail(values) {
@@ -145,16 +150,6 @@ export async function getAdminResource(resource) {
   const payload = contentType.includes("application/json")
     ? await result.json().catch(() => ({}))
     : null;
-  if (resource === "users" && !payload) {
-    const snapshot = await getDocs(collection(firestoreDb, "users"));
-    return snapshot.docs.map((item) => ({
-      id: item.id,
-      ...item.data(),
-      authAccount: item.id === firebaseAuth.currentUser.uid,
-      authUid: item.id,
-      emailVerified: item.data().emailVerified === true,
-    }));
-  }
   if (!payload) {
     throw new Error("The admin API is not running. Use the deployed admin endpoint or start the Vercel development server.");
   }
@@ -176,17 +171,17 @@ export async function requestAdminAction(action, payload) {
   return adminRequest("POST", { action, payload });
 }
 
-export async function syncPaperTradingMarket(prices) {
+export async function syncPaperTradingMarket() {
   if (!firebaseAuth?.currentUser) return null;
   const token = await getIdToken(firebaseAuth.currentUser);
   const result = await fetch("/api/paper-trading-sync", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ prices }),
+    body: JSON.stringify({}),
   });
   const data = await result.json().catch(() => ({}));
   if (!result.ok) {
-    const error = new Error(data.error || "Paper-trading market sync failed.");
+    const error = new Error(data.error || "Crypto trading market sync failed.");
     error.code = data.code || `paper-trading-sync-${result.status}`;
     throw error;
   }
@@ -198,4 +193,16 @@ export async function reauthenticateAdmin(password) {
   if (!currentUser?.email || !password) throw new Error("Enter your administrator password to continue.");
   await reauthenticateWithCredential(currentUser, EmailAuthProvider.credential(currentUser.email, password));
   return getIdToken(currentUser, true);
+}
+
+export async function changeAdminPassword(currentPassword, newPassword) {
+  const currentUser = firebaseAuth?.currentUser;
+  if (!currentUser?.email) throw new Error("You must be signed in as an administrator.");
+  if (!currentPassword || !newPassword) throw new Error("Enter your current and new passwords to continue.");
+  await reauthenticateWithCredential(
+    currentUser,
+    EmailAuthProvider.credential(currentUser.email, currentPassword),
+  );
+  await updatePassword(currentUser, newPassword);
+  await getIdToken(currentUser, true);
 }

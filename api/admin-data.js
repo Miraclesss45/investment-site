@@ -1,5 +1,9 @@
-﻿import admin from "firebase-admin";
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
 import fs from "node:fs";
+import { getAuth } from "firebase-admin/auth";
+import { FieldPath, FieldValue, getFirestore } from "firebase-admin/firestore";
+import { deliverWithdrawalEmail } from "./withdrawal-mailer.js";
+import { calculateWithdrawableBalance, getPaperTradingCapital } from "../src/lib/financialMath.js";
 
 const CHILD_COLLECTIONS = {
   deposits: ["deposits"],
@@ -20,9 +24,33 @@ const STATUS_TRANSITIONS = {
   closed: new Set([]),
   resolved: new Set([]),
 };
+const RESOURCE_STATUS_TRANSITIONS = {
+  deposits: {
+    pending: new Set(["approved", "rejected", "cancelled", "on-hold"]),
+    approved: new Set(["cancelled"]),
+    "on-hold": new Set(["pending", "approved", "rejected", "cancelled"]),
+    rejected: new Set([]),
+    cancelled: new Set([]),
+  },
+  withdrawals: {
+    pending: new Set(["rejected", "cancelled", "on-hold"]),
+    approved: new Set([]),
+    "on-hold": new Set(["pending", "rejected", "cancelled"]),
+    rejected: new Set([]),
+    cancelled: new Set([]),
+  },
+  support: {
+    open: new Set(["closed", "resolved", "on-hold"]),
+    "on-hold": new Set(["open", "closed", "resolved"]),
+    closed: new Set([]),
+    resolved: new Set([]),
+  },
+};
 const RECENT_AUTH_SECONDS = 10 * 60;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,150}$/;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{8,120}$/;
+const READ_BATCH_SIZE = 500;
+const PAPER_TRADING_ASSETS = ["BTC", "ETH", "LTC", "BNB"];
 
 function sendJson(res, statusCode, body) {
   res.setHeader("Content-Type", "application/json");
@@ -36,7 +64,7 @@ function parseBody(body) {
 }
 
 function getFirebaseAdmin() {
-  if (admin.apps.length) return admin.app();
+  if (getApps().length) return getApp();
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   const filePath = process.env.FIREBASE_SERVICE_ACCOUNT_FILE;
   let serviceAccount = raw;
@@ -49,9 +77,17 @@ function getFirebaseAdmin() {
   }
   if (!serviceAccount) throw new Error("Firebase service account is not configured.");
   try {
-    return admin.initializeApp({ credential: admin.credential.cert(JSON.parse(serviceAccount)) });
+    let parsed = JSON.parse(serviceAccount);
+    if (typeof parsed === "string") parsed = JSON.parse(parsed);
+    if (!parsed || typeof parsed !== "object") throw new Error("Service account is not an object.");
+    return initializeApp({ credential: cert(parsed) });
   } catch {
+    try {
+      const decoded = Buffer.from(serviceAccount, "base64").toString("utf8");
+      return initializeApp({ credential: cert(JSON.parse(decoded)) });
+    } catch {
     throw new Error("Firebase service account credentials are invalid.");
+    }
   }
 }
 
@@ -64,6 +100,30 @@ function serialize(value) {
   return value;
 }
 
+async function getAllDocuments(collectionRef) {
+  const documents = [];
+  let lastDocument = null;
+  while (true) {
+    let query = collectionRef.orderBy(FieldPath.documentId()).limit(READ_BATCH_SIZE);
+    if (lastDocument) query = query.startAfter(lastDocument);
+    const snapshot = await query.get();
+    documents.push(...snapshot.docs);
+    if (snapshot.size < READ_BATCH_SIZE) return documents;
+    lastDocument = snapshot.docs[snapshot.docs.length - 1];
+  }
+}
+
+async function getAuthUsers(auth) {
+  const users = [];
+  let pageToken;
+  do {
+    const page = await auth.listUsers(1000, pageToken);
+    users.push(...page.users);
+    pageToken = page.pageToken;
+  } while (pageToken);
+  return users;
+}
+
 async function authenticate(req, app) {
   const authorization = req.headers?.authorization || req.headers?.Authorization || "";
   if (!authorization.startsWith("Bearer ")) {
@@ -71,8 +131,8 @@ async function authenticate(req, app) {
     error.statusCode = 401;
     throw error;
   }
-  const token = await app.auth().verifyIdToken(authorization.slice(7));
-  if (token.admin !== true) {
+  const token = await getAuth(app).verifyIdToken(authorization.slice(7));
+  if (token.admin !== true && String(token.role || "").trim().toLowerCase() !== "admin") {
     const error = new Error("Administrator privileges are required.");
     error.statusCode = 403;
     throw error;
@@ -100,23 +160,17 @@ function requireReason(payload) {
 
 async function aggregate(db, auth, resource) {
   if (resource === "packages" || resource === "audit") {
-    const snapshot = await db.collection(resource).orderBy("createdAt", "desc").limit(100).get().catch(() => db.collection(resource).limit(100).get());
-    return snapshot.docs.map((item) => ({ id: item.id, ...serialize(item.data()) }));
+    const documents = await getAllDocuments(db.collection(resource));
+    return documents.map((item) => ({ id: item.id, ...serialize(item.data()) }));
   }
   if (resource === "users") {
-    const snapshot = await db.collection("users").limit(100).get();
-    const authUsers = [];
-    let pageToken;
-    do {
-      const page = await auth.listUsers(1000, pageToken);
-      authUsers.push(...page.users);
-      pageToken = page.pageToken;
-    } while (pageToken);
+    const userDocuments = await getAllDocuments(db.collection("users"));
+    const authUsers = await getAuthUsers(auth);
     const authByUid = new Map(authUsers.map((item) => [item.uid, item]));
-    const authByEmail = new Map(authUsers.filter((item) => item.email).map((item) => [item.email.toLowerCase(), item]));
-    return snapshot.docs.map((item) => {
+    return userDocuments.flatMap((item) => {
       const profile = item.data();
-      const authUser = authByUid.get(item.id) || (profile.email && authByEmail.get(String(profile.email).toLowerCase()));
+      const authUser = authByUid.get(item.id);
+      if (!authUser) return [];
       return {
         id: item.id,
         ...serialize(profile),
@@ -127,13 +181,38 @@ async function aggregate(db, auth, resource) {
       };
     });
   }
+  if (resource === "admins") {
+    const [authUsers, profileDocuments] = await Promise.all([
+      getAuthUsers(auth),
+      getAllDocuments(db.collection("users")),
+    ]);
+    const profiles = new Map(profileDocuments.map((item) => [item.id, item.data()]));
+    return authUsers
+      .filter((authUser) => authUser.customClaims?.admin === true
+        || String(authUser.customClaims?.role || "").trim().toLowerCase() === "admin")
+      .map((authUser) => {
+        const profile = profiles.get(authUser.uid) || {};
+        return {
+          id: authUser.uid,
+          email: authUser.email || profile.email || null,
+          displayName: authUser.displayName || profile.displayName || profile.fullName || profile.username || null,
+          username: profile.username || null,
+          emailVerified: authUser.emailVerified === true,
+          disabled: authUser.disabled === true,
+          role: "admin",
+          lastSignInTime: authUser.metadata?.lastSignInTime || null,
+          creationTime: authUser.metadata?.creationTime || null,
+        };
+      });
+  }
   const collections = CHILD_COLLECTIONS[resource];
   if (!collections) throw Object.assign(new Error("Unknown admin resource."), { statusCode: 400 });
-  const users = await db.collection("users").limit(100).get();
+  const authByUid = new Map((await getAuthUsers(auth)).map((item) => [item.uid, item]));
+  const users = (await getAllDocuments(db.collection("users"))).filter((user) => authByUid.has(user.id));
   const rows = [];
   const userBatches = [];
-  for (let index = 0; index < users.docs.length; index += 10) {
-    userBatches.push(users.docs.slice(index, index + 10));
+  for (let index = 0; index < users.length; index += 10) {
+    userBatches.push(users.slice(index, index + 10));
   }
 
   for (const userBatch of userBatches) {
@@ -142,7 +221,7 @@ async function aggregate(db, auth, resource) {
         const recordsByCollection = await Promise.all(
           collections.map(async (childCollection) => ({
             childCollection,
-            records: await user.ref.collection(childCollection).limit(100).get(),
+            records: { docs: await getAllDocuments(user.ref.collection(childCollection)) },
           })),
         );
 
@@ -169,7 +248,7 @@ async function audit(db, token, action, details) {
     adminId: token.uid,
     adminEmail: token.email || null,
     details: JSON.parse(JSON.stringify(details)),
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
   });
 }
 
@@ -177,23 +256,42 @@ async function getActiveDeposit(db, profileId) {
   const profileSnapshot = await db.collection("users").doc(profileId).get();
   if (!profileSnapshot.exists) return 0;
   const profile = profileSnapshot.data();
-  const transactions = await db.collection("users").doc(profileId).collection("transactions").limit(100).get();
+  const transactionDocuments = await getAllDocuments(db.collection("users").doc(profileId).collection("transactions"));
   let deposits = 0;
   let withdrawals = 0;
-  for (const item of transactions.docs) {
+  let hasLedgerRecords = false;
+  for (const item of transactionDocuments) {
     const data = item.data();
+    hasLedgerRecords = true;
     if (!["completed", "complete", "approved", "settled", "success"].includes(String(data.status || "completed").toLowerCase())) continue;
     const amount = Math.max(Number(data.amount) || 0, 0);
     const type = String(data.type || "").toLowerCase();
     if (type.includes("deposit") || type.includes("credit") || type.includes("investment")) deposits += amount;
     if (type.includes("withdraw") || type.includes("debit") || type.includes("payout")) withdrawals += amount;
   }
-  return Math.max(
-    (deposits || Number(profile.totalDeposit) || 0)
-      - (withdrawals || Number(profile.totalWithdrawal) || 0)
-      + (Number(profile.paperTradingProfit) || 0),
-    0,
-  );
+  if (!hasLedgerRecords) {
+    return Math.max(
+      Number(profile.totalDeposit || 0) - Number(profile.totalWithdrawal || 0) + Number(profile.paperTradingProfit || 0),
+      0,
+    );
+  }
+  return Math.max(deposits - withdrawals + Number(profile.paperTradingProfit || 0), 0);
+}
+
+function getWithdrawableBalance(profile) {
+  const totalEarnings = (Number(profile.totalEarnings) || 0) + (Number(profile.paperTradingProfit) || 0);
+  return calculateWithdrawableBalance({
+    totalDeposit: profile.totalDeposit,
+    totalEarnings,
+    totalWithdrawal: profile.totalWithdrawal,
+    commission: profile.commission,
+    paperTradingWithdrawals: profile.paperTradingWithdrawals,
+    paperTradingCapital: getPaperTradingCapital(profile),
+  });
+}
+
+function roundToEight(value) {
+  return Number(Number(value).toFixed(8));
 }
 
 async function performAction(db, token, action, payload = {}) {
@@ -203,6 +301,12 @@ async function performAction(db, token, action, payload = {}) {
   if (action === "create") {
     if (!payload.name || typeof payload.name !== "string") throw Object.assign(new Error("Package name is required."), { statusCode: 400 });
     const reason = requireReason(payload);
+    const minimum = Number(payload.minimum);
+    const maximum = Number(payload.maximum);
+    const returnRate = Number(payload.returnRate);
+    if (!Number.isFinite(minimum) || minimum < 0 || !Number.isFinite(maximum) || maximum < minimum || !Number.isFinite(returnRate) || returnRate < 0) {
+      throw Object.assign(new Error("Package amounts and return rate must be valid non-negative values, with maximum at least minimum."), { statusCode: 400 });
+    }
     const allowed = ["name", "description", "minimum", "maximum", "returnRate", "duration"];
     const data = Object.fromEntries(allowed.filter((key) => payload[key] !== undefined).map((key) => [key, payload[key]]));
     const currencies = ["BTC", "ETH", "LTC", "BNB"];
@@ -219,12 +323,13 @@ async function performAction(db, token, action, payload = {}) {
       totalCapital: Object.values(allocations).reduce((sum, amount) => sum + amount, 0),
       mode: Object.keys(allocations).length === 1 ? "single" : "multiple",
     };
-    data.createdAt = admin.firestore.FieldValue.serverTimestamp();
+    data.createdAt = FieldValue.serverTimestamp();
     const ref = await db.collection("packages").add(data);
     await audit(db, token, action, { resource: "packages", id: ref.id, reason });
     return { id: ref.id };
   }
   if (action === "update-package") {
+    const reason = requireReason(payload);
     const packageId = String(payload.id || "");
     if (!SAFE_ID.test(packageId)) throw Object.assign(new Error("A valid package is required."), { statusCode: 400 });
     const currencies = ["BTC", "ETH", "LTC", "BNB"];
@@ -235,6 +340,12 @@ async function performAction(db, token, action, payload = {}) {
     );
     if (!payload.name || !Object.keys(allocations).length) {
       throw Object.assign(new Error("Package name and at least one paper-trading allocation are required."), { statusCode: 400 });
+    }
+    const minimum = Number(payload.minimum);
+    const maximum = Number(payload.maximum);
+    const returnRate = Number(payload.returnRate);
+    if (!Number.isFinite(minimum) || minimum < 0 || !Number.isFinite(maximum) || maximum < minimum || !Number.isFinite(returnRate) || returnRate < 0) {
+      throw Object.assign(new Error("Package amounts and return rate must be valid non-negative values, with maximum at least minimum."), { statusCode: 400 });
     }
     const ref = db.collection("packages").doc(packageId);
     const snapshot = await ref.get();
@@ -251,7 +362,7 @@ async function performAction(db, token, action, payload = {}) {
         totalCapital: Object.values(allocations).reduce((sum, amount) => sum + amount, 0),
         mode: Object.keys(allocations).length === 1 ? "single" : "multiple",
       },
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     };
     await ref.update(updated);
     await audit(db, token, action, { resource: "packages", id: packageId, reason });
@@ -267,12 +378,16 @@ async function performAction(db, token, action, payload = {}) {
         .filter(([, amount]) => amount > 0),
     );
     const totalCapital = Object.values(allocations).reduce((sum, amount) => sum + amount, 0);
-    const activeDeposit = await getActiveDeposit(db, profileId);
-    const reason = requireReason(payload);
-    if (!totalCapital || totalCapital > activeDeposit) {
-      throw Object.assign(new Error(`Paper-trading capital must be greater than zero and cannot exceed the member's active deposit of ${activeDeposit.toFixed(2)}.`), { statusCode: 400 });
+
+    const profileRef = db.collection("users").doc(profileId);
+    if (!(await profileRef.get()).exists) {
+      throw Object.assign(new Error("The selected member profile no longer exists."), { statusCode: 404, code: "user-not-found" });
     }
-    const ref = db.collection("users").doc(profileId);
+    await getTargetAuthUser(getAuth(getFirebaseAdmin()), profileId);
+    if (!totalCapital) {
+      throw Object.assign(new Error("Paper-trading capital must be greater than zero."), { statusCode: 400 });
+    }
+    const ref = profileRef;
     const previous = (await ref.get()).data()?.paperTrading || null;
     const paperTrading = {
       enabled: true,
@@ -280,11 +395,11 @@ async function performAction(db, token, action, payload = {}) {
       allocations,
       totalCapital,
       packageName: String(payload.packageName || "").trim() || null,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
       updatedBy: token.uid,
     };
     await ref.set({ paperTrading }, { merge: true });
-    await audit(db, token, action, { profileId, packageName: paperTrading.packageName, previous, paperTrading: { ...paperTrading, updatedAt: undefined }, activeDeposit, reason });
+    await audit(db, token, action, { profileId, packageName: paperTrading.packageName, previous, paperTrading: { ...paperTrading, updatedAt: undefined }, reason });
     return {
       updated: true,
       paperTrading: {
@@ -298,23 +413,35 @@ async function performAction(db, token, action, payload = {}) {
   if (!REVIEWABLE.has(resource) || !SAFE_ID.test(String(payload.userId || "")) || !SAFE_ID.test(String(payload.id || ""))) {
     throw Object.assign(new Error("A reviewable resource, userId and record id are required."), { statusCode: 400 });
   }
+  await getTargetAuthUser(getAuth(getFirebaseAdmin()), String(payload.userId));
   const collectionName = resource === "support" ? "supportTickets" : resource;
   const ref = db.doc(`users/${payload.userId}/${collectionName}/${payload.id}`);
   const snapshot = await ref.get();
   if (!snapshot.exists) throw Object.assign(new Error("The requested record was not found."), { statusCode: 404 });
   const status = String(payload.nextStatus || payload.status || "").toLowerCase();
   if (!STATUSES.has(status)) throw Object.assign(new Error("A safe review status is required."), { statusCode: 400 });
+  if (resource === "withdrawals" && status === "approved") {
+    throw Object.assign(new Error("Use the withdrawal approval action to complete settlement and notify the member."), { statusCode: 409 });
+  }
   const previousStatus = String(snapshot.data().status || "pending").toLowerCase();
-  if (previousStatus !== status && !STATUS_TRANSITIONS[previousStatus]?.has(status)) {
+  const transitions = RESOURCE_STATUS_TRANSITIONS[resource] || STATUS_TRANSITIONS;
+  if (previousStatus !== status && !transitions[previousStatus]?.has(status)) {
     throw Object.assign(new Error(`Illegal status transition from ${previousStatus} to ${status}.`), { statusCode: 409 });
   }
-  const reason = requireReason(payload);
+  const reason = resource === "withdrawals" ? "" : requireReason(payload);
   await ref.update({
     status,
-    reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+    reviewedAt: FieldValue.serverTimestamp(),
     reviewedBy: token.uid,
   });
-  await audit(db, token, "review", { resource, userId: payload.userId, id: payload.id, previousStatus, newStatus: status, reason });
+  await audit(db, token, "review", {
+    resource,
+    userId: payload.userId,
+    id: payload.id,
+    previousStatus,
+    newStatus: status,
+    ...(reason ? { reason } : {}),
+  });
   return { updated: true };
 }
 
@@ -345,7 +472,57 @@ async function getTargetAuthUser(auth, targetId) {
 
 async function performSensitiveAction(db, token, action, payload) {
   requireRecentAuth(token);
-  const reason = requireReason(payload);
+  const isDeletion = ["delete-user", "delete-deposit", "delete-withdrawal"].includes(action);
+  const reason = isDeletion || action === "approve-withdrawal" ? "" : requireReason(payload);
+  if (action === "delete-withdrawal") {
+    const profileId = String(payload.profileId || payload.userId || "");
+    const withdrawalId = String(payload.withdrawalId || payload.id || "");
+    if (!SAFE_ID.test(profileId) || !SAFE_ID.test(withdrawalId)) {
+      throw Object.assign(new Error("A valid withdrawal and user profile are required."), { statusCode: 400 });
+    }
+    if (String(payload.confirmation || "") !== "DELETE WITHDRAWAL") {
+      throw Object.assign(new Error("Type DELETE WITHDRAWAL to confirm request deletion."), { statusCode: 400 });
+    }
+
+    const profileRef = db.collection("users").doc(profileId);
+    const withdrawalRef = profileRef.collection("withdrawals").doc(withdrawalId);
+    const transactionRef = profileRef.collection("transactions").doc(`manual-withdrawal-${withdrawalId}`);
+    const deleted = await db.runTransaction(async (transaction) => {
+      const [profileSnapshot, withdrawalSnapshot, transactionSnapshot] = await Promise.all([
+        transaction.get(profileRef),
+        transaction.get(withdrawalRef),
+        transaction.get(transactionRef),
+      ]);
+      if (!profileSnapshot.exists || !withdrawalSnapshot.exists) {
+        throw Object.assign(new Error("The selected withdrawal request was not found."), { statusCode: 404 });
+      }
+
+      const withdrawal = withdrawalSnapshot.data();
+      const status = String(withdrawal.status || "pending").toLowerCase();
+      if (
+        withdrawal.settlementId
+        || withdrawal.settledAt
+        || withdrawal.completedAt
+        || withdrawal.paidAt
+        || transactionSnapshot.exists
+        || ["complete", "completed", "settled", "paid", "success"].includes(status)
+      ) {
+        throw Object.assign(new Error("Paid or settled withdrawal requests cannot be deleted."), {
+          statusCode: 409,
+          code: "withdrawal-delete-locked",
+        });
+      }
+
+      transaction.delete(withdrawalRef);
+      return { previousStatus: status };
+    });
+    await audit(db, token, "delete-withdrawal", {
+      profileId,
+      withdrawalId,
+      previousStatus: deleted.previousStatus,
+    });
+    return { deleted: true, profileId, withdrawalId };
+  }
   if (action === "delete-deposit") {
     const profileId = String(payload.profileId || payload.userId || "");
     const depositId = String(payload.depositId || payload.id || "");
@@ -373,7 +550,6 @@ async function performSensitiveAction(db, token, action, payload) {
       profileEmail: payload.profileEmail || null,
       profileUsername: payload.profileUsername || null,
       previousStatus: status,
-      reason,
     });
     return { deleted: true, profileId, depositId };
   }
@@ -426,14 +602,7 @@ async function performSensitiveAction(db, token, action, payload) {
       const profile = profileSnapshot.data();
       const previousAvailable = Number(profile.availableBalance) || 0;
       const previousTotalDeposit = Number(profile.totalDeposit) || 0;
-      const activeDepositAfterSettlement = Math.max(
-        previousTotalDeposit + amount - (Number(profile.totalWithdrawal) || 0),
-        0,
-      );
       if (packagePaperTrading) {
-        if (Number(packagePaperTrading.totalCapital) > activeDepositAfterSettlement) {
-          throw Object.assign(new Error(`The package paper-trading allocation exceeds the member's active deposit after settlement (${activeDepositAfterSettlement.toFixed(2)}).`), { statusCode: 400 });
-        }
         transaction.update(profileRef, {
           paperTrading: {
             enabled: true,
@@ -441,7 +610,7 @@ async function performSensitiveAction(db, token, action, payload) {
             allocations: packagePaperTrading.allocations,
             totalCapital: packagePaperTrading.totalCapital,
             packageName,
-            assignedAt: admin.firestore.FieldValue.serverTimestamp(),
+            assignedAt: FieldValue.serverTimestamp(),
             assignedBy: token.uid,
           },
         });
@@ -449,7 +618,7 @@ async function performSensitiveAction(db, token, action, payload) {
       transaction.update(profileRef, {
         availableBalance: previousAvailable + amount,
         totalDeposit: previousTotalDeposit + amount,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       transaction.create(transactionRef, {
         type: "deposit",
@@ -461,8 +630,8 @@ async function performSensitiveAction(db, token, action, payload) {
         settlementId,
         paymentMethod: deposit.method || deposit.asset || null,
         reason,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+        completedAt: FieldValue.serverTimestamp(),
       });
       transaction.update(depositRef, {
         status: "completed",
@@ -472,23 +641,187 @@ async function performSensitiveAction(db, token, action, payload) {
         currency,
         settledBy: token.uid,
         settlementReason: reason,
-        settledAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        settledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
       return { settlementId, amount, currency, profileId, depositId };
     });
     await audit(db, token, "settle-deposit", { ...settlement, offlineConfirmed: true, reason });
     return { settled: true, ...settlement };
   }
+  if (action === "approve-withdrawal") {
+    const profileId = String(payload.profileId || payload.userId || "");
+    const withdrawalId = String(payload.withdrawalId || payload.id || "");
+    if (!SAFE_ID.test(profileId) || !SAFE_ID.test(withdrawalId)) {
+      throw Object.assign(new Error("A valid withdrawal and user profile are required."), { statusCode: 400 });
+    }
+    if (payload.payoutSent !== true) {
+      throw Object.assign(new Error("Confirm that the payout has already been sent to the saved wallet address."), { statusCode: 400 });
+    }
+    const profileRef = db.collection("users").doc(profileId);
+    const withdrawalRef = profileRef.collection("withdrawals").doc(withdrawalId);
+    const transactionRef = profileRef.collection("transactions").doc(`manual-withdrawal-${withdrawalId}`);
+    const settlement = await db.runTransaction(async (transaction) => {
+      const [profileSnapshot, withdrawalSnapshot, transactionSnapshot] = await Promise.all([
+        transaction.get(profileRef),
+        transaction.get(withdrawalRef),
+        transaction.get(transactionRef),
+      ]);
+      if (!profileSnapshot.exists || !withdrawalSnapshot.exists) {
+        throw Object.assign(new Error("The selected withdrawal request was not found."), { statusCode: 404 });
+      }
+      const withdrawal = withdrawalSnapshot.data();
+      const status = String(withdrawal.status || "pending").toLowerCase();
+      if (status === "completed" && (transactionSnapshot.exists || withdrawal.settlementId)) {
+        return {
+          settlementId: withdrawal.settlementId || transactionSnapshot.data()?.settlementId,
+          amount: Number(withdrawal.amount),
+          profileId,
+          withdrawalId,
+          alreadyCompleted: true,
+        };
+      }
+      if (transactionSnapshot.exists || withdrawal.settlementId || ["completed", "settled", "paid"].includes(status)) {
+        throw Object.assign(new Error("This withdrawal has already been completed."), { statusCode: 409, code: "withdrawal-already-settled" });
+      }
+      if (!["pending", "on-hold", "approved"].includes(status)) {
+        throw Object.assign(new Error("Only pending, on-hold, or previously approved withdrawals can be completed."), { statusCode: 409 });
+      }
+      const amount = Number(withdrawal.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw Object.assign(new Error("The withdrawal amount is invalid."), { statusCode: 400 });
+      }
+      const profile = profileSnapshot.data();
+      const currentWithdrawal = Math.max(Number(profile.totalWithdrawal) || 0, 0);
+      const previousCapitalWithdrawals = Math.max(Number(profile.paperTradingWithdrawals) || 0, 0);
+      const baseBalance = calculateWithdrawableBalance({
+        totalDeposit: profile.totalDeposit,
+        totalEarnings: (Number(profile.totalEarnings) || 0) + (Number(profile.paperTradingProfit) || 0),
+        totalWithdrawal: currentWithdrawal,
+        commission: profile.commission,
+        paperTradingWithdrawals: previousCapitalWithdrawals,
+        paperTradingCapital: 0,
+      });
+      const withdrawableBalance = getWithdrawableBalance(profile);
+      if (amount > withdrawableBalance) {
+        throw Object.assign(new Error("The member no longer has enough transferable balance for this withdrawal. Promotional and referral credits are not withdrawable."), { statusCode: 409 });
+      }
+      const capitalWithdrawal = Math.max(amount - baseBalance, 0);
+      const tradingCapital = getPaperTradingCapital(profile);
+      let paperTradingUpdate;
+      let nextPaperTradingProfit;
+      if (capitalWithdrawal > 0) {
+        const paperTrading = profile.paperTrading || {};
+        const allocationEntries = PAPER_TRADING_ASSETS
+          .map((asset) => [asset, Math.max(Number(paperTrading.allocations?.[asset]) || 0, 0)])
+          .filter(([, allocation]) => allocation > 0);
+        const allocationTotal = allocationEntries.reduce((sum, [, allocation]) => sum + allocation, 0);
+        if (!paperTrading.enabled || allocationTotal <= 0 || capitalWithdrawal > tradingCapital) {
+          throw Object.assign(new Error("The paper-trading capital could not be safely reduced. Ask an administrator to review the member's allocations."), { statusCode: 409 });
+        }
+        const remainingCapital = roundToEight(Math.max(tradingCapital - capitalWithdrawal, 0));
+        const allocationScale = remainingCapital / allocationTotal;
+        const allocations = { ...paperTrading.allocations };
+        for (const [asset, allocation] of allocationEntries) {
+          allocations[asset] = roundToEight(allocation * allocationScale);
+        }
+        const roundedTotal = allocationEntries.reduce((sum, [asset]) => sum + allocations[asset], 0);
+        const allocationRemainder = roundToEight(remainingCapital - roundedTotal);
+        if (allocationEntries.length && allocationRemainder !== 0) {
+          const [lastAsset] = allocationEntries[allocationEntries.length - 1];
+          allocations[lastAsset] = roundToEight(allocations[lastAsset] + allocationRemainder);
+        }
+        const remainingRatio = tradingCapital > 0 ? remainingCapital / tradingCapital : 0;
+        nextPaperTradingProfit = roundToEight((Number(profile.paperTradingProfit) || 0) * remainingRatio);
+        paperTradingUpdate = {
+          ...paperTrading,
+          enabled: remainingCapital > 0,
+          allocations,
+          totalCapital: remainingCapital,
+          lastMarketValue: roundToEight((Number(paperTrading.lastMarketValue) || 0) * remainingRatio),
+          paperTradingProfit: nextPaperTradingProfit,
+          updatedAt: FieldValue.serverTimestamp(),
+        };
+      }
+      const settlementId = `manual-${withdrawalId}`;
+      const profileUpdate = {
+        availableBalance: Math.max((Number(profile.availableBalance) || 0) - amount, 0),
+        totalWithdrawal: currentWithdrawal + amount,
+        paperTradingWithdrawals: previousCapitalWithdrawals + capitalWithdrawal,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      if (paperTradingUpdate) {
+        profileUpdate.paperTrading = paperTradingUpdate;
+        profileUpdate.paperTradingProfit = nextPaperTradingProfit;
+      }
+      transaction.update(profileRef, profileUpdate);
+      transaction.create(transactionRef, {
+        type: "withdrawal",
+        source: "manual-withdrawal-settlement",
+        amount,
+        currency: "USD",
+        status: "completed",
+        withdrawalId,
+        settlementId,
+        paymentMethod: withdrawal.method || withdrawal.asset || null,
+        reason,
+        createdAt: FieldValue.serverTimestamp(),
+        completedAt: FieldValue.serverTimestamp(),
+      });
+      transaction.update(withdrawalRef, {
+        status: "completed",
+        settlementId,
+        settledBy: token.uid,
+        approvedBy: token.uid,
+        payoutSentBeforeApproval: true,
+        settlementReason: reason,
+        settledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return { settlementId, amount, profileId, withdrawalId };
+    });
+    if (!settlement.alreadyCompleted) {
+      await audit(db, token, "approve-withdrawal", {
+        ...settlement,
+        payoutSentBeforeApproval: true,
+      });
+    }
+    let email;
+    try {
+      email = await deliverWithdrawalEmail({
+        db,
+        profileId,
+        withdrawalId,
+        kind: "completed",
+      });
+    } catch (error) {
+      console.error("Withdrawal was settled but its completion email status could not be confirmed", {
+        profileId,
+        withdrawalId,
+        error,
+      });
+      email = {
+        status: "failed",
+        error: "The payout was recorded, but the completion email status could not be confirmed. Refresh the withdrawal record before retrying.",
+      };
+    }
+    return { settled: true, ...settlement, email };
+  }
   const targetId = String(payload.userId || "");
   const profileId = String(payload.profileId || targetId);
   if (!SAFE_ID.test(targetId)) throw Object.assign(new Error("A valid target user is required."), { statusCode: 400 });
   if (!SAFE_ID.test(profileId)) throw Object.assign(new Error("A valid profile is required."), { statusCode: 400 });
+  if (targetId !== profileId) {
+    throw Object.assign(new Error("The Firebase Authentication account and Firestore profile must use the same UID."), {
+      statusCode: 409,
+      code: "profile-auth-mismatch",
+    });
+  }
   if (targetId === token.uid) throw Object.assign(new Error("Administrators cannot change their own access."), { statusCode: 400 });
   const userRef = db.collection("users").doc(profileId);
   const userSnapshot = await userRef.get();
   if (!userSnapshot.exists) throw Object.assign(new Error("The target user was not found."), { statusCode: 404 });
-  const auth = getFirebaseAdmin().auth();
+  const auth = getAuth(getFirebaseAdmin());
 
   if (action === "delete-user") {
     if (String(payload.confirmation || "") !== "DELETE USER") {
@@ -510,7 +843,6 @@ async function performSensitiveAction(db, token, action, payload) {
     await audit(db, token, action, {
       userId: targetId,
       email: targetAuth.email || null,
-      reason,
       phase: "started",
     });
     await auth.deleteUser(targetId);
@@ -526,7 +858,6 @@ async function performSensitiveAction(db, token, action, payload) {
     await audit(db, token, action, {
       userId: targetId,
       email: targetAuth.email || null,
-      reason,
       phase: "completed",
       profileDeleted: true,
       authDeleted: true,
@@ -551,9 +882,9 @@ async function performSensitiveAction(db, token, action, payload) {
     await userRef.set({
       status: disabled ? "Disabled" : "Active",
       disabled,
-      disabledAt: disabled ? admin.firestore.FieldValue.serverTimestamp() : null,
+      disabledAt: disabled ? FieldValue.serverTimestamp() : null,
       disabledBy: disabled ? token.uid : null,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
     await audit(db, token, action, { userId: targetId, disabled, reason });
     return { updated: true, disabled };
@@ -569,11 +900,12 @@ async function performSensitiveAction(db, token, action, payload) {
 
     const targetAuth = await getTargetAuthUser(auth, targetId);
     await auth.setCustomUserClaims(targetId, { ...(targetAuth.customClaims || {}), admin: role === "admin", role });
-    await userRef.set({ role, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    await userRef.set({ role, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     await audit(db, token, action, { userId: targetId, previousRole: existing.role || "member", newRole: role, reason });
     return { updated: true, role };
   }
   if (action === "ledger") {
+    await getTargetAuthUser(auth, targetId);
     const kind = String(payload.kind || "").toLowerCase();
     if (!["credit", "debit", "reversal"].includes(kind)) throw Object.assign(new Error("Ledger action must be credit, debit, or reversal."), { statusCode: 400 });
     const amount = Number(payload.amount);
@@ -589,7 +921,7 @@ async function performSensitiveAction(db, token, action, payload) {
       if (existing.exists) return { id: existing.id, ...existing.data(), idempotent: true };
       const data = {
         userId: targetId, kind, amount, currency: String(payload.currency || "USD").toUpperCase(),
-        reason, adminId: token.uid, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        reason, adminId: token.uid, createdAt: FieldValue.serverTimestamp(),
         reversalOf: payload.reversalOf ? String(payload.reversalOf) : null,
       };
       transaction.create(ledgerRef, data);
@@ -606,14 +938,14 @@ export default async function handler(req, res) {
   try {
     const app = getFirebaseAdmin();
     const token = await authenticate(req, app);
-    const db = app.firestore();
+    const db = getFirestore(app);
     if (req.method === "GET") {
       const resource = String(req.query?.resource || "users");
-      return sendJson(res, 200, { items: await aggregate(db, app.auth(), resource) });
+      return sendJson(res, 200, { items: await aggregate(db, getAuth(app), resource) });
     }
     let body;
     try { body = parseBody(req.body); } catch { return sendJson(res, 400, { error: "Invalid request body." }); }
-    const result = ["disable-user", "set-role", "delete-user", "ledger", "settle-deposit", "delete-deposit"].includes(body.action)
+    const result = ["disable-user", "set-role", "delete-user", "ledger", "settle-deposit", "approve-withdrawal", "delete-deposit", "delete-withdrawal"].includes(body.action)
       ? await performSensitiveAction(db, token, body.action, body.payload || {})
       : await performAction(db, token, body.action, body.payload || {});
     return sendJson(res, 200, result);
