@@ -47,7 +47,8 @@ export function AuthProvider({ children }) {
       } catch (roleError) {
         if (!active) return;
         setRole("member");
-        setError(roleError.message || "Your account role could not be verified. Please try again.");
+        console.error("Account role could not be verified.", roleError);
+        setError("We could not verify your account access. Refresh the page or sign in again.");
       } finally {
         if (active) {
           window.clearTimeout(timeoutId);

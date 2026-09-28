@@ -4,6 +4,7 @@ import { firestoreDb } from "./firebaseFirestore";
 
 export async function resolveUserRole(user) {
   if (!user) return "member";
+  if (user.isAnonymous) return "member";
 
   let tokenError;
   try {

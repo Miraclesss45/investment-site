@@ -22,7 +22,7 @@ export default async function handler(req, res) {
 
   const chart = String(req.query?.chart || "") === "1";
   const days = String(req.query?.days || "1");
-  const allowedDays = new Set(["0.041", "1", "7", "30"]);
+  const allowedDays = new Set(["1", "7", "30"]);
   if (chart && (ids.length !== 1 || !allowedDays.has(days))) {
     return sendJson(res, 400, { error: "A single valid asset and chart range are required." });
   }

@@ -76,7 +76,7 @@ export default function WithdrawalPendingPage() {
               <div><p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Asset</p><p className="mt-2 text-sm font-bold">{withdrawalState.asset || "Under review"}</p></div>
               <div><p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Amount</p><p className="mt-2 text-sm font-bold">{withdrawalState.amount ? formatMoney(withdrawalState.amount) : "Under review"}</p></div>
               <div><p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Network fee</p><p className="mt-2 text-sm font-bold">{formatMoney(withdrawalState.fee || 0)}</p></div>
-              {withdrawalState.wallet && <div className="sm:col-span-2"><p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Destination wallet</p><p className="mt-2 break-all font-['IBM_Plex_Mono'] text-xs leading-5 text-slate-200">{withdrawalState.wallet}</p></div>}
+              {withdrawalState.wallet && <div className="sm:col-span-2"><p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Destination wallet</p><p className="mt-2 break-all font-['Inter'] text-xs leading-5 text-slate-200">{withdrawalState.wallet}</p></div>}
             </div>
           )}
           <div className="mt-8 grid gap-3 sm:grid-cols-2">

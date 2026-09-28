@@ -1,1 +1,1 @@
-export { changeAdminPassword, getAdminResource, requestAdminAction, reauthenticateAdmin } from "./firebaseData";
+export { changeAdminPassword, getAdminPage, getAdminRecord, getAdminResource, requestAdminAction, reauthenticateAdmin } from "./firebaseData";

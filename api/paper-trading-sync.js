@@ -1,9 +1,9 @@
 import { cert, getApp as getAdminApp, getApps, initializeApp } from "firebase-admin/app";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
-import { requireVerifiedUser } from "./auth.js";
+import { requireVerifiedUser } from "../server/auth.js";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { parseFirebaseServiceAccount } from "./firebase-service-account.js";
+import { parseFirebaseServiceAccount } from "../server/firebase-service-account.js";
 
 const SUPPORTED = ["BTC", "ETH", "LTC", "BNB"];
 const COIN_IDS = { BTC: "bitcoin", ETH: "ethereum", LTC: "litecoin", BNB: "binancecoin" };

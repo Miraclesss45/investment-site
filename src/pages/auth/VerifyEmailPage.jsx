@@ -4,6 +4,7 @@ import { ArrowRight, Check, ExternalLink, LoaderCircle, Mail, ShieldCheck } from
 import { sendEmailVerification, signOut } from "firebase/auth";
 import { firebaseAuth } from "../../lib/firebase";
 import WhatsAppIcon, { WHATSAPP_URL } from "../../components/ui/WhatsAppIcon";
+import { getAuthErrorMessage } from "../../lib/authHelpers";
 
 function maskEmail(email) {
   if (!email || !email.includes("@")) return "your email address";
@@ -33,7 +34,7 @@ export default function VerifyEmailPage() {
       await sendEmailVerification(firebaseAuth.currentUser);
       setFeedback("A new verification email has been sent.");
     } catch (error) {
-      setFeedback(error?.message || "We could not resend the verification email.");
+      setFeedback(getAuthErrorMessage(error, "We could not resend the verification email."));
     } finally {
       setResending(false);
     }

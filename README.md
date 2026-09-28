@@ -38,8 +38,6 @@ This project runs on Vercel without requiring Firebase Cloud Functions. The Reac
    VITE_FIREBASE_APP_ID
    FIREBASE_SERVICE_ACCOUNT
    FIREBASE_SERVICE_ACCOUNT_FILE
-   TELEGRAM_BOT_TOKEN
-   TELEGRAM_CHAT_ID
    ```
 
    Use values from **Firebase Console -> Project settings -> Your apps -> Web app** for the `VITE_*` variables.
@@ -49,8 +47,6 @@ This project runs on Vercel without requiring Firebase Cloud Functions. The Reac
    For local development, use `FIREBASE_SERVICE_ACCOUNT_FILE` instead and
    point it to the downloaded JSON file outside the repository. Do not add the
    file to Git or use a `VITE_` prefix.
-
-   Add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` if deposit notifications are enabled.
 
 5. Click **Deploy**. Vercel's default build command (`npm run build`) and output directory (`dist`) work automatically.
 6. After the first deploy, in Firebase Console open **Authentication -> Settings -> Authorized domains** and add the Vercel domain (e.g. `your-app.vercel.app`) and custom domain.
@@ -72,21 +68,24 @@ firebase deploy --only firestore:rules
 
 Review `firestore.rules` before deploying to production. The rules allow each signed-in member to access only their own records, while username lookup is intentionally public for email-or-username login.
 
-## Deposit notifications
+## Deposit email notifications
 
-Deposit requests are saved to Firestore and the Vercel Function `/api/send-deposit-telegram`
-sends a formatted notification to a private Telegram chat. Add these private
-environment variables in Vercel:
+Deposit requests are saved to Firestore. The member receives one pending
+confirmation email at the verified email address on their Firebase Authentication
+account (Gmail addresses are supported). After an administrator confirms the
+offline payment and credits the deposit, the member receives one success email.
+Both use the server-only SMTP settings listed in `DEPLOYMENT.md`. A failed
+pending email can be retried from the confirmation page; administrators can retry
+a failed success email from the Deposits list.
 
-```text
-TELEGRAM_BOT_TOKEN=your-bot-token
-TELEGRAM_CHAT_ID=your-chat-id
-```
+## Support ticket email notifications
 
-Create a bot with Telegram's `@BotFather`, send the bot a message, and obtain
-the chat ID from Telegram's `getUpdates` API. The notification contains the
-depositor name, email, bundle, chain, amount, and request ID. Never expose the
-bot token in frontend code.
+Support requests are saved under the member's Firestore profile, then the
+server sends a branded notification to the support inbox and a confirmation to
+the member's verified account email. Both use the SMTP settings in
+`DEPLOYMENT.md`. If email delivery fails, the saved ticket remains available
+in the admin portal and the member can retry the notifications from the support
+form.
 
 ## Admin access
 

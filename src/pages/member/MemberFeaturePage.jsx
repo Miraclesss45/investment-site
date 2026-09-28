@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../../lib/authContext";
-import { createMemberRequest, sendDepositRequestEmail, sendWithdrawalProcessingEmail, updateUserProfile } from "../../lib/firebaseData";
+import { createMemberRequest, sendDepositPendingEmail, sendWithdrawalProcessingEmail, updateUserProfile } from "../../lib/firebaseData";
 import useAccountData from "../../lib/useAccountData";
 import CountrySelect from "../../components/ui/CountrySelect";
 import {
@@ -22,6 +22,7 @@ import {
 } from "../../lib/financial";
 import WhatsAppIcon, { WHATSAPP_URL } from "../../components/ui/WhatsAppIcon";
 import FeedbackMessage from "../../components/ui/FeedbackMessage";
+import SkipToContent from "../../components/ui/SkipToContent";
 
 const navigation = [
   ["Dashboard", "/dashboard"],
@@ -177,7 +178,7 @@ function DateRangeControls({
               max={toDate || undefined}
               onChange={(event) => setFromDate(event.target.value)}
               aria-label="Start date"
-              className="mt-2 block h-11 w-full min-w-0 rounded-xl border border-white/10 bg-[#0d1728] px-3 font-['IBM_Plex_Mono'] text-xs font-medium text-slate-100 shadow-inner shadow-black/10 outline-none transition placeholder:text-slate-600 hover:border-white/20 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10 [color-scheme:dark] sm:w-40 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:transition [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
+              className="mt-2 block h-11 w-full min-w-0 rounded-xl border border-white/10 bg-[#0d1728] px-3 font-['Inter'] text-xs font-medium text-slate-100 shadow-inner shadow-black/10 outline-none transition placeholder:text-slate-600 hover:border-white/20 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10 [color-scheme:dark] sm:w-40 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:transition [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
             />
           </label>
           <label className="block min-w-0 text-xs font-semibold text-slate-400">
@@ -188,7 +189,7 @@ function DateRangeControls({
               min={fromDate || undefined}
               onChange={(event) => setToDate(event.target.value)}
               aria-label="End date"
-              className="mt-2 block h-11 w-full min-w-0 rounded-xl border border-white/10 bg-[#0d1728] px-3 font-['IBM_Plex_Mono'] text-xs font-medium text-slate-100 shadow-inner shadow-black/10 outline-none transition placeholder:text-slate-600 hover:border-white/20 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10 [color-scheme:dark] sm:w-40 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:transition [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
+              className="mt-2 block h-11 w-full min-w-0 rounded-xl border border-white/10 bg-[#0d1728] px-3 font-['Inter'] text-xs font-medium text-slate-100 shadow-inner shadow-black/10 outline-none transition placeholder:text-slate-600 hover:border-white/20 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10 [color-scheme:dark] sm:w-40 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:transition [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
             />
           </label>
           <button
@@ -438,17 +439,13 @@ export default function MemberFeaturePage() {
         fullName: depositorName,
         email: user.email || "",
       });
+      let emailFailed = false;
+      let emailFailureCode = "";
       try {
-        await sendDepositRequestEmail({
-          requestId: request.id,
-          name: depositorName,
-          email: user.email || "",
-          plan: selectedPackage,
-          method: selectedAsset,
-          amount,
-        });
-      } catch {
-        setMessage("Your deposit was saved, but the Telegram notification could not be sent. Our team can still review it in the portal.");
+        await sendDepositPendingEmail(request.id);
+      } catch (error) {
+        emailFailed = true;
+        emailFailureCode = error?.code || "deposit-email-failed";
       }
       setDepositAmount("");
       navigate("/deposit-pending", {
@@ -457,6 +454,9 @@ export default function MemberFeaturePage() {
           packageName: selectedPackage,
           amount,
           asset: selectedAsset,
+          requestId: request.id,
+          emailFailed,
+          emailFailureCode,
         },
       });
     } catch (error) {
@@ -557,6 +557,7 @@ export default function MemberFeaturePage() {
 
   return (
     <div className="min-h-screen bg-[#07111d] text-white">
+      <SkipToContent />
       <header className="sticky top-0 z-40 border-b border-white/10 bg-transparent shadow-lg shadow-black/10 backdrop-blur-xl">
         <div className="mx-auto flex w-[min(1280px,calc(100%-2rem))] items-center justify-between gap-4 py-4 sm:w-[min(1280px,calc(100%-3rem))]">
           <Link
@@ -633,7 +634,7 @@ export default function MemberFeaturePage() {
             ))}
           </nav>
         </aside>
-        <main className="min-w-0">
+        <main id="main-content" tabIndex="-1" className="min-w-0 outline-none">
           <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-sky-400">
             Member portal
           </p>
@@ -855,7 +856,7 @@ export default function MemberFeaturePage() {
                     <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
                       Available balance
                     </p>
-                    <p className="mt-1 font-['IBM_Plex_Mono'] text-3xl font-semibold tracking-[-0.05em] text-white">
+                    <p className="mt-1 font-['Inter'] text-3xl font-semibold tracking-[-0.05em] text-white">
                       {formatMoney(summary.availableBalance)}
                     </p>
                   </div>
@@ -922,7 +923,7 @@ export default function MemberFeaturePage() {
                   <div className={`mt-4 rounded-xl border p-4 text-xs leading-5 ${selectedWithdrawalWallet ? "border-white/10 bg-[#081321] text-slate-300" : "border-amber-300/25 bg-amber-300/[0.07] text-amber-100"}`}>
                     <p className="font-bold text-white">Saved {selectedWithdrawalAsset} wallet</p>
                     {selectedWithdrawalWallet ? (
-                      <p className="mt-2 break-all font-['IBM_Plex_Mono'] text-slate-300">{selectedWithdrawalWallet}</p>
+                      <p className="mt-2 break-all font-['Inter'] text-slate-300">{selectedWithdrawalWallet}</p>
                     ) : (
                       <p className="mt-2">
                         Add a {selectedWithdrawalAsset} wallet address in{" "}
@@ -949,19 +950,19 @@ export default function MemberFeaturePage() {
                     </div>
                     <div className="space-y-2">
                       <dt className="text-slate-500">Destination wallet</dt>
-                      <dd className="break-all font-['IBM_Plex_Mono'] text-xs leading-5 text-white">
+                      <dd className="break-all font-['Inter'] text-xs leading-5 text-white">
                         {selectedWithdrawalWallet || "Add this wallet in your profile to continue"}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-4">
                       <dt className="text-slate-500">Network fee</dt>
-                      <dd className="font-['IBM_Plex_Mono'] font-semibold text-white">
+                      <dd className="font-['Inter'] font-semibold text-white">
                         {formatMoney(selectedWithdrawalFee)}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-4 border-t border-white/10 pt-4">
                       <dt className="text-slate-500">You request</dt>
-                      <dd className="font-['IBM_Plex_Mono'] font-semibold text-cyan-300">
+                      <dd className="font-['Inter'] font-semibold text-cyan-300">
                         {formatMoney(Number(withdrawalAmount) || 0)}
                       </dd>
                     </div>
@@ -1043,7 +1044,7 @@ export default function MemberFeaturePage() {
                               {transactionDate(item)} · {transactionStatus(item)}
                             </p>
                           </div>
-                          <p className="font-['IBM_Plex_Mono'] font-semibold text-white">
+                          <p className="font-['Inter'] font-semibold text-white">
                             −{formatMoney(item.amount)}
                           </p>
                         </div>
@@ -1163,7 +1164,7 @@ export default function MemberFeaturePage() {
                     className="rounded-2xl border border-white/10 bg-[#0d1728] p-5"
                   >
                     <p className="text-xs font-semibold text-slate-400">{label}</p>
-                    <p className="mt-3 font-['IBM_Plex_Mono'] text-2xl font-semibold tracking-[-0.04em] text-white">
+                    <p className="mt-3 font-['Inter'] text-2xl font-semibold tracking-[-0.04em] text-white">
                       {formatMoney(amount)}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">{caption}</p>
@@ -1239,9 +1240,8 @@ export default function MemberFeaturePage() {
                   );
 
                   return filteredTransactions.length ? (
-                    <div className="overflow-x-auto">
-                      <div className="min-w-[680px]">
-                        <div className="grid grid-cols-[1.35fr_1fr_1fr_0.8fr] gap-4 border-b border-white/10 px-6 py-3 text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                    <div>
+                      <div className="hidden grid-cols-[1.35fr_1fr_1fr_0.8fr] gap-4 border-b border-white/10 px-6 py-3 text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500 sm:grid">
                           <span>Activity</span>
                           <span>Date</span>
                           <span>Status</span>
@@ -1265,10 +1265,10 @@ export default function MemberFeaturePage() {
                           return (
                             <div
                               key={item.id}
-                              className="grid grid-cols-[1.35fr_1fr_1fr_0.8fr] gap-4 border-b border-white/5 px-6 py-4 text-sm last:border-0"
+                              className="grid grid-cols-2 gap-x-3 gap-y-2 border-b border-white/5 bg-white/[0.02] px-4 py-4 text-sm last:border-0 sm:grid-cols-[1.35fr_1fr_1fr_0.8fr] sm:gap-4 sm:bg-transparent sm:px-6"
                             >
-                              <div>
-                                <p className="font-semibold text-white">
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold text-white">
                                   {formatTransactionType(item.type, "Account activity")}
                                 </p>
                                 <p className="mt-1 text-xs capitalize text-slate-500">
@@ -1276,22 +1276,21 @@ export default function MemberFeaturePage() {
                                   {item.currency ? ` · ${item.currency}` : ""}
                                 </p>
                               </div>
-                              <span className="self-center text-slate-400">
+                              <span className="order-3 self-center text-xs text-slate-400 sm:order-none sm:text-sm">
                                 {transactionDate(item)}
                               </span>
-                              <span className="self-center">
+                              <span className="order-4 self-center sm:order-none">
                                 <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}`}>
                                   {transactionStatus(item)}
                                 </span>
                               </span>
-                              <span className={`self-center text-right font-bold ${isOutgoing ? "text-white" : "text-emerald-300"}`}>
+                              <span className={`order-2 self-center text-right font-bold sm:order-none ${isOutgoing ? "text-white" : "text-emerald-300"}`}>
                                 {isOutgoing ? "−" : "+"}
                                 {formatMoney(item.amount)}
                               </span>
                             </div>
                           );
                         })}
-                      </div>
                     </div>
                   ) : (
                     <div className="px-6 py-14 text-center">
@@ -1352,7 +1351,7 @@ export default function MemberFeaturePage() {
               </div>
               <p className="mt-5 text-sm text-slate-400">
                 Recorded commission:{" "}
-                <span className="font-['IBM_Plex_Mono'] font-semibold text-white">
+                <span className="font-['Inter'] font-semibold text-white">
                   {formatMoney(summary.commission)}
                 </span>
               </p>

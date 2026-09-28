@@ -1,25 +1,59 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { LoaderCircle, Mail, MapPin, Send } from "lucide-react";
+import { Check, Copy, LoaderCircle, MapPin, MessageCircle } from "lucide-react";
 import { useAuth } from "../../lib/authContext";
-import { saveSupportTicket } from "../../lib/firebaseData";
+import { saveSupportTicket, sendSupportTicketEmails } from "../../lib/firebaseData";
+import { SUPPORT_CHAT_OPEN_EVENT } from "../../lib/supportChat";
 import { PublicPage } from "../../components/site/SiteChrome";
 import heroAsset from "../../assets/uploads/banner-5.webp";
 import heroAssetMedium from "../../assets/uploads/banner-5-1440.webp";
 import heroAssetSmall from "../../assets/uploads/banner-5-960.webp";
 import FeedbackMessage from "../../components/ui/FeedbackMessage";
+import { getSafeErrorMessage } from "../../lib/authHelpers";
 
 const SUPPORT_EMAIL = "meridianvest948@gmail.com";
-const SUPPORT_TELEGRAM_URL = "https://t.me/meridianvests";
 
 export default function SupportPage() {
   const { user } = useAuth();
+  const canSubmitTicket = Boolean(user && !user.isAnonymous);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("status");
   const [loading, setLoading] = useState(false);
+  const [ticketId, setTicketId] = useState("");
+  const [emailRetryAvailable, setEmailRetryAvailable] = useState(false);
+  const [emailRetrying, setEmailRetrying] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
+
+  async function copySupportAddress() {
+    try {
+      await navigator.clipboard.writeText(SUPPORT_EMAIL);
+      setEmailCopied(true);
+      window.setTimeout(() => setEmailCopied(false), 1800);
+    } catch {
+      setEmailCopied(false);
+    }
+  }
+
+  async function retrySupportEmails() {
+    if (!ticketId || emailRetrying) return;
+    setEmailRetrying(true);
+    setMessage("");
+    try {
+      await sendSupportTicketEmails(ticketId);
+      setEmailRetryAvailable(false);
+      setMessage("Your support request was sent and the email notifications were delivered.");
+      setMessageType("success");
+    } catch (error) {
+      setMessageType("error");
+      setMessage(getSafeErrorMessage(error, "Your request is saved, but its email notifications could not be sent. Please try again."));
+    } finally {
+      setEmailRetrying(false);
+    }
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (!canSubmitTicket) return;
     setMessage("");
     setMessageType("status");
     setLoading(true);
@@ -29,32 +63,27 @@ export default function SupportPage() {
     try {
       if (!user)
         throw new Error("Please sign in before sending a support request.");
-      await saveSupportTicket(user.uid, {
+      const ticket = await saveSupportTicket(user.uid, {
         fullName: formData.get("fullName"),
         email: user.email || formData.get("email"),
         subject: `Support request from ${formData.get("fullName")}`,
         message: formData.get("message"),
       });
-
-      const subject = `Support request from ${formData.get("fullName")}`;
-      const body = [
-        `Name: ${formData.get("fullName")}`,
-        `Email: ${user.email || formData.get("email")}`,
-        "",
-        String(formData.get("message")),
-      ].join("\n");
-
-      window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      setMessage("Your email app is opening with the support message addressed to MeridianVests.");
-      setMessageType("success");
+      setTicketId(ticket.id);
       form.reset();
+      try {
+        await sendSupportTicketEmails(ticket.id);
+        setEmailRetryAvailable(false);
+        setMessage("Your support request was sent. A confirmation email has been sent to your verified email address.");
+        setMessageType("success");
+      } catch {
+        setEmailRetryAvailable(true);
+        setMessage("Your support request was saved, but we could not send all email notifications. You can retry the email now.");
+        setMessageType("status");
+      }
     } catch (error) {
       setMessageType("error");
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to send your request right now.",
-      );
+      setMessage(getSafeErrorMessage(error, "Unable to send your request right now."));
     } finally {
       setLoading(false);
     }
@@ -106,82 +135,120 @@ export default function SupportPage() {
                 experience.
               </p>
               <div className="mb-6 flex flex-wrap gap-3">
-                <a
-                  href={`mailto:${SUPPORT_EMAIL}`}
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event(SUPPORT_CHAT_OPEN_EVENT))}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-xs font-extrabold uppercase tracking-[0.12em] text-cyan-100 transition hover:border-cyan-200 hover:bg-cyan-300/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                >
+                  <MessageCircle size={16} /> Start live chat
+                </button>
+                <button
+                  type="button"
+                  onClick={copySupportAddress}
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-sky-400/10 px-4 py-3 text-xs font-extrabold uppercase tracking-[0.12em] text-sky-200 transition hover:border-sky-300 hover:bg-sky-400/15"
+                  aria-live="polite"
                 >
-                  <Mail size={16} /> Email
-                </a>
-                <a
-                  href={SUPPORT_TELEGRAM_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-xs font-extrabold uppercase tracking-[0.12em] text-cyan-200 transition hover:border-cyan-300 hover:bg-cyan-400/15"
-                >
-                  <Send size={16} /> Telegram
-                </a>
+                  {emailCopied ? <Check size={16} /> : <Copy size={16} />}
+                  {emailCopied ? "Email copied" : "Copy support email"}
+                </button>
               </div>
               <div className="flex items-center gap-4 text-sm text-slate-200">
                 <MapPin size={18} /> MeridianVests Crypto Management Group
               </div>
             </div>
-            <form
-              className="motion-safe:transition motion-safe:duration-700 rounded-[0.625rem] border border-white/10 bg-[#050b14] p-5 shadow-[0_20px_45px_rgba(2,8,23,0.28)] sm:p-8"
-              onSubmit={handleSubmit}
-            >
-              <h3 className="mb-7 text-2xl font-semibold text-white">
-                Send a message
-              </h3>
-              <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-300">
-                Full name
-                <input
-                  name="fullName"
-                  type="text"
-                  placeholder="Your full name"
-                  required
-                  maxLength={120}
-                  className="mt-2 h-12 w-full rounded-md border border-white/10 bg-[#101d30] px-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
-                />
-              </label>
-              <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-300">
-                Email address
-                <input
-                  name="email"
-                  type="email"
-                  placeholder="name@example.com"
-                  required
-                  maxLength={254}
-                  className="mt-2 h-12 w-full rounded-md border border-white/10 bg-[#101d30] px-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
-                />
-              </label>
-              <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-300">
-                Message
-                <textarea
-                  name="message"
-                  placeholder="Tell us how we can help"
-                  required
-                  minLength={10}
-                  maxLength={4000}
-                  className="mt-2 min-h-[145px] w-full rounded-md border border-white/10 bg-[#101d30] px-3 py-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={loading}
-                aria-busy={loading}
-                className="inline-flex min-h-12 items-center justify-center rounded-md bg-gradient-to-r from-sky-400 to-cyan-400 px-5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#082032] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            {canSubmitTicket ? (
+              <form
+                className="motion-safe:transition motion-safe:duration-700 rounded-[0.625rem] border border-white/10 bg-[#050b14] p-5 shadow-[0_20px_45px_rgba(2,8,23,0.28)] sm:p-8"
+                onSubmit={handleSubmit}
               >
-                {loading ? (
-                  <>
-                    <LoaderCircle size={16} className="mr-2 animate-spin" aria-hidden="true" />
-                    Sending...
-                  </>
-                ) : (
-                  "Submit request"
+                <h3 className="mb-7 text-2xl font-semibold text-white">
+                  Send a support ticket
+                </h3>
+                <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-300">
+                  Full name
+                  <input
+                    name="fullName"
+                    type="text"
+                    placeholder="Your full name"
+                    required
+                    maxLength={120}
+                    className="mt-2 h-12 w-full rounded-md border border-white/10 bg-[#101d30] px-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+                  />
+                </label>
+                <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-300">
+                  Email address
+                  <input
+                    name="email"
+                    type="email"
+                    placeholder="name@example.com"
+                    required
+                    maxLength={254}
+                    className="mt-2 h-12 w-full rounded-md border border-white/10 bg-[#101d30] px-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+                  />
+                </label>
+                <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-300">
+                  Message
+                  <textarea
+                    name="message"
+                    placeholder="Tell us how we can help"
+                    required
+                    minLength={10}
+                    maxLength={4000}
+                    className="mt-2 min-h-[145px] w-full rounded-md border border-white/10 bg-[#101d30] px-3 py-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  aria-busy={loading}
+                  className="inline-flex min-h-12 items-center justify-center rounded-md bg-gradient-to-r from-sky-400 to-cyan-400 px-5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#082032] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? (
+                    <>
+                      <LoaderCircle size={16} className="mr-2 animate-spin" aria-hidden="true" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Submit request"
+                  )}
+                </button>
+                {message && <FeedbackMessage className="mt-4" type={messageType}>{message}</FeedbackMessage>}
+                {emailRetryAvailable && (
+                  <button
+                    type="button"
+                    onClick={retrySupportEmails}
+                    disabled={emailRetrying}
+                    className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg border border-amber-200/30 px-4 text-xs font-bold text-amber-100 transition hover:bg-amber-100/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {emailRetrying ? <LoaderCircle size={14} className="animate-spin" /> : null}
+                    {emailRetrying ? "Retrying email..." : "Retry email notifications"}
+                  </button>
                 )}
-              </button>
-              {message && <FeedbackMessage className="mt-4" type={messageType}>{message}</FeedbackMessage>}
-            </form>
+              </form>
+            ) : (
+              <section className="rounded-[0.625rem] border border-white/10 bg-[#050b14] p-5 shadow-[0_20px_45px_rgba(2,8,23,0.28)] sm:p-8">
+                <h3 className="text-2xl font-semibold text-white">
+                  Choose how to get help
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-slate-300">
+                  Start a live chat now, or sign in to submit a support ticket.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Link
+                    to="/login"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-4 text-xs font-bold text-white transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    to="/signup"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-4 text-xs font-bold text-white transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                  >
+                    Create an account
+                  </Link>
+                </div>
+              </section>
+            )}
           </div>
         </section>
       </main>

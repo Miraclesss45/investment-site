@@ -13,7 +13,7 @@ const plans = [
 export default function BondsPage() {
   return (
     <PublicPage>
-      <main id="main-content" tabIndex="-1" className="bg-[#202125]/70 px-4 py-12 sm:py-16 lg:py-[94px]">
+      <main id="main-content" tabIndex="-1" className="bg-[#0a1422]/80 px-4 py-12 sm:py-16 lg:py-[94px]">
         <div className="mx-auto w-full max-w-[1160px]">
           <div className="mb-6 flex items-center justify-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">
             <span className="block h-2.5 w-2.5 bg-sky-400" /> Our packages
@@ -31,19 +31,17 @@ export default function BondsPage() {
               <Reveal
                 as="article"
                 key={name}
-                className={`group flex h-full flex-col rounded-xl p-5 text-slate-900 shadow-xl shadow-slate-950/30 transition duration-500 ease-out hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-500/20 sm:p-6 ${
-                  index >= 2 ? "bg-cyan-100" : "bg-white"
-                }`}
+                className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0d1728] p-5 text-slate-100 shadow-[0_18px_45px_rgba(2,8,23,0.18)] transition duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_24px_54px_rgba(2,8,23,0.3)] motion-reduce:transition-none sm:p-6"
                 style={{ "--reveal-delay": `${index * 120}ms` }}
               >
-                <div className="mb-5 inline-flex self-start rounded-full bg-gradient-to-r from-sky-400 to-sky-500 px-3.5 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-white">
+                <div className="mb-5 inline-flex self-start rounded-md border border-sky-300/15 bg-sky-300/[0.08] px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.12em] text-sky-200">
                   {name}
                 </div>
-                <div className="flex items-start text-[clamp(3.5rem,15vw,4.5rem)] font-extrabold leading-none tracking-[-0.08em] text-slate-900">
+                <div className="flex items-start font-['Inter'] text-[clamp(3rem,12vw,4rem)] font-semibold leading-none tracking-[-0.07em] text-white">
                   {rate}
-                  <span className="ml-2 pt-2 text-2xl tracking-normal">%</span>
+                  <span className="ml-1.5 pt-1.5 text-xl tracking-normal text-slate-400">%</span>
                 </div>
-                <ul className="mt-8 flex-1 space-y-5 text-left text-[11px] text-slate-800 sm:mt-9 sm:space-y-6">
+                <ul className="mt-8 flex-1 space-y-4 text-left text-xs text-slate-300 sm:mt-9 sm:space-y-5">
                   {[
                     ["Minimum deposit", minimum],
                     ["Maximum deposit", maximum],
@@ -52,8 +50,8 @@ export default function BondsPage() {
                     ["Plan return", "Subject to terms"],
                   ].map(([label, value]) => (
                     <li key={label} className="flex items-start gap-3">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white transition group-hover:bg-slate-950">
-                        <Check size={12} />
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-300/[0.08] text-emerald-200">
+                        <Check size={12} aria-hidden="true" />
                       </span>
                       <span className="font-medium">
                         {label}: <b>{value}</b>
@@ -63,7 +61,7 @@ export default function BondsPage() {
                 </ul>
                 <Link
                   to="/signup"
-                  className="mt-8 inline-flex h-[58px] w-full items-center justify-center rounded-xl bg-slate-900 text-[11px] font-extrabold uppercase tracking-[0.14em] text-white transition duration-300 hover:-translate-y-0.5 hover:bg-sky-500"
+                  className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-sky-300 px-4 text-xs font-bold uppercase tracking-[0.1em] text-slate-950 transition-colors hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1728]"
                 >
                   Get started
                 </Link>

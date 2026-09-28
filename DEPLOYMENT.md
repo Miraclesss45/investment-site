@@ -14,7 +14,6 @@ The MeridianVest project has been fully migrated from Netlify to Vercel. All Net
 ### Added
 - `api/admin-data.js` - Admin operations and audit logging
 - `api/create-referral-reward.js` - Referral reward verification
-- `api/send-deposit-telegram.js` - Deposit notifications
 - `api/send-withdrawal-email.js` and `api/withdrawal-mailer.js` - Branded withdrawal email delivery over Truehost SMTP
 - `vercel.json` - Vercel build and function configuration
 
@@ -53,8 +52,6 @@ VITE_FIREBASE_STORAGE_BUCKET=<value>
 VITE_FIREBASE_MESSAGING_SENDER_ID=<value>
 VITE_FIREBASE_APP_ID=<value>
 FIREBASE_SERVICE_ACCOUNT=<complete JSON object>
-TELEGRAM_BOT_TOKEN=<value>
-TELEGRAM_CHAT_ID=<value>
 SMTP_HOST=<outgoing SMTP hostname shown by Truehost>
 SMTP_PORT=<outgoing SMTP port shown by Truehost>
 SMTP_SECURE=<true for implicit TLS, false for STARTTLS>
@@ -65,6 +62,41 @@ MAIL_FROM=<MeridianVest <same mailbox address>>
 
 **Important:** Store `FIREBASE_SERVICE_ACCOUNT` as the complete JSON string from your Firebase service account key.
 SMTP variables are server-only: do not prefix them with `VITE_`, place them in frontend code, or commit their real values. `MAIL_FROM` should use the Truehost mailbox/domain that is authorized to send. After changing Vercel variables, redeploy for them to take effect.
+
+### Support chat prerequisites
+
+The customer chat uses a top-level `supportConversations/{customer_uid}` document
+and its `messages` and temporary `typing` subcollections. Existing
+`users/{uid}/supportTickets` documents and the support request form remain
+separate from chat conversations. Support form submissions are saved to
+Firestore and their branded notification and confirmation emails are sent by
+`/api/send-support-email` through the configured SMTP account. Email delivery
+failures are recorded on the ticket and can be retried from the form.
+Deploy `firestore.rules` before using the chat:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+In Firebase Console, enable **Authentication → Sign-in method → Anonymous** for
+the Firebase project used by the site. This is required for visitors who are not
+signed in; anonymous credentials use browser-session persistence and are
+authorized by the same owner-specific Firestore rules as member sessions.
+Administrators must continue to sign in with their verified account and
+existing administrator custom claims.
+
+Resolved or closed conversations can be archived from the admin support inbox.
+Archiving retains all messages and writes immutable archive/restore events; it
+does not delete conversation data. Archived conversations are available through
+the Archived filter and can be restored. Customers can still read an archived
+conversation, but must contact support or ask an administrator to restore it
+before sending another message.
+
+The chat does not use Firebase Storage, Cloud Functions, SMTP, or email
+notifications. Attachments and email notifications are not part of this
+implementation. Typing state is stored separately from messages and cleared
+when the composer becomes idle. Do not deploy a permissive Firestore rule to
+work around a missing permission; diagnose and deploy the rules above instead.
 
 `vercel env add` saves a variable to the Vercel project; it does not update an
 already-running local `vercel dev` process or redeploy an existing Production
@@ -120,11 +152,15 @@ Backend functions are available at:
 - `POST /api/admin-data` - Admin dashboard data and operations
 - `GET /api/admin-data?resource=admins` - Read-only current administrator directory
 - `POST /api/create-referral-reward` - Referral reward processing
-- `POST /api/send-deposit-telegram` - Deposit notification sending
+- `POST /api/send-deposit-email` - Sends the member's pending deposit confirmation
 - `POST /api/send-withdrawal-email` - Sends the authenticated member's withdrawal-processing email
+- `POST /api/send-support-email` - Sends support-team and member confirmation emails for a saved ticket
 
-The member receives the first email after the pending request is saved. Both
-withdrawal emails include the USD request amount and selected payout asset, and
+The member receives one pending deposit email after the request is saved and one
+success email after an administrator credits the deposit. Both go to the verified
+email on the member's Firebase Authentication account; Gmail addresses are supported.
+Deposit and withdrawal messages use the configured SMTP sender. Both withdrawal
+emails include the USD request amount and selected payout asset, and
 display `(n/a)` for the wallet address. The actual payout wallet remains saved as an
 immutable request snapshot for administrator review and payout. Firestore rules
 require it to match the member's saved wallet for the selected asset when the request

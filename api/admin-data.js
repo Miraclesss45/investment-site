@@ -2,7 +2,8 @@ import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
 import fs from "node:fs";
 import { getAuth } from "firebase-admin/auth";
 import { FieldPath, FieldValue, getFirestore } from "firebase-admin/firestore";
-import { deliverWithdrawalEmail } from "./withdrawal-mailer.js";
+import { deliverDepositEmail } from "../server/deposit-mailer.js";
+import { deliverWithdrawalEmail } from "../server/withdrawal-mailer.js";
 import { calculateWithdrawableBalance, getPaperTradingCapital } from "../src/lib/financialMath.js";
 
 const CHILD_COLLECTIONS = {
@@ -50,6 +51,7 @@ const RECENT_AUTH_SECONDS = 10 * 60;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,150}$/;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{8,120}$/;
 const READ_BATCH_SIZE = 500;
+const ADMIN_PAGE_SIZE = 50;
 const PAPER_TRADING_ASSETS = ["BTC", "ETH", "LTC", "BNB"];
 
 function sendJson(res, statusCode, body) {
@@ -124,6 +126,224 @@ async function getAuthUsers(auth) {
   return users;
 }
 
+async function countOutstandingQueueItems(db, collectionName, statuses) {
+  const collectionGroup = db.collectionGroup(collectionName);
+  const [allSnapshot, closedSnapshot, emptyStatusSnapshot] = await Promise.all([
+    collectionGroup.count().get(),
+    collectionGroup.where("status", "not-in", statuses).count().get(),
+    collectionGroup.where("status", "==", "").count().get(),
+  ]);
+  // Missing and empty legacy statuses default to pending/open in the UI.
+  return Math.max(
+    allSnapshot.data().count - closedSnapshot.data().count + emptyStatusSnapshot.data().count,
+    0,
+  );
+}
+
+async function aggregateAdminQueueCounts(db) {
+  const [deposits, withdrawals, support, referrals] = await Promise.all([
+    countOutstandingQueueItems(db, "deposits", ["pending", "approved"]),
+    countOutstandingQueueItems(db, "withdrawals", ["pending", "on-hold", "approved"]),
+    countOutstandingQueueItems(db, "supportTickets", ["open", "on-hold"]),
+    countOutstandingQueueItems(db, "referralRewards", ["pending", "open", "on-hold", "review"]),
+  ]);
+  return { deposits, withdrawals, support, referrals };
+}
+
+function decodePageCursor(value) {
+  if (!value) return {};
+  try {
+    const decoded = JSON.parse(Buffer.from(String(value), "base64url").toString("utf8"));
+    if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) throw new Error();
+    return decoded;
+  } catch {
+    throw Object.assign(new Error("The page cursor is invalid. Refresh the list and try again."), { statusCode: 400 });
+  }
+}
+
+function encodePageCursor(value) {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+async function getPagedAdmins(db, auth, cursor) {
+  let pageToken = typeof cursor.adminPageToken === "string" && cursor.adminPageToken
+    ? cursor.adminPageToken
+    : undefined;
+  let offset = Number.isInteger(cursor.adminOffset) && cursor.adminOffset >= 0 ? cursor.adminOffset : 0;
+  const rows = [];
+  let boundaryCursor = null;
+
+  while (rows.length <= ADMIN_PAGE_SIZE) {
+    const page = await auth.listUsers(1000, pageToken);
+    const admins = page.users.filter((authUser) => authUser.customClaims?.admin === true
+      || String(authUser.customClaims?.role || "").trim().toLowerCase() === "admin");
+    for (let index = offset; index < admins.length; index += 1) {
+      const authUser = admins[index];
+      if (rows.length === ADMIN_PAGE_SIZE) {
+        rows.push(authUser);
+        break;
+      }
+      rows.push(authUser);
+      if (rows.length === ADMIN_PAGE_SIZE) {
+        boundaryCursor = index + 1 < admins.length
+          ? { adminPageToken: pageToken || "", adminOffset: index + 1 }
+          : page.pageToken
+            ? { adminPageToken: page.pageToken, adminOffset: 0 }
+            : null;
+      }
+    }
+    if (rows.length > ADMIN_PAGE_SIZE || !page.pageToken) break;
+    pageToken = page.pageToken;
+    offset = 0;
+  }
+
+  const hasMore = rows.length > ADMIN_PAGE_SIZE;
+  const pageAdmins = rows.slice(0, ADMIN_PAGE_SIZE);
+  const items = await Promise.all(pageAdmins.map(async (authUser) => {
+    const profileSnapshot = await db.doc(`users/${authUser.uid}`).get();
+    const profile = profileSnapshot.exists ? profileSnapshot.data() : {};
+    return {
+      id: authUser.uid,
+      email: authUser.email || profile.email || null,
+      displayName: authUser.displayName || profile.displayName || profile.fullName || profile.username || null,
+      username: profile.username || null,
+      emailVerified: authUser.emailVerified === true,
+      disabled: authUser.disabled === true,
+      role: "admin",
+      lastSignInTime: authUser.metadata?.lastSignInTime || null,
+      creationTime: authUser.metadata?.creationTime || null,
+    };
+  }));
+  return {
+    items,
+    nextCursor: hasMore && boundaryCursor ? encodePageCursor(boundaryCursor) : null,
+    hasMore,
+  };
+}
+
+async function getPagedAdminResource(db, auth, resource, cursorValue) {
+  const cursor = decodePageCursor(cursorValue);
+  if (resource === "admins") return getPagedAdmins(db, auth, cursor);
+
+  if (resource === "users" || resource === "packages" || resource === "audit") {
+    const collectionName = resource;
+    let query = db.collection(collectionName).orderBy(FieldPath.documentId());
+    const lastPath = cursor[collectionName];
+    if (lastPath) {
+      const lastDocument = await db.doc(lastPath).get();
+      if (!lastDocument.exists || lastDocument.ref.parent.id !== collectionName) {
+        throw Object.assign(new Error("The page cursor is no longer valid. Refresh the list."), { statusCode: 400 });
+      }
+      query = query.startAfter(lastDocument);
+    }
+    const snapshot = await query.limit(ADMIN_PAGE_SIZE + 1).get();
+    const hasMore = snapshot.size > ADMIN_PAGE_SIZE;
+    const pageDocuments = snapshot.docs.slice(0, ADMIN_PAGE_SIZE);
+    let items;
+    if (resource === "users") {
+      const profilesWithAuth = await Promise.all(pageDocuments.map(async (item) => {
+        try {
+          const authUser = await auth.getUser(item.id);
+          const profile = item.data();
+          return {
+            id: item.id,
+            ...serialize(profile),
+            authAccount: true,
+            authUid: authUser.uid,
+            authDisabled: authUser.disabled === true,
+            emailVerified: authUser.emailVerified === true || profile.emailVerified === true,
+          };
+        } catch (error) {
+          if (error?.code === "auth/user-not-found") return null;
+          throw error;
+        }
+      }));
+      items = profilesWithAuth.filter(Boolean);
+    } else {
+      items = pageDocuments.map((item) => ({ id: item.id, ...serialize(item.data()) }));
+    }
+    const nextCursor = hasMore && pageDocuments.length
+      ? encodePageCursor({ [collectionName]: pageDocuments[pageDocuments.length - 1].ref.path })
+      : null;
+    return { items, nextCursor, hasMore };
+  }
+
+  const childCollections = resource === "withdrawal-decisions"
+    ? ["withdrawals"]
+    : CHILD_COLLECTIONS[resource];
+  if (!childCollections) throw Object.assign(new Error("Unknown admin resource."), { statusCode: 400 });
+
+  const snapshots = await Promise.all(childCollections.map(async (collectionName) => {
+    let query = db.collectionGroup(collectionName).orderBy(FieldPath.documentId());
+    if (resource === "withdrawal-decisions") {
+      query = db.collectionGroup(collectionName)
+        .where("status", "in", ["pending", "on-hold", "approved"])
+        .orderBy(FieldPath.documentId());
+    }
+    const lastPath = cursor[collectionName];
+    if (lastPath) {
+      const lastDocument = await db.doc(lastPath).get();
+      if (!lastDocument.exists || lastDocument.ref.parent.id !== collectionName) {
+        throw Object.assign(new Error("The page cursor is no longer valid. Refresh the list."), { statusCode: 400 });
+      }
+      query = query.startAfter(lastDocument);
+    }
+    return { collectionName, snapshot: await query.limit(ADMIN_PAGE_SIZE + 1).get() };
+  }));
+  const merged = snapshots.flatMap(({ collectionName, snapshot }) => snapshot.docs.map((document) => ({
+    collectionName,
+    document,
+  }))).sort((left, right) => left.document.ref.path.localeCompare(right.document.ref.path));
+  const pageDocuments = merged.slice(0, ADMIN_PAGE_SIZE);
+  const hasMore = merged.length > ADMIN_PAGE_SIZE || snapshots.some(({ snapshot }) => snapshot.size > ADMIN_PAGE_SIZE);
+  const nextCursor = { ...cursor };
+  for (const { collectionName, document } of pageDocuments) nextCursor[collectionName] = document.ref.path;
+
+  const userIds = [...new Set(pageDocuments.map(({ document }) => document.ref.parent.parent?.id).filter(Boolean))];
+  const profiles = new Map(await Promise.all(userIds.map(async (userId) => {
+    const profile = await db.doc(`users/${userId}`).get();
+    return [userId, profile.exists ? profile.data() : {}];
+  })));
+  const items = pageDocuments.map(({ collectionName, document }) => {
+    const userId = document.ref.parent.parent?.id;
+    const profile = profiles.get(userId) || {};
+    return {
+      ...serialize(document.data()),
+      id: document.id,
+      userId,
+      profileEmail: profile.email || null,
+      profileUsername: profile.username || null,
+      collection: collectionName,
+    };
+  });
+  return {
+    items,
+    nextCursor: hasMore ? encodePageCursor(nextCursor) : null,
+    hasMore,
+  };
+}
+
+async function getAdminRecord(db, resource, userId, recordId, collectionName) {
+  if (!SAFE_ID.test(userId) || !SAFE_ID.test(recordId)) {
+    throw Object.assign(new Error("A valid user and record are required."), { statusCode: 400 });
+  }
+  const allowedCollections = CHILD_COLLECTIONS[resource];
+  if (!allowedCollections?.includes(collectionName)) {
+    throw Object.assign(new Error("The requested record type is invalid."), { statusCode: 400 });
+  }
+  const snapshot = await db.doc(`users/${userId}/${collectionName}/${recordId}`).get();
+  if (!snapshot.exists) throw Object.assign(new Error("The requested record could not be found."), { statusCode: 404 });
+  const profile = await db.doc(`users/${userId}`).get();
+  return {
+    ...serialize(snapshot.data()),
+    id: snapshot.id,
+    userId,
+    profileEmail: profile.data()?.email || null,
+    profileUsername: profile.data()?.username || null,
+    collection: collectionName,
+  };
+}
+
 async function authenticate(req, app) {
   const authorization = req.headers?.authorization || req.headers?.Authorization || "";
   if (!authorization.startsWith("Bearer ")) {
@@ -159,6 +379,7 @@ function requireReason(payload) {
 }
 
 async function aggregate(db, auth, resource) {
+  if (resource === "admin-queue-counts") return aggregateAdminQueueCounts(db);
   if (resource === "packages" || resource === "audit") {
     const documents = await getAllDocuments(db.collection(resource));
     return documents.map((item) => ({ id: item.id, ...serialize(item.data()) }));
@@ -250,32 +471,6 @@ async function audit(db, token, action, details) {
     details: JSON.parse(JSON.stringify(details)),
     createdAt: FieldValue.serverTimestamp(),
   });
-}
-
-async function getActiveDeposit(db, profileId) {
-  const profileSnapshot = await db.collection("users").doc(profileId).get();
-  if (!profileSnapshot.exists) return 0;
-  const profile = profileSnapshot.data();
-  const transactionDocuments = await getAllDocuments(db.collection("users").doc(profileId).collection("transactions"));
-  let deposits = 0;
-  let withdrawals = 0;
-  let hasLedgerRecords = false;
-  for (const item of transactionDocuments) {
-    const data = item.data();
-    hasLedgerRecords = true;
-    if (!["completed", "complete", "approved", "settled", "success"].includes(String(data.status || "completed").toLowerCase())) continue;
-    const amount = Math.max(Number(data.amount) || 0, 0);
-    const type = String(data.type || "").toLowerCase();
-    if (type.includes("deposit") || type.includes("credit") || type.includes("investment")) deposits += amount;
-    if (type.includes("withdraw") || type.includes("debit") || type.includes("payout")) withdrawals += amount;
-  }
-  if (!hasLedgerRecords) {
-    return Math.max(
-      Number(profile.totalDeposit || 0) - Number(profile.totalWithdrawal || 0) + Number(profile.paperTradingProfit || 0),
-      0,
-    );
-  }
-  return Math.max(deposits - withdrawals + Number(profile.paperTradingProfit || 0), 0);
 }
 
 function getWithdrawableBalance(profile) {
@@ -474,6 +669,22 @@ async function performSensitiveAction(db, token, action, payload) {
   requireRecentAuth(token);
   const isDeletion = ["delete-user", "delete-deposit", "delete-withdrawal"].includes(action);
   const reason = isDeletion || action === "approve-withdrawal" ? "" : requireReason(payload);
+  if (action === "retry-deposit-email") {
+    const profileId = String(payload.profileId || payload.userId || "");
+    const depositId = String(payload.depositId || payload.id || "");
+    if (!SAFE_ID.test(profileId) || !SAFE_ID.test(depositId)) {
+      throw Object.assign(new Error("A valid deposit and user profile are required."), { statusCode: 400 });
+    }
+    const email = await deliverDepositEmail({
+      db,
+      profileId,
+      depositId,
+      kind: "successful",
+      retryOnly: true,
+    });
+    await audit(db, token, "retry-deposit-email", { profileId, depositId, reason });
+    return { email, profileId, depositId };
+  }
   if (action === "delete-withdrawal") {
     const profileId = String(payload.profileId || payload.userId || "");
     const withdrawalId = String(payload.withdrawalId || payload.id || "");
@@ -647,7 +858,23 @@ async function performSensitiveAction(db, token, action, payload) {
       return { settlementId, amount, currency, profileId, depositId };
     });
     await audit(db, token, "settle-deposit", { ...settlement, offlineConfirmed: true, reason });
-    return { settled: true, ...settlement };
+    let email;
+    try {
+      email = await deliverDepositEmail({
+        db,
+        profileId,
+        depositId,
+        kind: "successful",
+      });
+    } catch (error) {
+      console.error("Deposit was credited but its success email could not be sent", {
+        profileId,
+        depositId,
+        error,
+      });
+      email = { status: "failed", error: "The deposit was credited, but its confirmation email could not be sent." };
+    }
+    return { settled: true, ...settlement, email };
   }
   if (action === "approve-withdrawal") {
     const profileId = String(payload.profileId || payload.userId || "");
@@ -941,11 +1168,20 @@ export default async function handler(req, res) {
     const db = getFirestore(app);
     if (req.method === "GET") {
       const resource = String(req.query?.resource || "users");
+      if (String(req.query?.record || "") === "1") {
+        const collectionName = String(req.query?.collection || (resource === "support" ? "supportTickets" : resource));
+        const item = await getAdminRecord(db, resource, String(req.query?.userId || ""), String(req.query?.id || ""), collectionName);
+        return sendJson(res, 200, { item });
+      }
+      if (String(req.query?.page || "") === "1") {
+        const page = await getPagedAdminResource(db, getAuth(app), resource, req.query?.cursor);
+        return sendJson(res, 200, page);
+      }
       return sendJson(res, 200, { items: await aggregate(db, getAuth(app), resource) });
     }
     let body;
     try { body = parseBody(req.body); } catch { return sendJson(res, 400, { error: "Invalid request body." }); }
-    const result = ["disable-user", "set-role", "delete-user", "ledger", "settle-deposit", "approve-withdrawal", "delete-deposit", "delete-withdrawal"].includes(body.action)
+    const result = ["disable-user", "set-role", "delete-user", "ledger", "settle-deposit", "retry-deposit-email", "approve-withdrawal", "delete-deposit", "delete-withdrawal"].includes(body.action)
       ? await performSensitiveAction(db, token, body.action, body.payload || {})
       : await performAction(db, token, body.action, body.payload || {});
     return sendJson(res, 200, result);
@@ -953,7 +1189,7 @@ export default async function handler(req, res) {
     if (error?.message === "Firebase service account is not configured.") return sendJson(res, 503, { error: error.message, code: "firebase-not-configured" });
     if (error?.code === "user-not-found") return sendJson(res, 404, { error: error.message, code: "user-not-found" });
     if (error?.code === "recent-auth-required") return sendJson(res, 401, { error: error.message, code: error.code });
-    if (error?.code?.startsWith("auth/")) return sendJson(res, 401, { error: "Authentication token is invalid or expired.", code: "auth-invalid" });
+    if (typeof error?.code === "string" && error.code.startsWith("auth/")) return sendJson(res, 401, { error: "Authentication token is invalid or expired.", code: "auth-invalid" });
     console.error("admin-data failed", error);
     return sendJson(res, error.statusCode || 500, { error: error.message || "The admin request failed." });
   }

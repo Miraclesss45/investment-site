@@ -1,11 +1,31 @@
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Clock3, Mail, MessageCircle } from "lucide-react";
 import { formatMoney } from "../../lib/financial";
+import { sendDepositPendingEmail } from "../../lib/firebaseData";
 import WhatsAppIcon, { WHATSAPP_URL } from "../../components/ui/WhatsAppIcon";
 
 export default function DepositPendingPage() {
   const location = useLocation();
   const request = location.state || {};
+  const [emailFailed, setEmailFailed] = useState(request.emailFailed === true);
+  const [emailRetrying, setEmailRetrying] = useState(false);
+  const [emailNotice, setEmailNotice] = useState("");
+
+  async function retryPendingEmail() {
+    if (!request.requestId || emailRetrying) return;
+    setEmailRetrying(true);
+    setEmailNotice("");
+    try {
+      await sendDepositPendingEmail(request.requestId);
+      setEmailFailed(false);
+      setEmailNotice("Deposit confirmation email sent to your verified account email.");
+    } catch {
+      setEmailNotice("The deposit request is saved, but its email could not be sent. Please contact support if this continues.");
+    } finally {
+      setEmailRetrying(false);
+    }
+  }
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#07111d] px-4 py-8 text-white sm:px-6">
@@ -93,6 +113,17 @@ export default function DepositPendingPage() {
               </p>
             </div>
 
+            {emailFailed && (
+              <div role="alert" className="mt-5 rounded-xl border border-amber-300/25 bg-amber-300/10 p-4 text-left text-sm leading-6 text-amber-100">
+                <p>The request was saved, but we could not send its pending email to your verified account email.</p>
+                {request.requestId ? (
+                  <button type="button" onClick={retryPendingEmail} disabled={emailRetrying} className="mt-3 rounded-lg border border-amber-200/30 px-3 py-2 text-xs font-bold text-amber-50 hover:bg-amber-100/10 disabled:opacity-60">
+                    {emailRetrying ? "Sending…" : "Retry email"}
+                  </button>
+                ) : null}
+                {emailNotice ? <p role="status" className="mt-2">{emailNotice}</p> : null}
+              </div>
+            )}
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               <Link
                 to="/support"

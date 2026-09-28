@@ -22,7 +22,7 @@ const EMAIL_STATES = {
 const EMAIL_LEASE_MS = 2 * 60 * 1000;
 const LOGO_CID = "meridianvest-logo";
 
-function getDeliveryFailure(error) {
+export function getDeliveryFailure(error) {
   if (error?.code === "member-email-unavailable") {
     return {
       code: "member-email-unavailable",
@@ -97,6 +97,19 @@ function createTransport() {
   };
 }
 
+export async function sendConfiguredEmail({ to, subject, text, html, attachments = [], replyTo }) {
+  const { transport, from } = createTransport();
+  return transport.sendMail({
+    from,
+    to,
+    subject,
+    text,
+    html,
+    attachments,
+    ...(replyTo ? { replyTo } : {}),
+  });
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
@@ -111,7 +124,6 @@ async function sendWithdrawalEmail({ to, kind, withdrawal }) {
   const emailState = EMAIL_STATES[kind];
   if (!emailState) throw new Error("Unsupported withdrawal email type.");
 
-  const { transport, from } = createTransport();
   const logo = await fs.readFile(join(process.cwd(), "public", "meridianvest-favicon.png"));
   const amount = Number(withdrawal.amount);
   const formattedAmount = Number.isFinite(amount)
@@ -127,8 +139,7 @@ async function sendWithdrawalEmail({ to, kind, withdrawal }) {
   const html = `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#0f172a"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 12px;background:#f1f5f9"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden"><tr><td style="padding:28px 32px;background:#07111d"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td><img src="cid:${LOGO_CID}" width="44" height="44" alt="MeridianVest" style="display:block;border:0;border-radius:8px"></td><td style="padding-left:12px;color:#fff;font-size:20px;font-weight:bold">Meridian<span style="color:#38bdf8">Vest</span></td></tr></table></td></tr><tr><td style="padding:32px"><h1 style="margin:0 0 16px;font-size:24px;line-height:1.3">${emailState.heading}</h1><p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.7">${escapedMessage}</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2e8f0;border-radius:10px"><tr><td style="padding:14px 16px;color:#64748b;font-size:13px">Amount (USD)</td><td align="right" style="padding:14px 16px;font-weight:bold">${escapedAmount}</td></tr><tr><td style="padding:14px 16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:13px">Payout asset</td><td align="right" style="padding:14px 16px;border-top:1px solid #e2e8f0;font-weight:bold">${escapedAsset}</td></tr></table><p style="margin:24px 0 0;color:#64748b;font-size:13px;line-height:1.6">If you have questions, contact our support team. This is an automated notification; please do not reply with sensitive account details.</p></td></tr></table></td></tr></table></body></html>`;
   const text = `${emailState.heading}\n\n${message}\n\nAmount (USD): ${formattedAmount}\nPayout asset: ${asset}\n\nFor help, contact MeridianVest support.`;
 
-  await transport.sendMail({
-    from,
+  await sendConfiguredEmail({
     to,
     subject: emailState.subject,
     text,

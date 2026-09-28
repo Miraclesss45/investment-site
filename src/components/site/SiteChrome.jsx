@@ -4,6 +4,8 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { useLanguage } from "../../lib/i18nContext";
 import { languageOptions } from "../../lib/i18nData";
 import WhatsAppIcon, { WHATSAPP_URL } from "../ui/WhatsAppIcon";
+import LanguageFlag from "../ui/LanguageFlag";
+import SkipToContent from "../ui/SkipToContent";
 import heroAsset from "../../assets/uploads/banner-5.webp";
 import heroAssetMedium from "../../assets/uploads/banner-5-1440.webp";
 import heroAssetSmall from "../../assets/uploads/banner-5-960.webp";
@@ -35,9 +37,7 @@ function LanguageSelector() {
   return (
     <label className="flex items-center gap-2">
       <span className="sr-only">Select language</span>
-      <span className="text-lg leading-none" aria-hidden="true">
-        {selected[2]}
-      </span>
+      <LanguageFlag countryCode={selected[2]} />
       <span className="relative">
         <select
           value={language}
@@ -105,12 +105,7 @@ export function SiteHeader() {
 
   return (
     <>
-      <a
-        className="fixed left-3 top-3 z-[100] -translate-y-[180%] rounded-lg bg-cyan-400 px-4 py-3 text-xs font-extrabold tracking-[0.04em] text-[#07111d] transition-transform duration-150 focus:translate-y-0"
-        href="#main-content"
-      >
-        Skip to main content
-      </a>
+      <SkipToContent />
       <div className="hidden h-[54px] border-t border-white/10 bg-[#101d30] lg:block">
         <div className="mx-auto flex h-full w-[min(1160px,calc(100%-2rem))] items-center justify-between gap-8 text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-200 sm:w-[min(1160px,calc(100%-3rem))] lg:w-[min(1160px,calc(100%-5rem))]">
           <div className="flex items-center gap-8">
@@ -164,7 +159,7 @@ export function SiteHeader() {
           </Link>
           <nav
             id="main-navigation"
-            className={`absolute left-0 right-0 top-[68px] flex-col gap-5 overflow-x-hidden overflow-y-auto border-b border-white/10 bg-[#0c1422] px-6 shadow-xl shadow-slate-950/30 transition-[max-height,opacity,padding] duration-300 sm:top-[78px] lg:static lg:ml-auto lg:flex lg:max-h-none lg:flex-row lg:items-center lg:gap-9 lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0 lg:opacity-100 lg:shadow-none ${menuOpen ? "flex max-h-[calc(100dvh-68px)] py-6 opacity-100 sm:max-h-[calc(100dvh-78px)]" : "flex max-h-0 py-0 opacity-0 lg:flex"}`}
+            className={`absolute left-0 right-0 top-[68px] flex-col gap-5 overflow-x-hidden overflow-y-auto border-b border-white/10 bg-[#0c1422] px-6 shadow-xl shadow-slate-950/30 transition-[max-height,opacity,padding] duration-300 sm:top-[78px] lg:static lg:ml-auto lg:flex lg:max-h-none lg:flex-row lg:items-center lg:gap-9 lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0 lg:opacity-100 lg:shadow-none ${menuOpen ? "visible flex max-h-[calc(100dvh-68px)] py-6 opacity-100 sm:max-h-[calc(100dvh-78px)]" : "invisible flex max-h-0 py-0 opacity-0 lg:visible lg:flex"}`}
             aria-label="Main navigation"
           >
             {navItems.map(({ label, to }, index) => (

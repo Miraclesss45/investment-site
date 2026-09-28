@@ -8,6 +8,8 @@ import {
 } from "../../lib/firebase";
 import { firestoreDb } from "../../lib/firebaseFirestore";
 import {
+  browserLocalPersistence,
+  setPersistence,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -74,6 +76,7 @@ export default function LoginPage() {
         email,
         formData.get("password"),
       );
+      await setPersistence(firebaseAuth, browserLocalPersistence);
 
       if (!credential.user.emailVerified) {
         await signOut(firebaseAuth);
@@ -155,6 +158,7 @@ export default function LoginPage() {
     try {
       const email = await resolveLoginEmail(identifier);
       const credential = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      await setPersistence(firebaseAuth, browserLocalPersistence);
       if (credential.user.emailVerified) {
         setFeedback("This email address is already verified.");
       } else {

@@ -1,6 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { requireVerifiedUser } from "./auth.js";
-import { deliverWithdrawalEmail, getFirebaseAdminApp } from "./withdrawal-mailer.js";
+import { requireVerifiedUser } from "../server/auth.js";
+import { deliverWithdrawalEmail, getFirebaseAdminApp } from "../server/withdrawal-mailer.js";
 
 function sendJson(res, statusCode, body) {
   res.setHeader("Content-Type", "application/json");

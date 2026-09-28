@@ -4,6 +4,27 @@ export function getPaperTradingCapital(profile) {
     .reduce((sum, amount) => sum + Math.max(Number(amount) || 0, 0), 0);
 }
 
+export function sumCompletedLedgerTransactions(transactions) {
+  return transactions.reduce((totals, transaction) => {
+    const status = String(transaction.status || "completed").toLowerCase();
+    const type = String(transaction.type || "").toLowerCase();
+    if (
+      type === "paper-trading-valuation" ||
+      !["completed", "complete", "approved", "settled", "success"].includes(status)
+    ) {
+      return totals;
+    }
+    const amount = Math.max(Number(transaction.amount) || 0, 0);
+    if (type.includes("deposit") || type.includes("credit") || type.includes("investment")) {
+      totals.totalDeposit += amount;
+    }
+    if (type.includes("withdraw") || type.includes("debit") || type.includes("payout")) {
+      totals.totalWithdrawal += amount;
+    }
+    return totals;
+  }, { totalDeposit: 0, totalWithdrawal: 0 });
+}
+
 export function calculateWithdrawableBalance({
   totalDeposit,
   totalEarnings,

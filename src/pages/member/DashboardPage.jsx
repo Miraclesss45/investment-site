@@ -7,7 +7,9 @@ import { buildEmptyFinancialSummary, CRYPTO_SYMBOLS, formatMoney, formatTransact
 import { CHART_RANGES, CRYPTO_ASSETS, useCryptoChartData, useCryptoMarketData } from "../../lib/cryptoMarket";
 import { getAssetAllocation, hasUsableMarketPrice, safeNumber } from "../../lib/cryptoUtils";
 import { syncPaperTradingMarket } from "../../lib/firebaseData";
+import CryptoPriceChart from "../../components/dashboard/CryptoPriceChart";
 import FeedbackMessage from "../../components/ui/FeedbackMessage";
+import SkipToContent from "../../components/ui/SkipToContent";
 
 const navigation = [
   ["Dashboard", "/dashboard"],
@@ -84,7 +86,6 @@ export default function DashboardPage() {
     return {
       ...summary,
       totalEarnings: summary.totalEarnings + profitDelta,
-      activeDeposit: Math.max(summary.activeDeposit + profitDelta, 0),
       availableBalance: Math.max(summary.availableBalance + profitDelta, 0),
     };
   }, [livePaperTradingProfit, liveTradingValuation.ready, persistedPaperTradingProfit, summary]);
@@ -218,7 +219,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#07111d] text-white">
+    <div className="dashboard-font min-h-screen bg-[#07111d] text-white">
+      <SkipToContent />
       <header className="sticky top-0 z-40 border-b border-white/10 bg-transparent shadow-lg shadow-black/10 backdrop-blur-xl">
         <div className="mx-auto flex w-[min(1280px,calc(100%-2rem))] items-center justify-between gap-4 py-4 sm:w-[min(1280px,calc(100%-3rem))]">
           <Link
@@ -295,7 +297,7 @@ export default function DashboardPage() {
             ))}
           </nav>
         </aside>
-        <main className="min-w-0" aria-busy={loading}>
+        <main id="main-content" tabIndex="-1" className="min-w-0 outline-none" aria-busy={loading}>
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-sky-400">
@@ -334,8 +336,8 @@ export default function DashboardPage() {
                 />
                 Preparing your account overview...
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                {[1, 2, 3, 4, 5].map((item) => (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {[1, 2, 3, 4].map((item) => (
                   <div
                     key={item}
                     className="rounded-lg border border-white/10 bg-[#0d1728] p-5"
@@ -404,11 +406,6 @@ export default function DashboardPage() {
                 liveTradingValuation.ready ? "Includes non-withdrawable crypto capital and live P/L" : "Includes non-withdrawable crypto capital and confirmed P/L",
               ],
               [
-                "Active deposit",
-                liveSummary.activeDeposit,
-                liveTradingValuation.ready ? "Deposits plus crypto capital, less withdrawals and live P/L" : "Deposits plus crypto capital, less withdrawals and confirmed P/L",
-              ],
-              [
                 "Total deposit",
                 summary.totalDeposit,
                 "Completed deposits only; crypto capital excluded",
@@ -429,7 +426,7 @@ export default function DashboardPage() {
                 className="rounded-lg border border-white/10 bg-[#0d1728] p-5"
               >
                 <p className="text-xs font-semibold text-slate-400">{label}</p>
-                <p className="mt-4 font-['IBM_Plex_Mono'] text-2xl font-semibold tracking-[-0.04em]">{formatMoney(value)}</p>
+                <p className="mt-4 font-['Inter'] text-2xl font-semibold tracking-[-0.04em]">{formatMoney(value)}</p>
                 <p className="mt-2 text-xs text-slate-400">{detail}</p>
               </article>
             ))}
@@ -460,19 +457,19 @@ export default function DashboardPage() {
               <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-slate-400">Total earnings</p>
-                  <p className="mt-2 font-['IBM_Plex_Mono'] text-xl font-semibold">
+                  <p className="mt-2 font-['Inter'] text-xl font-semibold">
                     {formatMoney(liveSummary.totalEarnings)}
                   </p>
                 </div>
                 <div>
                   <p className="text-slate-400">Last deposit</p>
-                  <p className="mt-2 font-['IBM_Plex_Mono'] text-xl font-semibold">
+                  <p className="mt-2 font-['Inter'] text-xl font-semibold">
                     {formatMoney(summary.lastDeposit)}
                   </p>
                 </div>
                 <div>
                   <p className="text-slate-400">Last withdrawal</p>
-                  <p className="mt-2 font-['IBM_Plex_Mono'] text-xl font-semibold">
+                  <p className="mt-2 font-['Inter'] text-xl font-semibold">
                     {formatMoney(summary.lastWithdrawal)}
                   </p>
                 </div>
@@ -569,7 +566,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="text-right">
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Live simulated value</p>
-                  <p className="mt-2 font-['IBM_Plex_Mono'] text-2xl font-semibold tracking-[-0.04em]">
+                  <p className="mt-2 font-['Inter'] text-2xl font-semibold tracking-[-0.04em]">
                     {formatMoney(positionMetrics.currentValue)}
                   </p>
                     <p className={`mt-1 text-xs ${liveTradingValuation.ready ? "text-emerald-300" : "text-amber-300"}`}>
@@ -581,96 +578,41 @@ export default function DashboardPage() {
                 <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-xl border border-white/10 bg-[#0d1728] p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">P/L</p>
-                  <p className={`mt-3 font-['IBM_Plex_Mono'] text-xl font-semibold ${positionMetrics.pnl >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                  <p className={`mt-3 font-['Inter'] text-xl font-semibold ${positionMetrics.pnl >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
                     {positionMetrics.pnl >= 0 ? "+" : "-"}
                     {formatMoney(Math.abs(positionMetrics.pnl))}
                   </p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#0d1728] p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Capital</p>
-                  <p className="mt-3 font-['IBM_Plex_Mono'] text-xl font-semibold">{formatMoney(simCapital)}</p>
+                  <p className="mt-3 font-['Inter'] text-xl font-semibold">{formatMoney(simCapital)}</p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#0d1728] p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Position</p>
-                  <p className="mt-3 font-['IBM_Plex_Mono'] text-xl font-semibold">
+                  <p className="mt-3 font-['Inter'] text-xl font-semibold">
                     {positionMetrics.quantity ? `${positionMetrics.quantity.toFixed(6)} ${selectedAsset}` : "—"}
                   </p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-[#0d1728] p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Portfolio value</p>
-                  <p className="mt-3 font-['IBM_Plex_Mono'] text-xl font-semibold">
+                  <p className="mt-3 font-['Inter'] text-xl font-semibold">
                     {liveTradingValuation.ready ? formatMoney(liveTradingValuation.currentValue) : "—"}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-6 rounded-xl border border-white/10 bg-[#0d1728] p-4">
-                <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.18em] text-slate-400">
-                  <span>{selectedAsset} CoinGecko chart</span>
-                  <span>{chartData.timestamp ? `Updated ${new Date(chartData.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Waiting..."}</span>
-                </div>
-
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-1 rounded-full border border-white/10 bg-[#101d30] p-1">
-                    {CHART_RANGES.map((range) => (
-                      <button key={range.key} type="button" onClick={() => setChartRange(range.key)} className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${chartRange === range.key ? "bg-sky-400 text-slate-950" : "text-slate-300 hover:bg-white/10"}`}>
-                        {range.label}
-                      </button>
-                    ))}
-                  </div>
-                  <span className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Display only</span>
-                </div>
-                {chartData.error && (
-                  <p className="mb-3 text-sm text-amber-300">{chartData.error}</p>
-                )}
-                {chartData.loading && chartPoints.length === 0 ? (
-                  <div className="flex h-36 items-center justify-center text-sm text-slate-400">
-                    Loading CoinGecko chart…
-                  </div>
-                ) : chartPoints.length > 0 ? (
-                  <div className="relative h-44 w-full overflow-hidden rounded-lg bg-[#091321]">
-                    <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="h-full w-full">
-                      <defs>
-                        <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
-                          <stop offset="0%" stopColor="rgba(56,189,248,0.45)" />
-                          <stop offset="100%" stopColor="rgba(56,189,248,0.02)" />
-                        </linearGradient>
-                      </defs>
-                      {(() => {
-                        const width = 100;
-                        const height = 40;
-                        const rawMin = Math.min(...chartPoints.map((point) => point.price));
-                        const rawMax = Math.max(...chartPoints.map((point) => point.price));
-                        const padding = rawMax === rawMin
-                          ? Math.max(rawMin * 0.005, 1)
-                          : (rawMax - rawMin) * 0.1;
-                        const min = rawMin - padding;
-                        const max = rawMax + padding;
-                        const range = max - min;
-                        const linePoints = chartPoints
-                          .map((point, index) => {
-                            const x = (index / Math.max(chartPoints.length - 1, 1)) * width;
-                            const y = height - ((point.price - min) / range) * (height - 4) - 2;
-                            return `${x},${y}`;
-                          })
-                          .join(" ");
-                        const areaPoints = `${linePoints} ${width},${height} 0,${height}`;
-
-                        return (
-                          <>
-                            <polygon points={areaPoints} fill="url(#chartGradient)" />
-                            <polyline points={linePoints} fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </>
-                        );
-                      })()}
-                    </svg>
-                  </div>
-                ) : (
-                  <div className="flex h-36 items-center justify-center text-sm text-slate-400">
-                    No CoinGecko market data available yet.
-                  </div>
-                )}
-              </div>
+              <CryptoPriceChart
+                symbol={selectedAsset}
+                name={selectedAssetMeta.name}
+                points={chartPoints}
+                currentPrice={selectedAssetData?.price}
+                ranges={CHART_RANGES}
+                selectedRange={CHART_RANGES.find((range) => range.key === chartRange)?.label || "1D"}
+                onRangeChange={setChartRange}
+                updatedAt={chartData.timestamp || selectedAssetData?.timestamp}
+                loading={chartData.loading || selectedAssetData?.loading}
+                error={chartData.error}
+              />
             </div>
             )}
           </section>

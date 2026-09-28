@@ -2,6 +2,261 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isAdministrator() {
+      return request.auth != null
+        && (request.auth.token.get("admin", false) == true
+          || request.auth.token.get("role", "") == "admin");
+    }
+
+    function validSupportStatus(status) {
+      return status in ["open", "in_progress", "waiting", "resolved", "closed"];
+    }
+
+    function hasCustomerMessageAfter(conversationId, data) {
+      let messagePath = /databases/$(database)/documents/supportConversations/$(conversationId)/messages/$(data.lastMessageId);
+      return data.lastMessageId is string
+        && existsAfter(messagePath)
+        && getAfter(messagePath).data.senderId == request.auth.uid
+        && getAfter(messagePath).data.senderType == "customer"
+        && getAfter(messagePath).data.text == data.lastMessage;
+    }
+
+    function hasAgentMessageAfter(conversationId, data) {
+      let messagePath = /databases/$(database)/documents/supportConversations/$(conversationId)/messages/$(data.lastMessageId);
+      return data.lastMessageId is string
+        && existsAfter(messagePath)
+        && getAfter(messagePath).data.senderId == request.auth.uid
+        && getAfter(messagePath).data.senderType == "agent"
+        && getAfter(messagePath).data.text == data.lastMessage;
+    }
+
+    function validSupportMessage(data) {
+      return data.keys().hasAll(["senderId", "senderType", "text", "type", "createdAt", "read"])
+        && data.keys().hasOnly(["senderId", "senderType", "text", "type", "createdAt", "read"])
+        && data.senderId is string
+        && data.senderType in ["customer", "agent"]
+        && data.text is string
+        && data.text.size() > 0
+        && data.text.size() <= 4000
+        && data.type == "text"
+        && data.createdAt == request.time
+        && data.read == false;
+    }
+
+    match /supportConversations/{conversationId} {
+      function conversationBelongsToUser() {
+        return request.auth != null
+          && get(/databases/$(database)/documents/supportConversations/$(conversationId)).data.userId == request.auth.uid;
+      }
+
+      function conversationWillBelongToUser() {
+        return request.auth != null
+          && getAfter(/databases/$(database)/documents/supportConversations/$(conversationId)).data.userId == request.auth.uid;
+      }
+
+      allow get: if isAdministrator()
+        || (request.auth != null && conversationId == "customer_" + request.auth.uid);
+      allow list: if isAdministrator()
+        || (request.auth != null && resource.data.userId == request.auth.uid);
+
+      allow create: if request.auth != null
+        && conversationId == "customer_" + request.auth.uid
+        && request.resource.data.keys().hasAll([
+          "userId", "userName", "userEmail", "userCountry", "userType", "status",
+          "assignedAgent", "createdAt", "updatedAt", "lastMessage",
+          "lastMessageId", "lastMessageAt", "unreadForUser", "unreadForAgent"
+        ])
+        && request.resource.data.keys().hasOnly([
+          "userId", "userName", "userEmail", "userCountry", "userType", "status",
+          "assignedAgent", "createdAt", "updatedAt", "lastMessage",
+          "lastMessageId", "lastMessageAt", "unreadForUser", "unreadForAgent"
+        ])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.userName is string
+        && request.resource.data.userName.size() > 0
+        && request.resource.data.userName.size() <= 120
+        && request.resource.data.userEmail is string
+        && request.resource.data.userEmail.size() > 0
+        && request.resource.data.userEmail.size() <= 254
+        && request.resource.data.userCountry is string
+        && request.resource.data.userCountry.size() <= 100
+        && request.resource.data.userType in ["member", "guest"]
+        && request.resource.data.userType == (
+          request.auth.token.firebase.sign_in_provider == "anonymous" ? "guest" : "member"
+        )
+        && request.resource.data.status == "open"
+        && request.resource.data.assignedAgent == null
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastMessageAt == request.time
+        && request.resource.data.lastMessage is string
+        && request.resource.data.lastMessage.size() > 0
+        && request.resource.data.lastMessage.size() <= 4000
+        && request.resource.data.unreadForUser == 0
+        && request.resource.data.unreadForAgent == 1
+        && hasCustomerMessageAfter(conversationId, request.resource.data);
+
+      allow update: if isAdministrator()
+        ? (
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "updatedAt"])
+            && resource.data.get("archived", false) != true
+            && validSupportStatus(request.resource.data.status)
+            && request.resource.data.updatedAt == request.time
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(["unreadForAgent"])
+            && request.resource.data.unreadForAgent == 0
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasAll([
+              "archived", "archivedAt", "updatedAt"
+            ])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              "archived", "archivedAt", "archivedBy", "updatedAt"
+            ])
+            && request.resource.data.archived == true
+            && resource.data.get("archived", false) != true
+            && resource.data.status in ["resolved", "closed"]
+            && request.resource.data.archivedAt == request.time
+            && request.resource.data.archivedBy == request.auth.uid
+            && request.resource.data.updatedAt == request.time
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasAll([
+              "archived", "restoredAt", "updatedAt"
+            ])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              "archived", "restoredAt", "restoredBy", "updatedAt"
+            ])
+            && request.resource.data.archived == false
+            && resource.data.get("archived", false) == true
+            && request.resource.data.restoredAt == request.time
+            && request.resource.data.restoredBy == request.auth.uid
+            && request.resource.data.updatedAt == request.time
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              "status", "assignedAgent", "lastMessage", "lastMessageId",
+              "lastMessageAt", "updatedAt", "unreadForUser"
+            ])
+            && resource.data.get("archived", false) != true
+            && request.resource.data.status == "waiting"
+            && request.resource.data.assignedAgent == (
+              resource.data.assignedAgent == null
+                ? request.auth.uid
+                : resource.data.assignedAgent
+            )
+            && request.resource.data.lastMessageId != resource.data.lastMessageId
+            && request.resource.data.lastMessageAt == request.time
+            && request.resource.data.updatedAt == request.time
+            && request.resource.data.unreadForUser == resource.data.unreadForUser + 1
+            && request.resource.data.unreadForAgent == resource.data.unreadForAgent
+            && hasAgentMessageAfter(conversationId, request.resource.data)
+          )
+        )
+        : (
+          request.auth != null
+          && conversationId == "customer_" + request.auth.uid
+          && resource.data.userId == request.auth.uid
+          && (
+            (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                "status", "lastMessage", "lastMessageId", "lastMessageAt",
+                "updatedAt", "unreadForAgent"
+              ])
+              && resource.data.get("archived", false) != true
+              && request.resource.data.status == "open"
+              && request.resource.data.lastMessageId != resource.data.lastMessageId
+              && request.resource.data.lastMessageAt == request.time
+              && request.resource.data.updatedAt == request.time
+              && request.time > resource.data.lastMessageAt + duration.value(1, "s")
+              && request.resource.data.unreadForAgent == resource.data.unreadForAgent + 1
+              && request.resource.data.unreadForUser == resource.data.unreadForUser
+              && hasCustomerMessageAfter(conversationId, request.resource.data)
+            )
+            || (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(["unreadForUser"])
+              && request.resource.data.unreadForUser == 0
+            )
+          )
+        );
+
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get, list: if isAdministrator() || conversationBelongsToUser();
+        allow create: if validSupportMessage(request.resource.data)
+          && (
+            (
+              conversationWillBelongToUser()
+              && request.resource.data.senderType == "customer"
+              && request.resource.data.senderId == request.auth.uid
+              && getAfter(/databases/$(database)/documents/supportConversations/$(conversationId)).data.lastMessageId == messageId
+            )
+            || (
+              isAdministrator()
+              && request.resource.data.senderType == "agent"
+              && request.resource.data.senderId == request.auth.uid
+              && getAfter(/databases/$(database)/documents/supportConversations/$(conversationId)).data.lastMessageId == messageId
+            )
+          );
+        allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(["read"])
+          && resource.data.read == false
+          && request.resource.data.read == true
+          && (
+            (isAdministrator() && resource.data.senderType == "customer")
+            || (conversationBelongsToUser() && resource.data.senderType == "agent")
+          );
+        allow delete: if false;
+      }
+
+      match /typing/{userId} {
+        function canWriteTypingState() {
+          return request.auth != null
+            && request.resource.data.keys().hasAll(["userId", "isTyping", "updatedAt"])
+            && request.resource.data.keys().hasOnly(["userId", "isTyping", "updatedAt"])
+            && request.resource.data.userId == request.auth.uid
+            && request.resource.data.isTyping is bool
+            && request.resource.data.updatedAt == request.time
+            && (
+              (conversationBelongsToUser() && userId == request.auth.uid)
+              || (isAdministrator() && userId == request.auth.uid)
+            );
+        }
+
+        allow get, list: if isAdministrator() || conversationBelongsToUser();
+        allow create, update: if canWriteTypingState();
+        allow delete: if isAdministrator()
+          || (conversationBelongsToUser() && userId == request.auth.uid);
+      }
+
+      match /archiveEvents/{eventId} {
+        allow get, list: if isAdministrator();
+        allow create: if isAdministrator()
+          && request.resource.data.keys().hasAll(["action", "actorId", "createdAt"])
+          && request.resource.data.keys().hasOnly(["action", "actorId", "createdAt"])
+          && request.resource.data.action in ["archived", "restored"]
+          && request.resource.data.actorId == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && (
+            (
+              request.resource.data.action == "archived"
+              && get(/databases/$(database)/documents/supportConversations/$(conversationId)).data.get("archived", false) != true
+              && getAfter(/databases/$(database)/documents/supportConversations/$(conversationId)).data.archived == true
+              && getAfter(/databases/$(database)/documents/supportConversations/$(conversationId)).data.archivedBy == request.auth.uid
+            )
+            || (
+              request.resource.data.action == "restored"
+              && get(/databases/$(database)/documents/supportConversations/$(conversationId)).data.get("archived", false) == true
+              && getAfter(/databases/$(database)/documents/supportConversations/$(conversationId)).data.archived == false
+              && getAfter(/databases/$(database)/documents/supportConversations/$(conversationId)).data.restoredBy == request.auth.uid
+            )
+          );
+        allow update, delete: if false;
+      }
+    }
+
     match /users/{userId} {
       allow read: if request.auth != null
         && (request.auth.uid == userId
@@ -101,11 +356,13 @@ service cloud.firestore {
           && request.resource.data.status == "open";
         allow update, delete: if false;
       }
+
     }
 
-    // Login by username requires a public lookup before Firebase Auth signs in.
+    // Username reservation and referral lookup run through trusted API routes.
+    // The client no longer needs to enumerate these UID mappings.
     match /usernames/{username} {
-      allow read: if true;
+      allow read: if false;
       allow create: if request.auth != null
         && request.resource.data.uid == request.auth.uid;
       allow update: if request.auth != null

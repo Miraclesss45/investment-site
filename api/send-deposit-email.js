@@ -1,0 +1,67 @@
+import { getFirestore } from "firebase-admin/firestore";
+import { requireVerifiedUser } from "../server/auth.js";
+import { deliverDepositEmail } from "../server/deposit-mailer.js";
+import { getFirebaseAdminApp } from "../server/withdrawal-mailer.js";
+
+function sendJson(res, statusCode, body) {
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(statusCode).json(body);
+}
+
+function parseBody(body) {
+  if (body === undefined || body === null || body === "") return {};
+  return typeof body === "string" ? JSON.parse(body) : body;
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") return sendJson(res, 405, { error: "Method not allowed." });
+
+  let app;
+  let token;
+  try {
+    app = getFirebaseAdminApp();
+    token = await requireVerifiedUser(req, app);
+  } catch (error) {
+    if (error?.message === "Firebase service account is not configured.") {
+      return sendJson(res, 503, { error: "Deposit email delivery is not configured.", code: "firebase-not-configured" });
+    }
+    return sendJson(res, error.statusCode || 401, {
+      error: error.message || "Authentication token is invalid or expired.",
+      code: error.code || "auth-invalid",
+    });
+  }
+
+  let body;
+  try {
+    body = parseBody(req.body);
+  } catch {
+    return sendJson(res, 400, { error: "Invalid request body." });
+  }
+  const depositId = String(body.depositId || "").trim();
+  if (!/^[A-Za-z0-9_-]{1,150}$/.test(depositId)) {
+    return sendJson(res, 400, { error: "A valid deposit request is required." });
+  }
+
+  try {
+    const result = await deliverDepositEmail({
+      db: getFirestore(app),
+      profileId: token.uid,
+      depositId,
+      kind: "pending",
+    });
+    if (result.status === "failed") {
+      return sendJson(res, 502, { error: result.error, code: result.code || "deposit-email-failed" });
+    }
+    if (result.status === "sending") {
+      return sendJson(res, 409, { error: "The pending email is already being sent.", code: "deposit-email-in-progress" });
+    }
+    return sendJson(res, 200, { delivered: true, alreadySent: result.alreadySent === true });
+  } catch (error) {
+    console.error("send-deposit-email failed", error);
+    return sendJson(res, error.statusCode || 500, {
+      error: error.message || "The deposit email could not be sent.",
+      code: error.code || "deposit-email-failed",
+    });
+  }
+}

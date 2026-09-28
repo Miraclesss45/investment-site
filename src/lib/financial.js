@@ -1,6 +1,6 @@
 import { collection, doc, getDoc, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { firestoreDb } from "./firebaseFirestore";
-import { calculateWithdrawableBalance, getPaperTradingCapital } from "./financialMath";
+import { calculateWithdrawableBalance, getPaperTradingCapital, sumCompletedLedgerTransactions } from "./financialMath";
 
 const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const CRYPTO_SYMBOLS = ["BTC", "ETH", "LTC", "BNB"];
@@ -12,39 +12,44 @@ export function formatTransactionType(type, fallback = "Transaction") {
   return type || fallback;
 }
 export function buildEmptyFinancialSummary() {
-  return { availableBalance: 0, withdrawableBalance: 0, promotionalCredit: 0, lockedBonus: 0, activeDeposit: 0, totalDeposit: 0, totalWithdrawal: 0, totalEarnings: 0, lastDeposit: 0, lastWithdrawal: 0, referralCount: 0, commission: 0, transactions: [], referralRewards: 0, depositCryptoCapital: 0, administratorCryptoCapital: 0, cryptoTradingCapital: 0 };
+  return { availableBalance: 0, withdrawableBalance: 0, promotionalCredit: 0, lockedBonus: 0, totalDeposit: 0, totalWithdrawal: 0, totalEarnings: 0, lastDeposit: 0, lastWithdrawal: 0, referralCount: 0, commission: 0, transactions: [], referralRewards: 0, depositCryptoCapital: 0, administratorCryptoCapital: 0, cryptoTradingCapital: 0 };
 }
 function completed(item) { return ["completed", "complete", "approved", "settled", "success"].includes(String(item.status || "completed").toLowerCase()); }
 function isTradingValuation(item) {
   return String(item?.type || "").toLowerCase() === "paper-trading-valuation";
 }
+async function loadAtStage(stage, load) {
+  try {
+    return await load();
+  } catch (error) {
+    error.accountDataStage = stage;
+    throw error;
+  }
+}
 export async function loadAccountData(userId) {
   if (!firestoreDb || !userId) return { profile: {}, summary: buildEmptyFinancialSummary() };
-  let profileSnap;
-  try {
-    profileSnap = await getDoc(doc(firestoreDb, "users", userId));
-  } catch (error) {
-    error.accountDataStage = "profile";
-    throw error;
-  }
+  const [profileSnap, txSnap, rewardsSnap] = await Promise.all([
+    loadAtStage("profile", () => getDoc(doc(firestoreDb, "users", userId))),
+    loadAtStage(
+      "transactions",
+      () => getDocs(query(
+        collection(firestoreDb, "users", userId, "transactions"),
+        orderBy("createdAt", "desc"),
+        limit(25),
+      )),
+    ),
+    loadAtStage(
+      "referral rewards",
+      () => getDocs(query(
+        collection(firestoreDb, "users", userId, "referralRewards"),
+        limit(100),
+      )),
+    ),
+  ]);
   const profile = profileSnap.exists() ? profileSnap.data() : {};
-  let txSnap;
-  try {
-    txSnap = await getDocs(query(collection(firestoreDb, "users", userId, "transactions"), orderBy("createdAt", "desc"), limit(25)));
-  } catch (error) {
-    error.accountDataStage = "transactions";
-    throw error;
-  }
   const transactions = txSnap.docs
     .map((item) => ({ id: item.id, ...item.data() }))
     .filter((item) => !isTradingValuation(item));
-  let rewardsSnap;
-  try {
-    rewardsSnap = await getDocs(query(collection(firestoreDb, "users", userId, "referralRewards"), limit(100)));
-  } catch (error) {
-    error.accountDataStage = "referral rewards";
-    throw error;
-  }
   const summary = buildEmptyFinancialSummary();
   summary.transactions = transactions;
   summary.referralCount = Number(profile.referralCount) || rewardsSnap.size;
@@ -63,10 +68,25 @@ export async function loadAccountData(userId) {
   const hasLedgerValue = (field) =>
     Object.prototype.hasOwnProperty.call(profile, field) &&
     Number.isFinite(Number(profile[field]));
-  const ledgerTotalDeposit = hasLedgerValue("totalDeposit")
+  const needsCompleteLedger =
+    (!hasLedgerValue("totalDeposit") || Number(profile.totalDeposit) <= 0 ||
+      !hasLedgerValue("totalWithdrawal") || Number(profile.totalWithdrawal) <= 0) &&
+    (txSnap.size > 0 || Number(profile.availableBalance) > 0 || Number(profile.totalEarnings) > 0);
+  if (needsCompleteLedger) {
+    const ledgerSnap = await loadAtStage(
+      "transactions",
+      () => getDocs(collection(firestoreDb, "users", userId, "transactions")),
+    );
+    if (!ledgerSnap.empty) {
+      const ledgerTotals = sumCompletedLedgerTransactions(ledgerSnap.docs.map((item) => item.data()));
+      summary.totalDeposit = ledgerTotals.totalDeposit;
+      summary.totalWithdrawal = ledgerTotals.totalWithdrawal;
+    }
+  }
+  const ledgerTotalDeposit = hasLedgerValue("totalDeposit") && Number(profile.totalDeposit) > 0
     ? Math.max(Number(profile.totalDeposit), 0)
     : summary.totalDeposit;
-  const ledgerTotalWithdrawal = hasLedgerValue("totalWithdrawal")
+  const ledgerTotalWithdrawal = hasLedgerValue("totalWithdrawal") && Number(profile.totalWithdrawal) > 0
     ? Math.max(Number(profile.totalWithdrawal), 0)
     : summary.totalWithdrawal;
   const ledgerEarnings = hasLedgerValue("totalEarnings")
@@ -81,7 +101,6 @@ export async function loadAccountData(userId) {
   summary.depositCryptoCapital = depositCryptoCapital;
   summary.administratorCryptoCapital = administratorCryptoCapital;
   summary.cryptoTradingCapital = depositCryptoCapital + administratorCryptoCapital;
-  summary.activeDeposit = Math.max(summary.totalDeposit - summary.totalWithdrawal + administratorCryptoCapital + paperTradingProfit, 0);
   summary.withdrawableBalance = calculateWithdrawableBalance({
     totalDeposit: summary.totalDeposit,
     totalEarnings: summary.totalEarnings,

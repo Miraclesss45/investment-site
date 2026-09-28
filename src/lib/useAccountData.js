@@ -4,6 +4,15 @@ import {
   buildEmptyFinancialSummary,
   loadAccountData,
 } from "./financial";
+import { getSafeErrorMessage } from "./authHelpers";
+
+function getAccountErrorMessage(reason) {
+  if (reason?.code?.includes("permission-denied")) {
+    const stage = String(reason.accountDataStage || "account").replace(/[^a-z ]/gi, "");
+    return `We could not access your ${stage} data. Refresh the page or sign in again. Contact support if the problem continues.`;
+  }
+  return getSafeErrorMessage(reason, "We could not load your account data. Please try again.");
+}
 
 export default function useAccountData() {
   const { user } = useAuth();
@@ -56,13 +65,7 @@ export default function useAccountData() {
       })
       .catch((reason) => {
         if (!active) return;
-        setError(
-          reason?.code?.includes("permission-denied")
-            ? `Firebase denied access while loading your ${reason.accountDataStage || "account"} data. Deploy the current Firestore rules, then sign out and sign in again.`
-            : reason?.code === "account-data-timeout"
-              ? "Account data is taking too long to load. Check your connection and try again."
-            : "We could not load your account data. Please try again.",
-        );
+        setError(getAccountErrorMessage(reason));
         setLoading(false);
       });
 
@@ -72,7 +75,7 @@ export default function useAccountData() {
         setError("");
         refreshAccount()
           .catch((reason) => {
-            if (active) setError(reason?.message || "We could not refresh your account data.");
+            if (active) setError(getAccountErrorMessage(reason));
           })
           .finally(() => {
             if (active) setLoading(false);
@@ -84,7 +87,7 @@ export default function useAccountData() {
 
     const refreshTimer = window.setInterval(() => {
       refreshAccount().catch(() => {});
-    }, 30000);
+    }, 120000);
 
     return () => {
       active = false;

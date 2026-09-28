@@ -76,7 +76,7 @@ export default function SignupPage() {
         password,
         termsAccepted: true,
         phone: formData.get("phone") || "",
-        country: formData.get("country") || "",
+        country: formData.get("country")?.trim() || "",
         bitcoinWallet: formData.get("bitcoinWallet")?.trim() || "",
         bnbWallet: formData.get("bnbWallet")?.trim() || "",
         ethereumWallet: formData.get("ethereumWallet")?.trim() || "",

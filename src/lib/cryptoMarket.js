@@ -7,7 +7,7 @@ export const CRYPTO_ASSETS = [
   { symbol: "BNB", name: "BNB", coinGeckoId: "binancecoin" },
 ];
 export const CHART_RANGES = [
-  { key: "0.041", label: "1H" },
+  { key: "1h", label: "1H" },
   { key: "1", label: "1D" },
   { key: "7", label: "1W" },
   { key: "30", label: "1M" },
@@ -36,15 +36,25 @@ export function useCryptoChartData(asset, days) {
     const load = async () => {
       setState((current) => ({ ...current, loading: true, error: "" }));
       try {
+        // CoinGecko accepts integer day ranges. Request one day for the 1H
+        // view, then trim the returned 5-minute points to a rolling hour.
+        const requestDays = days === "1h" ? "1" : days;
         const response = await fetch(
-          `${COINGECKO_API_URL}?chart=1&ids=${encodeURIComponent(assetConfig.coinGeckoId)}&days=${encodeURIComponent(days)}`,
+          `${COINGECKO_API_URL}?chart=1&ids=${encodeURIComponent(assetConfig.coinGeckoId)}&days=${encodeURIComponent(requestDays)}`,
           { signal: controller.signal, headers: { Accept: "application/json" } },
         );
         if (!response.ok) throw new Error(`CoinGecko returned HTTP ${response.status}.`);
         const payload = await response.json();
-        const points = (Array.isArray(payload?.prices) ? payload.prices : [])
+        let points = (Array.isArray(payload?.prices) ? payload.prices : [])
           .map(([timestamp, price]) => ({ timestamp: Number(timestamp), price: Number(price) }))
           .filter((point) => Number.isFinite(point.timestamp) && Number.isFinite(point.price) && point.price > 0);
+        if (days === "1h" && points.length > 1) {
+          const end = points[points.length - 1].timestamp;
+          const cutoff = end - 60 * 60 * 1000;
+          const firstInRange = points.findIndex((point) => point.timestamp >= cutoff);
+          // Keep one earlier point so the graph begins with a connected line.
+          points = points.slice(Math.max(firstInRange - 1, 0));
+        }
         if (!points.length) throw new Error("CoinGecko returned no chart points.");
         if (active) setState({ points, loading: false, error: "", timestamp: Date.now() });
       } catch (error) {

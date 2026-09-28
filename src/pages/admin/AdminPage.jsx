@@ -2,26 +2,61 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity, ArrowDownToLine, ArrowUpRight, CheckCircle2, ChevronRight,
-  CircleHelp, ClipboardList, FileText, LayoutDashboard, LogOut, Menu, Package,
+  CircleHelp, ClipboardList, FileText, LayoutDashboard, LogOut, Menu, MessageCircle, Package,
   ExternalLink, RefreshCw, Search, ShieldCheck, TrendingUp, UserRound, Users, WalletCards, X,
 } from "lucide-react";
 import { useAuth } from "../../lib/authContext";
-import { changeAdminPassword, getAdminResource, requestAdminAction, reauthenticateAdmin } from "../../lib/adminApi";
-import { getAuthErrorMessage } from "../../lib/authHelpers";
+import { changeAdminPassword, getAdminPage, getAdminRecord, getAdminResource, requestAdminAction, reauthenticateAdmin } from "../../lib/adminApi";
+import { getAuthErrorMessage, getSafeErrorMessage } from "../../lib/authHelpers";
 import { clearAdminLoginSession } from "../../lib/adminSession";
+import { formatMoney } from "../../lib/financial";
 import FeedbackMessage from "../../components/ui/FeedbackMessage";
+import { firestoreDb } from "../../lib/firebaseFirestore";
+import { subscribeToAdminConversations } from "../../lib/supportChat";
+import AdminSupportChat from "./AdminSupportChat";
+import SkipToContent from "../../components/ui/SkipToContent";
 
-const nav = [
-  ["/control-room", "Overview", LayoutDashboard],
-  ["/control-room/users", "Users", Users],
-  ["/control-room/admins", "Admins", ShieldCheck],
-  ["/control-room/deposits", "Deposits", ArrowDownToLine],
-  ["/control-room/withdrawals", "Withdrawals", ArrowUpRight],
-  ["/control-room/support", "Support tickets", CircleHelp],
-  ["/control-room/transactions", "Transactions", WalletCards],
-  ["/control-room/packages", "Packages", Package],
-  ["/control-room/referrals", "Referrals", TrendingUp],
-  ["/control-room/audit", "Audit history", ClipboardList],
+const QUEUE_SECTIONS = {
+  withdrawals: "withdrawals",
+  deposits: "deposits",
+  support: "support",
+  "support-chat": "support-chat",
+  referrals: "referrals",
+};
+
+const navGroups = [
+  {
+    label: "Workspace",
+    items: [["/control-room", "Overview", LayoutDashboard]],
+  },
+  {
+    label: "Plans",
+    items: [["/control-room/packages", "Investment packages", Package]],
+  },
+  {
+    label: "Members",
+    items: [
+      ["/control-room/users", "Users", Users],
+      ["/control-room/admins", "Administrators", ShieldCheck],
+      ["/control-room/referrals", "Referrals", TrendingUp],
+    ],
+  },
+  {
+    label: "Transactions",
+    items: [
+      ["/control-room/transactions", "Transactions", WalletCards],
+      ["/control-room/withdrawals", "Withdrawals", ArrowUpRight],
+      ["/control-room/deposits", "Deposits", ArrowDownToLine],
+    ],
+  },
+  {
+    label: "Support & oversight",
+    items: [
+      ["/control-room/support-chat", "Support chat", MessageCircle],
+      ["/control-room/support", "Support tickets", CircleHelp],
+      ["/control-room/audit", "Audit history", ClipboardList],
+    ],
+  },
 ];
 
 const resources = {
@@ -30,6 +65,7 @@ const resources = {
   deposits: ["Deposits", "Review incoming funds before they are credited."],
   withdrawals: ["Withdrawals", "Approve or hold outgoing payment requests."],
   support: ["Support tickets", "Keep customer conversations moving."],
+  "support-chat": ["Support chat", "Respond to member and guest messages in real time."],
   transactions: ["Transactions & investments", "Trace money movement and active investments."],
   packages: ["Investment packages", "Manage the offers displayed to members."],
   referrals: ["Referrals", "Track attribution and referral rewards."],
@@ -55,6 +91,72 @@ function AdminRouteMessage({ title, description }) {
       >
         Return to overview
       </Link>
+    </div>
+  );
+}
+
+function ReferralDetails({ userId, rewardId }) {
+  const [reward, setReward] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    getAdminRecord("referrals", userId, rewardId, "referralRewards")
+      .then((match) => {
+        if (!active) return;
+        if (!match) {
+          setError("The requested referral reward could not be found.");
+          return;
+        }
+        setReward(match);
+      })
+      .catch((reason) => active && setError(getSafeErrorMessage(reason, "Unable to load referral details.")));
+    return () => {
+      active = false;
+    };
+  }, [rewardId, userId]);
+
+  const detailEntries = reward
+    ? Object.entries(reward).filter(([key]) => !["id", "userId", "collection"].includes(key))
+    : [];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-sky-300">Referral review</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white">Referral reward details</h1>
+          <p className="mt-1 text-sm text-slate-400">Read-only attribution and reward information.</p>
+        </div>
+        <Link to="/control-room/referrals" className="text-sm font-semibold text-sky-300 hover:text-sky-200">Back to referrals</Link>
+      </div>
+      {error ? (
+        <FeedbackMessage type="error">{error}</FeedbackMessage>
+      ) : !reward ? (
+        <div className="rounded-lg border border-white/10 bg-[#0b1626] p-12 text-center text-sm text-slate-400">Loading referral details…</div>
+      ) : (
+        <section className="overflow-hidden rounded-lg border border-white/10 bg-[#0b1626]">
+          <div className="flex items-center justify-between gap-4 border-b border-white/10 p-5">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-sky-300">Reward record</p>
+              <h2 className="mt-2 break-all font-semibold text-white">{reward.id}</h2>
+            </div>
+            <Status>{reward.status || "Recorded"}</Status>
+          </div>
+          <dl className="divide-y divide-white/10">
+            <div className="grid gap-2 px-5 py-4 sm:grid-cols-[minmax(140px,0.35fr)_1fr]">
+              <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Reward owner</dt>
+              <dd className="break-all text-sm text-slate-200">{userId}</dd>
+            </div>
+            {detailEntries.map(([key, value]) => (
+              <div className="grid gap-2 px-5 py-4 sm:grid-cols-[minmax(140px,0.35fr)_1fr]" key={key}>
+                <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{key}</dt>
+                <dd className="break-all text-sm text-slate-200">{value == null ? "—" : typeof value === "object" ? JSON.stringify(value) : String(value)}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
     </div>
   );
 }
@@ -90,22 +192,16 @@ function TransactionDetails({ userId, transactionId, collection }) {
 
   useEffect(() => {
     let active = true;
-    getAdminResource("transactions")
-      .then((rows) => {
+    getAdminRecord("transactions", userId, transactionId, collection || "transactions")
+      .then((match) => {
         if (!active) return;
-        const match = rows.find(
-          (row) =>
-            row.userId === userId &&
-            row.id === transactionId &&
-            (!collection || row.collection === collection),
-        );
         if (!match) {
           setError("The requested transaction could not be found.");
           return;
         }
         setTransaction(match);
       })
-      .catch((reason) => active && setError(reason.message || "Unable to load transaction details."));
+      .catch((reason) => active && setError(getSafeErrorMessage(reason, "Unable to load transaction details.")));
     return () => {
       active = false;
     };
@@ -172,17 +268,16 @@ function SupportDetails({ userId, ticketId }) {
 
   useEffect(() => {
     let active = true;
-    getAdminResource("support")
-      .then((rows) => {
+    getAdminRecord("support", userId, ticketId, "supportTickets")
+      .then((match) => {
         if (!active) return;
-        const match = rows.find((row) => row.userId === userId && row.id === ticketId);
         if (!match) {
           setError("The requested support ticket could not be found.");
           return;
         }
         setTicket(match);
       })
-      .catch((reason) => active && setError(reason.message || "Unable to load support ticket details."));
+      .catch((reason) => active && setError(getSafeErrorMessage(reason, "Unable to load support ticket details.")));
     return () => {
       active = false;
     };
@@ -244,23 +339,130 @@ function SupportDetails({ userId, ticketId }) {
   );
 }
 
+function DepositDetails({ userId, depositId, onAction, refreshKey }) {
+  const [deposit, setDeposit] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setDeposit(null);
+    setError("");
+    getAdminRecord("deposits", userId, depositId, "deposits")
+      .then((match) => {
+        if (!active) return;
+        if (!match) {
+          setError("The requested deposit could not be found.");
+          return;
+        }
+        setDeposit(match);
+      })
+      .catch((reason) => active && setError(getSafeErrorMessage(reason, "Unable to load deposit details.")));
+    return () => {
+      active = false;
+    };
+  }, [depositId, refreshKey, userId]);
+
+  const status = String(deposit?.status || "pending").toLowerCase();
+  const detailEntries = deposit
+    ? Object.entries(deposit).filter(([key]) => !["id", "userId", "collection", "__searchText", "profileEmail", "profileUsername", "emailNotifications"].includes(key))
+    : [];
+  const canCredit = deposit && ["pending", "approved"].includes(status);
+  const canDelete = deposit
+    && !["approved", "completed", "settled", "credited"].includes(status)
+    && !deposit.settlementId;
+  const failedSuccessEmail = deposit?.emailNotifications?.successful?.status === "failed";
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-sky-300">Deposit review</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white">Deposit request</h1>
+          <p className="mt-1 text-sm text-slate-400">Confirm the member, payment details, and status before taking action.</p>
+        </div>
+        <Link to="/control-room/deposits" className="text-sm font-semibold text-sky-300 hover:text-sky-200">Back to deposits</Link>
+      </div>
+      {error ? (
+        <FeedbackMessage type="error">{error}</FeedbackMessage>
+      ) : !deposit ? (
+        <div className="rounded-lg border border-white/10 bg-[#0b1626] p-12 text-center text-sm text-slate-400">Loading deposit details…</div>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              ["Username", deposit.profileUsername || deposit.username || "Not recorded"],
+              ["Member email", deposit.profileEmail || deposit.email || "Not recorded"],
+              ["Member ID", deposit.userId],
+              ["Status", deposit.status || "Pending"],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-lg border border-white/10 bg-[#0b1626] p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+                <p className="mt-3 break-all text-sm font-bold text-white">{String(value)}</p>
+              </div>
+            ))}
+          </div>
+          <section className="overflow-hidden rounded-lg border border-white/10 bg-[#0b1626]">
+            <div className="flex flex-col justify-between gap-4 border-b border-white/10 p-5 sm:flex-row sm:items-center">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-sky-300">Payment request details</p>
+                <h2 className="mt-2 break-all font-semibold text-white">{deposit.id}</h2>
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <Status>{deposit.status || "Pending"}</Status>
+                {canCredit && (
+                  <button onClick={() => onAction("settle-deposit", deposit)} className="text-xs font-bold text-emerald-300 hover:text-emerald-200">
+                    Credit offline payment
+                  </button>
+                )}
+                {failedSuccessEmail && (
+                  <button onClick={() => onAction("retry-deposit-email", deposit)} className="text-xs font-bold text-amber-200 hover:text-amber-100">
+                    Retry confirmation email
+                  </button>
+                )}
+                {canDelete && (
+                  <button onClick={() => onAction("delete-deposit", deposit)} className="text-xs font-bold text-rose-300 hover:text-rose-200">
+                    Delete request
+                  </button>
+                )}
+              </div>
+            </div>
+            <dl className="divide-y divide-white/10">
+              {detailEntries.map(([key, value]) => (
+                <div className="grid gap-2 px-5 py-4 sm:grid-cols-[minmax(140px,0.35fr)_1fr]" key={key}>
+                  <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{key.replace(/([A-Z])/g, " $1")}</dt>
+                  <dd className="whitespace-pre-wrap break-words text-sm text-slate-200">{typeof value === "object" ? JSON.stringify(value) : String(value ?? "—")}</dd>
+                </div>
+              ))}
+              {deposit.emailNotifications && (
+                <div className="grid gap-2 px-5 py-4 sm:grid-cols-[minmax(140px,0.35fr)_1fr]">
+                  <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Email notifications</dt>
+                  <dd className="break-words text-sm text-slate-200">{JSON.stringify(deposit.emailNotifications)}</dd>
+                </div>
+              )}
+            </dl>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
 function WithdrawalDetails({ userId, withdrawalId, onAction, refreshKey }) {
   const [withdrawal, setWithdrawal] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
-    getAdminResource("withdrawals")
-      .then((rows) => {
+    getAdminRecord("withdrawals", userId, withdrawalId, "withdrawals")
+      .then((match) => {
         if (!active) return;
-        const match = rows.find((row) => row.userId === userId && row.id === withdrawalId);
         if (!match) {
           setError("The requested withdrawal could not be found.");
           return;
         }
         setWithdrawal(match);
       })
-      .catch((reason) => active && setError(reason.message || "Unable to load withdrawal details."));
+      .catch((reason) => active && setError(getSafeErrorMessage(reason, "Unable to load withdrawal details.")));
     return () => {
       active = false;
     };
@@ -357,21 +559,41 @@ function WithdrawalDetails({ userId, withdrawalId, onAction, refreshKey }) {
 
 function WithdrawalDecisionQueue({ onAction, refreshKey }) {
   const [rows, setRows] = useState(null);
+  const [nextCursor, setNextCursor] = useState("");
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
-    getAdminResource("withdrawals")
-      .then((withdrawals) => {
+    getAdminPage("withdrawal-decisions")
+      .then((page) => {
         if (!active) return;
-        setRows(withdrawals.filter((withdrawal) => ["pending", "on-hold", "approved"].includes(String(withdrawal.status || "pending").toLowerCase())));
+        setRows(page.items);
+        setNextCursor(page.nextCursor);
+        setHasMore(page.hasMore);
         setError("");
       })
-      .catch((reason) => active && setError(reason.message || "Unable to load pending withdrawals."));
+      .catch((reason) => active && setError(getSafeErrorMessage(reason, "Unable to load pending withdrawals.")));
     return () => {
       active = false;
     };
   }, [refreshKey]);
+
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await getAdminPage("withdrawal-decisions", nextCursor);
+      setRows((current) => [...(current || []), ...page.items]);
+      setNextCursor(page.nextCursor);
+      setHasMore(page.hasMore);
+    } catch (reason) {
+      setError(getSafeErrorMessage(reason, "Unable to load more withdrawal requests."));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <section className="overflow-hidden rounded-lg border border-white/10 bg-[#0b1626]">
@@ -393,7 +615,7 @@ function WithdrawalDecisionQueue({ onAction, refreshKey }) {
               <div className="min-w-0">
                 <p className="break-all text-sm font-semibold text-white">{withdrawal.profileUsername || withdrawal.username || "Member"} · {withdrawal.profileEmail || withdrawal.email || "No email recorded"}</p>
                 <p className="mt-1 text-xs text-slate-400">
-                  Request {withdrawal.id} · {withdrawal.asset || withdrawal.method || "Payment method not recorded"} · {Number.isFinite(Number(withdrawal.amount)) ? `$${Number(withdrawal.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "Amount not recorded"}
+                  Request {withdrawal.id} · {withdrawal.asset || withdrawal.method || "Payment method not recorded"} · {Number.isFinite(Number(withdrawal.amount)) ? formatMoney(withdrawal.amount) : "Amount not recorded"}
                 </p>
                 <div className="mt-2"><Status>{withdrawal.status || "Pending"}</Status></div>
               </div>
@@ -418,6 +640,7 @@ function WithdrawalDecisionQueue({ onAction, refreshKey }) {
           ))}
         </div>
       )}
+      {hasMore && <div className="flex justify-center border-t border-white/10 p-4"><button type="button" onClick={loadMore} disabled={loadingMore} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/15 px-4 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06] disabled:opacity-60">{loadingMore ? "Loading…" : "Load more withdrawal requests"}</button></div>}
     </section>
   );
 }
@@ -430,7 +653,7 @@ function Overview() {
     let active = true;
     getAdminResource("users")
       .then((data) => active && setUsers(data))
-      .catch((reason) => active && setError(reason.message || "Unable to load user activity."));
+      .catch((reason) => active && setError(getSafeErrorMessage(reason, "Unable to load user activity.")));
     return () => {
       active = false;
     };
@@ -455,9 +678,36 @@ function Overview() {
         <Metric label="Needs review" value={formatMetric(pendingUsers)} detail="Pending or review status" icon={ClipboardList} />
         <Metric label="Last refresh" value={users ? "Just now" : error ? "Unavailable" : "Loading"} detail="Live users collection" icon={Activity} />
       </div>
+      <section aria-labelledby="admin-shortcuts-title" className="rounded-xl border border-white/10 bg-[#0b1626] p-5 shadow-[0_18px_50px_rgba(2,8,23,0.16)]">
+        <div className="mb-4">
+          <h2 id="admin-shortcuts-title" className="font-semibold text-white">Quick access</h2>
+          <p className="mt-1 text-sm text-slate-400">Go straight to a frequently used admin area.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ["/control-room/withdrawals", "Review withdrawals", "Review or complete member withdrawal requests.", ArrowUpRight],
+            ["/control-room/deposits", "Review deposits", "Check incoming payment requests.", ArrowDownToLine],
+            ["/control-room/users", "Manage members", "Find member accounts and access controls.", Users],
+            ["/control-room/support-chat", "Open support chat", "Reply to customer messages in real time.", MessageCircle],
+          ].map(([to, label, description, Icon]) => (
+            <Link
+              key={to}
+              to={to}
+              className="group flex min-h-24 items-start gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-4 transition hover:border-sky-300/30 hover:bg-sky-300/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-sky-300/10 text-sky-200 transition group-hover:bg-sky-300/15"><Icon size={17} /></span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-100 group-hover:text-white">{label}</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-400">{description}</span>
+              </span>
+              <ChevronRight size={15} className="ml-auto mt-1 shrink-0 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-sky-200" />
+            </Link>
+          ))}
+        </div>
+      </section>
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
         <section className="rounded-lg border border-white/10 bg-[#0b1626] p-5 shadow-[0_18px_50px_rgba(2,8,23,0.22)]"><div className="flex items-center justify-between"><div><h2 className="font-semibold text-white">Recent users</h2><p className="mt-1 text-sm text-slate-400">The latest profiles returned from Firebase.</p></div><Users size={19} className="text-slate-400" /></div><div className="mt-5 divide-y divide-white/10">{users?.slice(0, 5).map((user) => <div className="flex items-center justify-between gap-4 py-3" key={user.id}><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-100">{user.displayName || user.username || user.email || user.id}</p><p className="truncate text-xs text-slate-400">{user.email || "No email recorded"}</p></div><Status>{user.status || "Active"}</Status></div>) || <div className="flex min-h-32 items-center justify-center rounded-md border border-dashed border-white/15 bg-white/[0.03] text-sm text-slate-400">{error ? "User activity unavailable." : "Loading user activity…"}</div>}{users?.length === 0 && <div className="flex min-h-32 items-center justify-center rounded-md border border-dashed border-white/15 bg-white/[0.03] text-sm text-slate-400">No user profiles found.</div>}</div></section>
-        <section className="rounded-lg border border-white/10 bg-[#0b1626] p-5 shadow-[0_18px_50px_rgba(2,8,23,0.22)]"><div className="flex items-center justify-between"><h2 className="font-semibold text-white">Admin safeguards</h2><ShieldCheck size={19} className="text-emerald-300" /></div><div className="mt-4 space-y-2 text-sm text-slate-300"><p className="rounded-md bg-white/[0.04] p-3">Admin sign-in is separate from member authentication.</p><p className="rounded-md bg-white/[0.04] p-3">User data stays protected by Firestore rules.</p><p className="rounded-md bg-white/[0.04] p-3">Financial actions remain disabled until a trusted admin API is connected.</p></div></section>
+        <section className="rounded-lg border border-white/10 bg-[#0b1626] p-5 shadow-[0_18px_50px_rgba(2,8,23,0.22)]"><div className="flex items-center justify-between"><h2 className="font-semibold text-white">Admin safeguards</h2><ShieldCheck size={19} className="text-emerald-300" /></div><div className="mt-4 space-y-2 text-sm text-slate-300"><p className="rounded-md bg-white/[0.04] p-3">Admin sign-in is separate from member authentication.</p><p className="rounded-md bg-white/[0.04] p-3">User data stays protected by Firestore rules.</p><p className="rounded-md bg-white/[0.04] p-3">Sensitive changes require confirmation and are recorded in the audit history.</p></div></section>
       </div>
     </div>
   );
@@ -465,6 +715,9 @@ function Overview() {
 
 function PackageWorkspace({ refreshKey, onRefresh }) {
   const [users, setUsers] = useState(null);
+  const [userCursor, setUserCursor] = useState("");
+  const [hasMoreUsers, setHasMoreUsers] = useState(false);
+  const [loadingMoreUsers, setLoadingMoreUsers] = useState(false);
   const [packages, setPackages] = useState(null);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedPackageId, setSelectedPackageId] = useState("");
@@ -478,15 +731,32 @@ function PackageWorkspace({ refreshKey, onRefresh }) {
   useEffect(() => {
     let active = true;
     setStatus({ type: "", message: "" });
-    Promise.all([getAdminResource("users"), getAdminResource("packages")])
-      .then(([userRows, packageRows]) => {
+    Promise.all([getAdminPage("users"), getAdminPage("packages")])
+      .then(([userPage, packagePage]) => {
         if (!active) return;
-        setUsers(userRows);
-        setPackages(packageRows);
+        setUsers(userPage.items);
+        setUserCursor(userPage.nextCursor);
+        setHasMoreUsers(userPage.hasMore);
+        setPackages(packagePage.items);
       })
-      .catch((error) => active && setStatus({ type: "error", message: error.message || "Unable to load users and packages." }));
+      .catch((error) => active && setStatus({ type: "error", message: getSafeErrorMessage(error, "Unable to load users and packages.") }));
     return () => { active = false; };
   }, [refreshKey]);
+
+  async function loadMoreUsers() {
+    if (!userCursor || loadingMoreUsers) return;
+    setLoadingMoreUsers(true);
+    try {
+      const page = await getAdminPage("users", userCursor);
+      setUsers((current) => [...(current || []), ...page.items]);
+      setUserCursor(page.nextCursor);
+      setHasMoreUsers(page.hasMore);
+    } catch (error) {
+      setStatus({ type: "error", message: getSafeErrorMessage(error, "Unable to load more members.") });
+    } finally {
+      setLoadingMoreUsers(false);
+    }
+  }
 
   const filteredUsers = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -526,7 +796,7 @@ function PackageWorkspace({ refreshKey, onRefresh }) {
       setStatus({ type: "success", message: "Crypto trading assignment saved successfully. The selected user's Crypto Position is now updated." });
       setPassword("");
     } catch (error) {
-      setStatus({ type: "error", message: error.message || "The crypto trading allocation could not be saved." });
+      setStatus({ type: "error", message: getSafeErrorMessage(error, "The crypto trading allocation could not be saved.") });
     } finally {
       setSaving(false);
     }
@@ -555,14 +825,15 @@ function PackageWorkspace({ refreshKey, onRefresh }) {
               <button key={user.id} onClick={() => selectUser(user)} className={`w-full rounded-md border p-3 text-left transition ${selectedUserId === user.id ? "border-sky-300/60 bg-sky-300/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"}`}>
                 <div className="flex min-w-0 items-center justify-between gap-3"><span className="truncate text-sm font-semibold text-white">{user.displayName || user.username || user.email || user.id}</span><Status>{user.paperTrading?.enabled ? "Assigned" : "Not assigned"}</Status></div>
                 <p className="mt-1 truncate text-xs text-slate-400">{user.email || user.id}</p>
-                <p className="mt-1 text-[11px] text-slate-500">Active deposit (reference): ${Number(user.activeDeposit || user.totalDeposit || 0).toLocaleString()}</p>
+                <p className="mt-1 text-[11px] text-slate-500">Total deposits (reference): ${Number(user.totalDeposit || 0).toLocaleString()}</p>
               </button>
             ))}
           </div>
+          {hasMoreUsers && <button type="button" onClick={loadMoreUsers} disabled={loadingMoreUsers} className="mt-3 w-full rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-white/[0.05] disabled:opacity-60">{loadingMoreUsers ? "Loading…" : "Load more members"}</button>}
         </section>
         <section className="min-w-0 rounded-lg border border-white/10 bg-[#0b1626] p-4 shadow-[0_18px_50px_rgba(2,8,23,0.22)] sm:p-5">
           <h2 className="font-semibold text-white">Crypto trading assignment</h2>
-          <p className="mt-1 text-sm text-slate-400">{selectedUser ? `Editing ${selectedUser.displayName || selectedUser.email || selectedUser.id}. Crypto trading capital can be assigned independently of active deposit.` : "Select a member to begin."}</p>
+          <p className="mt-1 text-sm text-slate-400">{selectedUser ? `Editing ${selectedUser.displayName || selectedUser.email || selectedUser.id}. Crypto trading capital is managed separately from completed deposits.` : "Select a member to begin."}</p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-semibold text-slate-200">Package
               <select value={selectedPackageId} onChange={selectPackage} disabled={!selectedUser} className="mt-1 w-full rounded-md border border-white/10 bg-[#081321] px-3 py-2 text-sm font-normal text-white outline-none focus:border-sky-300 disabled:opacity-50">
@@ -641,15 +912,41 @@ function AdminSecurityPanel() {
 
 function ResourcePage({ resource, onAction, refreshKey, onRefresh }) {
   const [rows, setRows] = useState(null);
+  const [nextCursor, setNextCursor] = useState("");
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
     setRows(null);
+    setNextCursor("");
+    setHasMore(false);
     setError("");
-    getAdminResource(resource).then((data) => active && setRows(data)).catch((reason) => active && setError(reason.message || "The Firebase admin API is unavailable."));
+    getAdminPage(resource).then((page) => {
+      if (!active) return;
+      setRows(page.items);
+      setNextCursor(page.nextCursor);
+      setHasMore(page.hasMore);
+    }).catch((reason) => active && setError(getSafeErrorMessage(reason, "The admin data service is unavailable.")));
     return () => { active = false; };
   }, [resource, refreshKey]);
+
+  async function loadMore() {
+    if (!hasMore || !nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const page = await getAdminPage(resource, nextCursor);
+      setRows((current) => [...(current || []), ...page.items]);
+      setNextCursor(page.nextCursor);
+      setHasMore(page.hasMore);
+    } catch (reason) {
+      setError(getSafeErrorMessage(reason, "The next page could not be loaded."));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
   const searchableRows = useMemo(
     () =>
       (rows || []).map((row) => ({
@@ -673,15 +970,21 @@ function ResourcePage({ resource, onAction, refreshKey, onRefresh }) {
   const [title, description] = resources[resource];
   return (
     <div className="space-y-5">
-      <div><p className="text-xs font-bold uppercase tracking-widest text-sky-300">Resource management</p><h1 className="mt-2 text-2xl font-bold tracking-tight text-white">{title}</h1><p className="mt-1 text-sm text-slate-400">{description}</p></div>
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-sky-300">Resource management</p>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-white">{title}</h1>
+        <p className="mt-1 text-sm text-slate-400">{description}</p>
+        <p className="mt-1 text-xs text-slate-500">Search covers the records loaded so far. Load more to include older records.</p>
+      </div>
       <section className="overflow-hidden rounded-lg border border-white/10 bg-[#0b1626] shadow-[0_18px_50px_rgba(2,8,23,0.22)]">
         <div className="flex flex-col gap-3 border-b border-white/10 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center"><div className="relative w-full sm:max-w-xs"><Search size={16} className="absolute left-3 top-2.5 text-slate-500" /><input aria-label={`Search ${title}`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${title}`} className="w-full rounded-md border border-white/10 bg-[#081321] py-2 pl-9 pr-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/15" /></div><span className="text-xs font-medium text-slate-400">{error ? "Unavailable" : `${filtered.length.toLocaleString()} of ${(rows || []).length.toLocaleString()} records`}</span></div><div className="flex items-center gap-2"><button onClick={onRefresh} className="inline-flex items-center gap-2 rounded-md border border-white/15 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-white/[0.06]"><RefreshCw size={15} />Refresh</button>{resource === "packages" && <button onClick={() => onAction("create", {})} className="rounded-md bg-sky-300 px-3 py-2 text-sm font-semibold text-[#081321] hover:bg-sky-200">New package</button>}</div></div>
         {error ? (
           <div className="p-6">
             <FeedbackMessage type="error">{error}</FeedbackMessage>
           </div>
-        ) : !rows ? <div className="p-12 text-center text-sm text-slate-400">Loading live {title.toLowerCase()}…</div> : filtered.length ? <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-white/[0.04]"><tr className="border-b border-white/10 text-[11px] uppercase tracking-wider text-slate-400"><th className="px-5 py-3 font-bold">Record</th><th className="px-5 py-3 font-bold">Details</th><th className="px-5 py-3 font-bold">Status</th><th className="px-5 py-3" /></tr></thead><tbody>{filtered.map((row) => { const isDisabled = row.disabled === true || row.authDisabled === true || row.status === "Disabled"; const isAdmin = row.role === "admin"; const canManageAuth = resource !== "users" || row.authAccount === true;                         const actionPayload = { ...row, userId: resource === "users" ? (row.authUid || row.id) : row.userId, profileId: resource === "users" ? row.id : row.userId }; const depositStatus = String(row.status || "pending").toLowerCase(); const canDeleteDeposit = resource === "deposits" && !["approved", "completed", "settled", "credited"].includes(depositStatus) && !row.settlementId; const canDeleteWithdrawal = resource === "withdrawals" && !row.settlementId && !row.settledAt && !row.completedAt && !row.paidAt && !["complete", "completed", "settled", "paid", "success"].includes(depositStatus); return <tr className="border-b border-white/10 text-slate-300 last:border-0 hover:bg-white/[0.03]" key={row.id}><td className="px-5 py-4 font-semibold text-white">{row.id}</td><td className="max-w-xl px-5 py-4 text-xs">{resource === "deposits" && <div className="mb-2 grid gap-1 text-[11px]"><span><strong className="text-slate-200">Email:</strong> {row.profileEmail || row.email || "—"}</span><span><strong className="text-slate-200">Username:</strong> {row.profileUsername || row.username || "—"}</span></div>}{Object.entries(row).filter(([key]) => !["id", "__searchText", "emailNotifications", "authUid", "profileEmail", "profileUsername"].includes(key)).slice(0, 5).map(([key, value]) => <span className="mr-3 inline-block" key={key}><strong className="text-slate-200">{key}:</strong> {String(value ?? "—")}</span>)}{resource === "users" && !canManageAuth && <span className="mt-2 block text-amber-300">Firestore profile only — no Firebase Auth account</span>}</td><td className="px-5 py-4"><Status>{row.status || (canManageAuth ? (isDisabled ? "Suspended" : "Active") : "Profile only")}</Status></td><td className="px-5 py-4">{resource === "admins" ? null : resource === "users" ? <div className="flex justify-end gap-3"><button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} aria-label={`${isAdmin ? "Remove admin access from" : "Grant admin access to"} ${row.email || row.id}`} onClick={() => onAction("set-role", { ...actionPayload, role: isAdmin ? "member" : "admin" })} className="text-xs font-bold text-slate-200 hover:text-white disabled:cursor-not-allowed disabled:text-slate-600">{isAdmin ? "Remove admin" : "Grant admin"}</button><button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} aria-label={`${isDisabled ? "Enable" : "Disable"} ${row.email || row.id}`} onClick={() => onAction("disable-user", { ...actionPayload, disabled: !isDisabled })} className={`text-xs font-bold ${isDisabled ? "text-emerald-300 hover:text-emerald-200" : "text-rose-300 hover:text-rose-200"} disabled:cursor-not-allowed disabled:text-slate-600`}>{isDisabled ? "Enable" : "Disable"}</button>                <button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} onClick={() => onAction("delete-user", actionPayload)} className="text-xs font-bold text-rose-300 hover:text-rose-200 disabled:cursor-not-allowed disabled:text-slate-600">Delete</button></div> : resource === "deposits" ? <div className="flex justify-end gap-3">{["pending", "approved"].includes(depositStatus) && <button onClick={() => onAction("settle-deposit", actionPayload)} className="text-xs font-bold text-emerald-300 hover:text-emerald-200">Credit offline payment</button>}{["pending", "rejected", "cancelled"].includes(depositStatus) && <button onClick={() => onAction("review", row)} className="text-xs font-bold text-slate-200 hover:text-white">Review</button>}{canDeleteDeposit && <button onClick={() => onAction("delete-deposit", actionPayload)} className="text-xs font-bold text-rose-300 hover:text-rose-200">Delete request</button>}</div>                                         : resource === "withdrawals" ? <div className="flex justify-end gap-3"><Link to={`/control-room/withdrawals/${encodeURIComponent(row.userId)}/${encodeURIComponent(row.id)}`} className="text-xs font-bold text-sky-300 hover:text-sky-200">Details</Link>{canDeleteWithdrawal && <button onClick={() => onAction("delete-withdrawal", actionPayload)} className="text-xs font-bold text-rose-300 hover:text-rose-200">Delete request</button>}</div> : resource === "transactions" ? <a href={`/control-room/transactions/${encodeURIComponent(row.userId)}/${encodeURIComponent(row.id)}?collection=${encodeURIComponent(row.collection || "transactions")}`} target="_blank" rel="noreferrer" className="float-right inline-flex items-center gap-1 text-xs font-bold text-sky-300 hover:text-sky-200">View details <ExternalLink size={13} /></a> : resource === "support" ? <a href={`/control-room/support/${encodeURIComponent(row.userId)}/${encodeURIComponent(row.id)}`} target="_blank" rel="noreferrer" className="float-right inline-flex items-center gap-1 text-xs font-bold text-sky-300 hover:text-sky-200">View details <ExternalLink size={13} /></a>         : resource === "packages" ? <button onClick={() => onAction("update-package", row)} className="float-right text-xs font-bold text-slate-200 hover:text-white">Edit package <ChevronRight size={14} className="inline" /></button> : resource !== "audit" && <button onClick={() => onAction("review", row)} className="float-right text-xs font-bold text-slate-200 hover:text-white">Review <ChevronRight size={14} className="inline" /></button>}</td></tr>; })}</tbody></table></div> : <div className="p-12 text-center text-sm text-slate-400"><FileText className="mx-auto mb-3 text-slate-500" />No records found.</div>}
+        ) : !rows ? <div className="p-12 text-center text-sm text-slate-400">Loading live {title.toLowerCase()}…</div> : filtered.length ? <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-white/[0.04]"><tr className="border-b border-white/10 text-[11px] uppercase tracking-wider text-slate-400"><th className="px-5 py-3 font-bold">Record</th><th className="px-5 py-3 font-bold">Details</th><th className="px-5 py-3 font-bold">Status</th><th className="px-5 py-3" /></tr></thead><tbody>{filtered.map((row) => { const isDisabled = row.disabled === true || row.authDisabled === true || row.status === "Disabled"; const isAdmin = row.role === "admin"; const canManageAuth = resource !== "users" || row.authAccount === true;                         const actionPayload = { ...row, userId: resource === "users" ? (row.authUid || row.id) : row.userId, profileId: resource === "users" ? row.id : row.userId }; const depositStatus = String(row.status || "pending").toLowerCase(); const canDeleteDeposit = resource === "deposits" && !["approved", "completed", "settled", "credited"].includes(depositStatus) && !row.settlementId; const canDeleteWithdrawal = resource === "withdrawals" && !row.settlementId && !row.settledAt && !row.completedAt && !row.paidAt && !["complete", "completed", "settled", "paid", "success"].includes(depositStatus); return <tr className="border-b border-white/10 text-slate-300 last:border-0 hover:bg-white/[0.03]" key={row.id}><td className="px-5 py-4 font-semibold text-white">{row.id}</td><td className="max-w-xl px-5 py-4 text-xs">{resource === "deposits" && <div className="mb-2 grid gap-1 text-[11px]"><span><strong className="text-slate-200">Email:</strong> {row.profileEmail || row.email || "—"}</span><span><strong className="text-slate-200">Username:</strong> {row.profileUsername || row.username || "—"}</span></div>}{Object.entries(row).filter(([key]) => !["id", "__searchText", "emailNotifications", "authUid", "profileEmail", "profileUsername"].includes(key)).slice(0, 5).map(([key, value]) => <span className="mr-3 inline-block" key={key}><strong className="text-slate-200">{key}:</strong> {String(value ?? "—")}</span>)}{resource === "users" && !canManageAuth && <span className="mt-2 block text-amber-300">Firestore profile only — no Firebase Auth account</span>}</td><td className="px-5 py-4"><Status>{row.status || (canManageAuth ? (isDisabled ? "Suspended" : "Active") : "Profile only")}</Status></td><td className="px-5 py-4">{resource === "admins" ? null : resource === "users" ? <div className="flex justify-end gap-3"><button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} aria-label={`${isAdmin ? "Remove admin access from" : "Grant admin access to"} ${row.email || row.id}`} onClick={() => onAction("set-role", { ...actionPayload, role: isAdmin ? "member" : "admin" })} className="text-xs font-bold text-slate-200 hover:text-white disabled:cursor-not-allowed disabled:text-slate-600">{isAdmin ? "Remove admin" : "Grant admin"}</button><button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} aria-label={`${isDisabled ? "Enable" : "Disable"} ${row.email || row.id}`} onClick={() => onAction("disable-user", { ...actionPayload, disabled: !isDisabled })} className={`text-xs font-bold ${isDisabled ? "text-emerald-300 hover:text-emerald-200" : "text-rose-300 hover:text-rose-200"} disabled:cursor-not-allowed disabled:text-slate-600`}>{isDisabled ? "Enable" : "Disable"}</button>                <button disabled={!canManageAuth} title={!canManageAuth ? "No Firebase Authentication account exists for this profile" : undefined} onClick={() => onAction("delete-user", actionPayload)} className="text-xs font-bold text-rose-300 hover:text-rose-200 disabled:cursor-not-allowed disabled:text-slate-600">Delete</button></div> : resource === "deposits" ? <div className="flex justify-end gap-3">{["pending", "approved"].includes(depositStatus) && <button onClick={() => onAction("settle-deposit", actionPayload)} className="text-xs font-bold text-emerald-300 hover:text-emerald-200">Credit offline payment</button>}{["pending", "rejected", "cancelled"].includes(depositStatus) && <button onClick={() => onAction("review", row)} className="text-xs font-bold text-slate-200 hover:text-white">Review</button>}{canDeleteDeposit && <button onClick={() => onAction("delete-deposit", actionPayload)} className="text-xs font-bold text-rose-300 hover:text-rose-200">Delete request</button>}{resource === "deposits" && depositStatus === "completed" && row.emailNotifications?.successful?.status === "failed" && <button onClick={() => onAction("retry-deposit-email", actionPayload)} className="text-xs font-bold text-amber-200 hover:text-amber-100">Retry confirmation email</button>}</div>                                         : resource === "withdrawals" ? <div className="flex justify-end gap-3"><Link to={`/control-room/withdrawals/${encodeURIComponent(row.userId)}/${encodeURIComponent(row.id)}`} className="text-xs font-bold text-sky-300 hover:text-sky-200">Details</Link>{canDeleteWithdrawal && <button onClick={() => onAction("delete-withdrawal", actionPayload)} className="text-xs font-bold text-rose-300 hover:text-rose-200">Delete request</button>}</div> : resource === "transactions" ? <a href={`/control-room/transactions/${encodeURIComponent(row.userId)}/${encodeURIComponent(row.id)}?collection=${encodeURIComponent(row.collection || "transactions")}`} target="_blank" rel="noreferrer" className="float-right inline-flex items-center gap-1 text-xs font-bold text-sky-300 hover:text-sky-200">View details <ExternalLink size={13} /></a> : resource === "support" ? <a href={`/control-room/support/${encodeURIComponent(row.userId)}/${encodeURIComponent(row.id)}`} target="_blank" rel="noreferrer" className="float-right inline-flex items-center gap-1 text-xs font-bold text-sky-300 hover:text-sky-200">View details <ExternalLink size={13} /></a>         : resource === "packages" ? <button onClick={() => onAction("update-package", row)} className="float-right text-xs font-bold text-slate-200 hover:text-white">Edit package <ChevronRight size={14} className="inline" /></button> : resource !== "audit" && <button onClick={() => onAction("review", row)} className="float-right text-xs font-bold text-slate-200 hover:text-white">Review <ChevronRight size={14} className="inline" /></button>}</td></tr>; })}</tbody></table></div> : <div className="p-12 text-center text-sm text-slate-400"><FileText className="mx-auto mb-3 text-slate-500" />No records found.</div>}
       </section>
+      {hasMore && <div className="flex justify-center"><button type="button" onClick={loadMore} disabled={loadingMore} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/15 px-4 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06] disabled:cursor-wait disabled:opacity-60">{loadingMore ? <><RefreshCw size={14} className="animate-spin" />Loading…</> : "Load more records"}</button></div>}
       {resource === "admins" && <AdminSecurityPanel />}
     </div>
   );
@@ -695,8 +998,13 @@ export default function AdminPage() {
   const [notice, setNotice] = useState("");
   const [noticeType, setNoticeType] = useState("success");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [queueCounts, setQueueCounts] = useState({ deposits: 0, withdrawals: 0, support: 0, referrals: 0 });
+  const [supportConversations, setSupportConversations] = useState(null);
+  const [queueSummaryError, setQueueSummaryError] = useState("");
+  const [supportQueueError, setSupportQueueError] = useState("");
   const [confirm, setConfirm] = useState(null);
   const [actionSubmitting, setActionSubmitting] = useState(false);
+  const mobileMenuRef = useRef(null);
   const noticeTimeoutRef = useRef(null);
   const confirmDialogRef = useRef(null);
   const previousFocusRef = useRef(null);
@@ -718,24 +1026,112 @@ export default function AdminPage() {
   });
   const pathParts = location.pathname.split("/").filter(Boolean);
   const resource = pathParts[1] || "overview";
+  const supportChatArchive = resource === "support-chat" && pathParts[2] === "archive";
   const transactionDetails = resource === "transactions" && pathParts.length >= 4;
   const transactionUserId = transactionDetails ? decodePathPart(pathParts[2]) : "";
   const transactionId = transactionDetails ? decodePathPart(pathParts[3]) : "";
   const transactionCollection = new URLSearchParams(location.search).get("collection") || "";
+  const depositDetails = resource === "deposits" && pathParts.length >= 4;
+  const depositUserId = depositDetails ? decodePathPart(pathParts[2]) : "";
+  const depositId = depositDetails ? decodePathPart(pathParts[3]) : "";
   const supportDetails = resource === "support" && pathParts.length >= 4;
   const supportUserId = supportDetails ? decodePathPart(pathParts[2]) : "";
   const supportTicketId = supportDetails ? decodePathPart(pathParts[3]) : "";
   const withdrawalDetails = resource === "withdrawals" && pathParts.length >= 4;
   const withdrawalUserId = withdrawalDetails ? decodePathPart(pathParts[2]) : "";
   const withdrawalId = withdrawalDetails ? decodePathPart(pathParts[3]) : "";
+  const referralDetails = resource === "referrals" && pathParts.length >= 4;
+  const referralUserId = referralDetails ? decodePathPart(pathParts[2]) : "";
+  const referralRewardId = referralDetails ? decodePathPart(pathParts[3]) : "";
   const invalidTransactionDetails =
     transactionDetails && (!transactionUserId || !transactionId);
+  const invalidDepositDetails =
+    depositDetails && (!depositUserId || !depositId);
   const invalidSupportDetails =
     supportDetails && (!supportUserId || !supportTicketId);
   const invalidWithdrawalDetails =
     withdrawalDetails && (!withdrawalUserId || !withdrawalId);
+  const invalidReferralDetails =
+    referralDetails && (!referralUserId || !referralRewardId);
   const unknownResource =
     resource !== "overview" && !Object.prototype.hasOwnProperty.call(resources, resource);
+  const activeNavigationItem = navGroups
+    .flatMap((group) => group.items)
+    .find(([path]) =>
+      path === "/control-room"
+        ? location.pathname === path
+        : location.pathname === path || location.pathname.startsWith(`${path}/`),
+    );
+  const currentPageTitle = transactionDetails
+    ? "Transaction details"
+    : depositDetails
+      ? "Deposit review"
+    : supportDetails
+      ? "Support ticket details"
+      : withdrawalDetails
+        ? "Withdrawal review"
+        : referralDetails
+          ? "Referral details"
+          : supportChatArchive
+            ? "Archived support chats"
+            : activeNavigationItem?.[1] || "Admin";
+
+  useEffect(() => {
+    if (!user?.uid) return undefined;
+    let active = true;
+    async function refreshQueueRows() {
+      try {
+        const counts = await getAdminResource("admin-queue-counts");
+        if (!active) return;
+        setQueueCounts(counts);
+        setQueueSummaryError("");
+      } catch (error) {
+        if (!active) return;
+        console.error("Admin queue counts could not be refreshed.", error);
+        setQueueSummaryError(getSafeErrorMessage(error, "Pending-operation counts could not be refreshed."));
+      }
+    }
+
+    void refreshQueueRows();
+    function refreshWhenVisible() {
+      if (document.visibilityState === "visible") void refreshQueueRows();
+    }
+    const intervalId = window.setInterval(() => {
+      refreshWhenVisible();
+    }, 120_000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refreshKey, user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return undefined;
+    if (!firestoreDb) {
+      setSupportConversations([]);
+      setSupportQueueError("Support chat activity is unavailable because Firebase is not configured.");
+      return undefined;
+    }
+    return subscribeToAdminConversations(
+      (conversations) => {
+        setSupportConversations(conversations);
+        setSupportQueueError("");
+      },
+      (error) => {
+        console.error("Support chat badge count could not be refreshed.", error);
+        setSupportQueueError("Support chat activity could not be refreshed.");
+      },
+    );
+  }, [user?.uid]);
+
+  const queueBadgeCounts = useMemo(() => {
+    const outstandingChats = (supportConversations || []).filter((item) => (
+      item.archived !== true && !["resolved", "closed"].includes(String(item.status || "open").toLowerCase())
+    )).length;
+    return { ...queueCounts, "support-chat": outstandingChats };
+  }, [queueCounts, supportConversations]);
 
   function clearNoticeTimeout() {
     if (noticeTimeoutRef.current) {
@@ -758,6 +1154,34 @@ export default function AdminPage() {
   }
 
   useEffect(() => () => clearNoticeTimeout(), []);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    mobileMenuRef.current?.querySelector("a")?.focus();
+
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+
+    function closeOnDesktopResize() {
+      if (window.matchMedia("(min-width: 1024px)").matches) setMenuOpen(false);
+    }
+
+    document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", closeOnDesktopResize);
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", closeOnDesktopResize);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+        previousFocus.focus();
+      }
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     if (!confirm) {
@@ -800,6 +1224,12 @@ export default function AdminPage() {
               depositId: confirm.payload.id,
               amount: Number(actionForm.amount),
               currency: actionForm.currency,
+              reason: actionForm.reason,
+            }
+        : confirm.action === "retry-deposit-email"
+          ? {
+              profileId: confirm.payload.profileId || confirm.payload.userId,
+              depositId: confirm.payload.id,
               reason: actionForm.reason,
             }
         : confirm.action === "delete-deposit"
@@ -846,9 +1276,19 @@ export default function AdminPage() {
       await reauthenticateAdmin(actionForm.password);
       const result = await requestAdminAction(confirm.action === "withdrawal-decision" ? "review" : confirm.action, payload);
       setRefreshKey((current) => current + 1);
+      const depositEmailFailed = ["settle-deposit", "retry-deposit-email"].includes(confirm.action)
+        && result.email?.status === "failed";
       showNotice(
-        confirm.action === "approve-withdrawal" && result.email?.status === "failed" ? "error" : "success",
-        confirm.action === "approve-withdrawal" && result.email?.status === "failed"
+        (confirm.action === "approve-withdrawal" && result.email?.status === "failed") || depositEmailFailed ? "error" : "success",
+        depositEmailFailed
+          ? "Deposit was credited, but the member confirmation email failed. The deposit remains recorded."
+          : confirm.action === "retry-deposit-email"
+          ? result.email?.status === "sent"
+            ? "Deposit confirmation email sent to the member."
+            : result.email?.status === "sending"
+              ? "A deposit confirmation email is already being sent."
+              : "The deposit confirmation email could not be sent."
+          : confirm.action === "approve-withdrawal" && result.email?.status === "failed"
           ? "Withdrawal completed, but the success email failed. The failure is recorded; do not send the payout again."
           : confirm.action === "approve-withdrawal"
           ? result.alreadyCompleted
@@ -862,13 +1302,17 @@ export default function AdminPage() {
           ? "Withdrawal request deleted."
           : confirm.action === "withdrawal-decision"
             ? `Withdrawal ${confirm.payload.nextStatus}.`
+            : confirm.action === "settle-deposit"
+              ? result.email?.status === "sent"
+                ? "Deposit credited. The member confirmation email was sent."
+                : "Deposit credited. The member confirmation email is being processed."
             : "Admin request completed successfully.",
       );
       completed = true;
     } catch (error) {
       showNotice(
         "error",
-        error instanceof Error ? error.message : "The admin request failed.",
+        getSafeErrorMessage(error, "The admin request failed."),
       );
     } finally {
       setActionSubmitting(false);
@@ -876,8 +1320,16 @@ export default function AdminPage() {
     }
   }
   const onAction = (action, payload) => {
+    if (action === "review" && payload.collection === "deposits") {
+      navigate(`/control-room/deposits/${encodeURIComponent(payload.userId)}/${encodeURIComponent(payload.id)}`);
+      return;
+    }
     if (action === "review" && payload.collection === "withdrawals") {
       navigate(`/control-room/withdrawals/${encodeURIComponent(payload.userId)}/${encodeURIComponent(payload.id)}`);
+      return;
+    }
+    if (action === "review" && payload.collection === "referralRewards") {
+      navigate(`/control-room/referrals/${encodeURIComponent(payload.userId)}/${encodeURIComponent(payload.id)}`);
       return;
     }
     clearNoticeTimeout();
@@ -904,40 +1356,120 @@ export default function AdminPage() {
     setConfirm({ action, payload });
   };
   return (
-    <div className="min-h-screen bg-[#07111d] text-slate-100">
-      {menuOpen && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-slate-950/70 lg:hidden" onClick={() => setMenuOpen(false)} />}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-white/10 bg-[#0b1626] transition-transform lg:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex h-16 items-center justify-between border-b border-white/10 px-5"><Link to="/control-room" className="flex items-center gap-2"><img src="/meridianvest-logo.svg" className="h-8 w-8" alt="MeridianVests" /><span className="text-sm font-bold text-white">MeridianVests <span className="font-normal text-slate-400">Admin</span></span></Link><button className="text-slate-400 hover:text-white lg:hidden" onClick={() => setMenuOpen(false)}><X size={19} /></button></div>
-        <nav className="space-y-1 p-3">{nav.map(([path, label, Icon]) => <Link onClick={() => setMenuOpen(false)} className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium ${location.pathname === path ? "bg-sky-300 text-[#081321] shadow-sm" : "text-slate-300 hover:bg-white/[0.06] hover:text-white"}`} to={path} key={path}><Icon size={17} />{label}</Link>)}</nav>
-        <div className="absolute bottom-0 left-0 right-0 border-t border-white/10 p-4"><div className="flex items-center gap-2"><span className="rounded-full bg-white/10 p-2 text-slate-300"><UserRound size={15} /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-100">{user?.displayName || "Administrator"}</p><p className="truncate text-[11px] text-slate-400">{user?.email || "Verified admin"}</p></div><button title="Sign out" aria-label="Sign out" onClick={() => { clearAdminLoginSession(); signOutUser(); }} className="grid h-9 w-9 place-items-center rounded-lg border border-white/15 text-slate-400 transition hover:border-rose-400/40 hover:bg-rose-400/10 hover:text-rose-300"><LogOut size={16} /></button></div></div>
+    <div className="dashboard-font min-h-screen bg-[#07111d] text-slate-100">
+      <SkipToContent targetId="admin-main" />
+      {menuOpen && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-slate-950/70 backdrop-blur-sm lg:hidden" onClick={() => setMenuOpen(false)} />}
+      <aside ref={mobileMenuRef} id="admin-navigation" aria-label="Admin navigation panel" className={`fixed inset-y-0 left-0 z-40 flex w-[min(18rem,calc(100vw-2rem))] flex-col border-r border-white/10 bg-[#091522] shadow-2xl shadow-black/30 transition-transform duration-200 lg:w-72 lg:translate-x-0 lg:shadow-none ${menuOpen ? "visible translate-x-0" : "invisible -translate-x-full lg:visible"}`}>
+        <div className="flex h-[4.5rem] shrink-0 items-center justify-between border-b border-white/10 px-5">
+          <Link to="/control-room" onClick={() => setMenuOpen(false)} className="flex min-w-0 items-center gap-3">
+            <img src="/meridianvest-logo.svg" className="h-9 w-9 rounded-xl ring-1 ring-white/10" alt="MeridianVests" />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-bold text-white">MeridianVests</span>
+              <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-[0.16em] text-sky-300">Admin workspace</span>
+            </span>
+          </Link>
+          <button type="button" aria-label="Close navigation" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-white/[0.06] hover:text-white lg:hidden" onClick={() => setMenuOpen(false)}><X size={19} /></button>
+        </div>
+        <nav aria-label="Admin navigation" className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-5">
+          {navGroups.map((group) => (
+            <section key={group.label} aria-label={group.label}>
+              <h2 className="mb-2 px-3 text-[10px] font-extrabold uppercase tracking-[0.17em] text-slate-500">{group.label}</h2>
+              <div className="space-y-1">
+                {group.items.map(([path, label, Icon]) => {
+                  const active = activeNavigationItem?.[0] === path;
+                  const queueSection = Object.keys(QUEUE_SECTIONS).find(
+                    (section) => path === `/control-room/${section}`,
+                  );
+                  const badgeCount = queueSection ? queueBadgeCounts[queueSection] : 0;
+                  return (
+                    <Link
+                      key={path}
+                      to={path}
+                      onClick={() => setMenuOpen(false)}
+                      aria-current={active ? "page" : undefined}
+                      className={`group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold transition ${badgeCount > 0 ? "pr-10" : ""} ${
+                        active
+                          ? "bg-sky-300 text-[#07111d] shadow-[0_8px_24px_rgba(34,211,238,0.12)]"
+                          : "text-slate-300 hover:bg-white/[0.055] hover:text-white"
+                      }`}
+                    >
+                      {active && <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-cyan-600" aria-hidden="true" />}
+                      <Icon size={17} strokeWidth={active ? 2.4 : 1.9} className={active ? "shrink-0" : "shrink-0 text-slate-500 transition group-hover:text-sky-300"} />
+                      <span className="truncate">{label}</span>
+                      {badgeCount > 0 && (
+                        <span
+                          aria-label={`${badgeCount} outstanding ${label.toLowerCase()} items`}
+                          className="absolute right-2 top-1/2 grid h-5 min-w-5 -translate-y-1/2 place-items-center rounded-full border-2 border-[#091522] bg-rose-500 px-1 text-[10px] font-extrabold leading-none text-white shadow"
+                        >
+                          {badgeCount > 99 ? "99+" : badgeCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </nav>
+        <div className="shrink-0 border-t border-white/10 p-3">
+          <div className="flex items-center gap-3 rounded-xl bg-white/[0.035] p-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-300/10 text-sky-200 ring-1 ring-inset ring-sky-300/15"><UserRound size={16} /></span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-bold text-slate-100">{user?.displayName || "Administrator"}</p>
+              <p className="truncate text-[11px] text-slate-400">{user?.email || "Verified admin"}</p>
+            </div>
+            <button type="button" title="Sign out" aria-label="Sign out" onClick={() => { clearAdminLoginSession(); signOutUser(); }} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 text-slate-400 transition hover:border-rose-400/30 hover:bg-rose-400/10 hover:text-rose-300"><LogOut size={16} /></button>
+          </div>
+        </div>
       </aside>
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-white/10 bg-[#0b1626]/95 px-4 sm:px-7">
-          <button className="text-slate-300 hover:text-white lg:hidden" onClick={() => setMenuOpen(true)}><Menu size={21} /></button>
-          <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-slate-300"><ShieldCheck size={16} className="text-emerald-300" />Firebase admin console</div>
+      <div className="lg:pl-72">
+        <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 border-b border-white/10 bg-[#0b1626]/95 px-4 backdrop-blur-xl sm:px-7">
+          <div className="flex min-w-0 items-center gap-3">
+            <button type="button" aria-label="Open navigation" aria-controls="admin-navigation" aria-expanded={menuOpen} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 text-slate-300 transition hover:border-sky-300/30 hover:bg-sky-300/10 hover:text-white lg:hidden" onClick={() => setMenuOpen(true)}><Menu size={20} /></button>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-white">{currentPageTitle}</p>
+              <p className="hidden truncate text-[11px] text-slate-500 sm:block">{resources[resource]?.[1] || "Manage MeridianVests operations and member services."}</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[0.06] px-3 py-2 text-[11px] font-bold text-slate-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.8)]" /><span className="hidden sm:inline">Secure admin console</span><span className="sm:hidden">Secure</span></div>
         </header>
-        <main className="mx-auto max-w-[1500px] p-4 sm:p-7">
+        <main id="admin-main" tabIndex="-1" className="mx-auto max-w-[1600px] p-4 outline-none sm:p-6 lg:p-8">
           <div className="mb-5 flex items-center gap-2 text-xs text-slate-400">
             <Link to="/control-room" className="hover:text-white">Admin</Link>
             <ChevronRight size={13} />
-            <span>{transactionDetails ? "Transaction details" : supportDetails ? "Support ticket details" : withdrawalDetails ? "Withdrawal review" : resource === "overview" ? "Overview" : resources[resource]?.[0] || "Not found"}</span>
+            <span>{transactionDetails ? "Transaction details" : depositDetails ? "Deposit review" : supportDetails ? "Support ticket details" : withdrawalDetails ? "Withdrawal review" : referralDetails ? "Referral details" : supportChatArchive ? "Archived support chats" : resource === "overview" ? "Overview" : resources[resource]?.[0] || "Not found"}</span>
           </div>
+          {(queueSummaryError || supportQueueError) && (
+            <FeedbackMessage type="error" className="mb-5">
+              {[queueSummaryError, supportQueueError].filter(Boolean).join(" ")}
+            </FeedbackMessage>
+          )}
           {invalidTransactionDetails ? (
             <AdminRouteMessage title="Invalid transaction link" description="The transaction URL contains an invalid record identifier." />
+          ) : invalidDepositDetails ? (
+            <AdminRouteMessage title="Invalid deposit link" description="The deposit URL contains an invalid record identifier." />
           ) : invalidSupportDetails ? (
             <AdminRouteMessage title="Invalid support link" description="The support URL contains an invalid ticket identifier." />
           ) : invalidWithdrawalDetails ? (
             <AdminRouteMessage title="Invalid withdrawal link" description="The withdrawal URL contains an invalid record identifier." />
+          ) : invalidReferralDetails ? (
+            <AdminRouteMessage title="Invalid referral link" description="The referral URL contains an invalid reward identifier." />
           ) : unknownResource ? (
             <AdminRouteMessage title="Admin page not found" description="That admin resource does not exist." />
           ) : transactionDetails ? (
             <TransactionDetails userId={transactionUserId} transactionId={transactionId} collection={transactionCollection} />
+          ) : depositDetails ? (
+            <DepositDetails userId={depositUserId} depositId={depositId} onAction={onAction} refreshKey={refreshKey} />
           ) : supportDetails ? (
             <SupportDetails userId={supportUserId} ticketId={supportTicketId} />
           ) : withdrawalDetails ? (
             <WithdrawalDetails userId={withdrawalUserId} withdrawalId={withdrawalId} onAction={onAction} refreshKey={refreshKey} />
+          ) : referralDetails ? (
+            <ReferralDetails userId={referralUserId} rewardId={referralRewardId} />
           ) : resource === "overview" ? (
             <Overview />
+          ) : resource === "support-chat" ? (
+            <AdminSupportChat archiveView={supportChatArchive} sharedConversations={supportConversations} sharedError={supportQueueError} />
           ) : resource === "packages" ? (
             <PackageWorkspace refreshKey={refreshKey} onRefresh={() => setRefreshKey((current) => current + 1)} />
           ) : resource === "withdrawals" ? (
@@ -962,7 +1494,7 @@ export default function AdminPage() {
             className="w-full max-w-md rounded-lg border border-white/10 bg-[#0b1626] p-6 text-slate-100 shadow-2xl"
           >
             <h2 id="admin-confirm-title" className="text-lg font-bold text-white">
-              {confirm.action === "approve-withdrawal" ? "Approve and complete withdrawal" : confirm.action === "withdrawal-decision" ? `${confirm.payload.nextStatus === "approved" ? "Approve" : "Reject"} withdrawal request` : confirm.action === "review" ? "Update record status" : confirm.action === "settle-deposit" ? "Credit offline payment" : confirm.action === "delete-deposit" ? "Delete deposit request" : confirm.action === "delete-withdrawal" ? "Delete withdrawal request" : confirm.action === "disable-user" ? (confirm.payload.disabled ? "Enable user access" : "Disable user access") : confirm.action === "set-role" ? "Change user role" : confirm.action === "delete-user" ? "Permanently delete user" : confirm.action === "update-package" ? "Edit investment package" : "Create investment package"}
+              {confirm.action === "approve-withdrawal" ? "Approve and complete withdrawal" : confirm.action === "withdrawal-decision" ? `${confirm.payload.nextStatus === "approved" ? "Approve" : "Reject"} withdrawal request` : confirm.action === "review" ? "Update record status" : confirm.action === "settle-deposit" ? "Credit offline payment" : confirm.action === "retry-deposit-email" ? "Retry deposit confirmation email" : confirm.action === "delete-deposit" ? "Delete deposit request" : confirm.action === "delete-withdrawal" ? "Delete withdrawal request" : confirm.action === "disable-user" ? (confirm.payload.disabled ? "Enable user access" : "Disable user access") : confirm.action === "set-role" ? "Change user role" : confirm.action === "delete-user" ? "Permanently delete user" : confirm.action === "update-package" ? "Edit investment package" : "Create investment package"}
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-400">
               {confirm.action === "approve-withdrawal"
@@ -1013,7 +1545,7 @@ export default function AdminPage() {
                 <p>
                   {confirm.payload.method || confirm.payload.asset || "Payout asset"} ·{" "}
                   {Number.isFinite(Number(confirm.payload.amount))
-                    ? `$${Number(confirm.payload.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+                    ? `${formatMoney(confirm.payload.amount)} USD`
                     : "Amount not recorded"}
                 </p>
                 <p className="break-all font-mono text-xs leading-5">{confirm.payload.wallet || "No destination wallet was saved on this request."}</p>
@@ -1041,7 +1573,12 @@ export default function AdminPage() {
                   onChange={(event) => setActionForm((current) => ({ ...current, status: event.target.value }))}
                   className="mt-2 w-full rounded-md border border-white/15 bg-[#081321] px-3 py-2 text-sm font-normal text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20"
                 >
-                  {["pending", "approved", "rejected", "on-hold", "open", "closed", "resolved"].map((status) => (
+                  {(confirm.payload.resource === "support"
+                    ? ["open", "on-hold"].includes(String(confirm.payload.status || "open").toLowerCase())
+                      ? ["open", "on-hold", "resolved", "closed"]
+                      : [String(confirm.payload.status || "open").toLowerCase()]
+                    : ["pending", "approved", "rejected", "on-hold", "open", "closed", "resolved"]
+                  ).map((status) => (
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>

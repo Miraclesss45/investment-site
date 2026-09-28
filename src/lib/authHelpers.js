@@ -16,8 +16,7 @@ export async function resolveLoginEmail(identifier = "") {
   throw new Error("Enter the email address used to create your account.");
 }
 
-export function getAuthErrorMessage(error, fallback = "Something went wrong.") {
-  const messages = {
+const FRIENDLY_ERROR_MESSAGES = {
     "auth/email-already-in-use":
       "An account already exists with this email address.",
     "auth/weak-password":
@@ -54,12 +53,46 @@ export function getAuthErrorMessage(error, fallback = "Something went wrong.") {
     "over_request_rate_limit": "Too many attempts. Wait a moment and try again.",
     "network_error":
       "Network error. Check your connection and try again.",
-  };
+    "permission-denied":
+      "We could not access that information. Refresh the page and try again, or contact support if the problem continues.",
+    "unavailable":
+      "The service is temporarily unavailable. Check your connection and try again.",
+    "deadline-exceeded":
+      "The request took too long. Check your connection and try again.",
+    "resource-exhausted":
+      "There have been too many requests. Wait a moment and try again.",
+    "failed-precondition":
+      "This action is not available right now. Refresh the page and try again.",
+    "already-exists": "That record already exists.",
+    "aborted": "The update could not be completed. Refresh and try again.",
+    "out-of-range": "One of the submitted values is outside the allowed range.",
+    "data-loss": "We could not save the update. Please try again or contact support.",
+    "not-found": "The requested item could not be found. Refresh and try again.",
+    "unauthenticated":
+      "Your session has expired. Sign in again to continue.",
+    "account-data-timeout":
+      "Your account data is taking too long to load. Check your connection and try again.",
+};
 
+export function getSafeErrorMessage(error, fallback = "Something went wrong.") {
   const errorCode = String(error?.code || "").toLowerCase();
-  return errorCode && messages[errorCode]
-    ? messages[errorCode]
-    : error instanceof Error
-      ? error.message
-      : fallback;
+  return errorCode && FRIENDLY_ERROR_MESSAGES[errorCode]
+    ? FRIENDLY_ERROR_MESSAGES[errorCode]
+    : isFirebaseError(error, errorCode)
+      ? fallback
+      : error instanceof Error
+        ? error.message
+        : fallback;
+}
+
+function isFirebaseError(error, code) {
+  return error?.name === "FirebaseError"
+    || code.startsWith("auth/")
+    || code.startsWith("firestore/")
+    || code.startsWith("functions/")
+    || ["aborted", "already-exists", "cancelled", "data-loss", "internal", "invalid-argument", "not-found", "out-of-range", "unknown"].includes(code);
+}
+
+export function getAuthErrorMessage(error, fallback = "Something went wrong.") {
+  return getSafeErrorMessage(error, fallback);
 }

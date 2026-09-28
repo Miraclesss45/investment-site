@@ -1,7 +1,7 @@
 import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { parseFirebaseServiceAccount } from "./firebase-service-account.js";
+import { parseFirebaseServiceAccount } from "../server/firebase-service-account.js";
 
 function sendJson(res, statusCode, body) {
   res.setHeader("Content-Type", "application/json");

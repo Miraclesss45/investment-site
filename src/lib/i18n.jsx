@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { LanguageContext } from "./i18nContext";
+import { extraTranslations } from "./i18nExtraData";
 
 const translations = {
   es: {
@@ -393,6 +394,8 @@ const translations = {
   },
 };
 
+Object.assign(translations, extraTranslations);
+
 const reverseTranslations = Object.fromEntries(
   Object.entries(translations).flatMap(([language, entries]) =>
     Object.entries(entries).map(([source, translated]) => [translated, source]),
@@ -461,6 +464,7 @@ export function LanguageProvider({ children }) {
   useEffect(() => {
     localStorage.setItem("legacy-language", language);
     document.documentElement.lang = language;
+    document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
 
     const appRoot = document.getElementById("root");
     if (!appRoot) return undefined;
