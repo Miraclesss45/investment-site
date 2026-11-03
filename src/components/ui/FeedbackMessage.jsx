@@ -27,27 +27,50 @@ const styles = {
   },
 };
 
+const lightStyles = {
+  error: {
+    container: "border-rose-200 bg-rose-50 text-rose-900",
+    iconClass: "text-rose-700",
+  },
+  success: {
+    container: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    iconClass: "text-emerald-700",
+  },
+  status: {
+    container: "border-blue-200 bg-blue-50 text-blue-900",
+    iconClass: "text-blue-700",
+  },
+  warning: {
+    container: "border-amber-200 bg-amber-50 text-amber-900",
+    iconClass: "text-amber-800",
+  },
+};
+
 export default function FeedbackMessage({
   children,
   type = "status",
+  variant = "dark",
   className = "",
 }) {
-  const variant = styles[type] || styles.status;
-  const Icon = variant.icon;
+  const styleKey = styles[type] ? type : "status";
+  const messageStyle = variant === "light"
+    ? { ...styles[styleKey], ...lightStyles[styleKey] }
+    : styles[styleKey];
+  const Icon = styles[styleKey].icon;
   const isError = type === "error";
 
   return (
     <div
       role={isError ? "alert" : "status"}
       aria-live="polite"
-      className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm leading-6 ${variant.container} ${className}`}
+      className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-sm leading-6 ${messageStyle.container} ${className}`}
     >
       <Icon
         size={18}
         aria-hidden="true"
-        className={`mt-0.5 shrink-0 ${variant.iconClass}`}
+        className={`mt-0.5 shrink-0 ${messageStyle.iconClass}`}
       />
-      <span className="min-w-0">{children}</span>
+      <span className="min-w-0 break-words [overflow-wrap:anywhere]">{children}</span>
     </div>
   );
 }

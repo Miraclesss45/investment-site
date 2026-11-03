@@ -1,7 +1,7 @@
 import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { parseFirebaseServiceAccount } from "../server/firebase-service-account.js";
+import { loadFirebaseServiceAccount } from "../server/firebase-service-account.js";
 
 function sendJson(res, statusCode, body) {
   res.setHeader("Content-Type", "application/json");
@@ -16,9 +16,7 @@ function parseBody(body) {
 
 function getFirebaseAdmin() {
   if (getApps().length) return getApp();
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!serviceAccount) throw new Error("Firebase service account is not configured.");
-  return initializeApp({ credential: cert(parseFirebaseServiceAccount(serviceAccount)) });
+  return initializeApp({ credential: cert(loadFirebaseServiceAccount()) });
 }
 
 export default async function handler(req, res) {
@@ -70,17 +68,29 @@ export default async function handler(req, res) {
     const refereeRewardRef = db.doc(`users/${decodedToken.uid}/referralRewards/${referrerId}`);
     const referrerRef = db.doc(`users/${referrerId}`);
     await db.runTransaction(async (transaction) => {
-      const rewardSnapshot = await transaction.get(rewardRef);
-      const refereeRewardSnapshot = await transaction.get(refereeRewardRef);
-      if (!rewardSnapshot.exists) {
+      const [rewardSnapshot, refereeRewardSnapshot, referrerProfileSnapshot] = await Promise.all([
+        transaction.get(rewardRef),
+        transaction.get(refereeRewardRef),
+        transaction.get(referrerRef),
+      ]);
+      if (!referrerProfileSnapshot.exists) {
+        throw Object.assign(new Error("The referral account is no longer active."), {
+          statusCode: 409,
+          code: "referrer-profile-missing",
+        });
+      }
+      const existingRewardStatus = String(rewardSnapshot.data()?.status || "").toLowerCase();
+      if (!rewardSnapshot.exists || existingRewardStatus === "pending") {
         transaction.set(rewardRef, {
           referrerId,
           referredUserId: decodedToken.uid,
           amount: 5,
           recipientRole: "referrer",
           status: "promotional",
-          createdAt: FieldValue.serverTimestamp(),
-        });
+          creditedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          ...(!rewardSnapshot.exists ? { createdAt: FieldValue.serverTimestamp() } : {}),
+        }, { merge: true });
         transaction.set(referrerRef, {
           referralCount: FieldValue.increment(1),
         }, { merge: true });
@@ -93,6 +103,8 @@ export default async function handler(req, res) {
           recipientRole: "referee",
           status: "promotional",
           createdAt: FieldValue.serverTimestamp(),
+          creditedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         });
       }
     });
@@ -104,6 +116,9 @@ export default async function handler(req, res) {
     }
     if (error?.message === "Firebase service account is not configured.") {
       return sendJson(res, 503, { error: "Referral rewards are not configured." });
+    }
+    if (error?.code === "referrer-profile-missing") {
+      return sendJson(res, 409, { error: error.message, code: error.code });
     }
     console.error("create-referral-reward failed", error);
     return sendJson(res, 500, { error: "Referral reward could not be recorded." });

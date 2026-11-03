@@ -78,7 +78,6 @@ export default function SignupPage() {
         phone: formData.get("phone") || "",
         country: formData.get("country")?.trim() || "",
         bitcoinWallet: formData.get("bitcoinWallet")?.trim() || "",
-        bnbWallet: formData.get("bnbWallet")?.trim() || "",
         ethereumWallet: formData.get("ethereumWallet")?.trim() || "",
         litecoinWallet: formData.get("litecoinWallet")?.trim() || "",
         referredBy: referralUsername,
@@ -125,12 +124,12 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050b14] px-4 pb-16 pt-8 text-slate-200 sm:px-6">
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 px-4 pb-16 pt-8 text-slate-700 sm:px-6">
       <div className="pointer-events-none absolute right-[-12rem] top-[-14rem] h-[34rem] w-[34rem] rounded-full bg-sky-500/15 blur-3xl" />
       <div className="relative mx-auto flex w-full max-w-[1120px] items-center justify-between">
         <Link
           to="/"
-          className="flex items-center gap-3 text-lg font-extrabold tracking-[-0.04em] text-white"
+          className="flex items-center gap-3 text-lg font-extrabold tracking-[-0.04em] text-slate-900"
         >
           <img
             className="h-10 w-10 rounded-lg object-cover"
@@ -139,29 +138,29 @@ export default function SignupPage() {
             width="40"
             height="40"
           />
-          Meridian<span className="text-sky-400">Vests</span>
+          Meridian<span className="text-blue-700">Vests</span>
         </Link>
         <div className="flex items-center gap-3 text-right text-xs font-semibold sm:text-sm">
           <span className="hidden sm:inline">Already a member?</span>
           <Link
             to="/login"
-            className="inline-flex h-10 min-w-[86px] items-center justify-center rounded-full border border-sky-300/30 bg-sky-300/10 px-4 text-[11px] font-extrabold uppercase tracking-[0.12em] text-sky-200 transition hover:bg-sky-300/20"
+            className="inline-flex h-10 min-w-[86px] items-center justify-center rounded-full border border-sky-300/30 bg-blue-50 px-4 text-[11px] font-extrabold uppercase tracking-[0.12em] text-blue-800 transition hover:bg-sky-300/20"
           >
             Login
           </Link>
         </div>
       </div>
-      <div className="relative mx-auto mt-12 w-full max-w-[900px] rounded-[2rem] border border-white/[0.12] bg-[#0b1626]/80 p-6 shadow-[0_30px_90px_rgba(2,8,23,0.45)] backdrop-blur-2xl sm:mt-16 sm:p-10">
+      <div className="relative mx-auto mt-12 w-full max-w-[900px] rounded-[2rem] border border-blue-100 bg-white/90 p-6 shadow-[0_30px_90px_rgba(30,64,175,0.12)] backdrop-blur-2xl sm:mt-16 sm:p-10">
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div className="mb-8">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.2em] text-cyan-200">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-50 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.2em] text-blue-700">
               <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" /> Start
               your journey
             </div>
-            <h1 className="text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
+            <h1 className="text-3xl font-semibold tracking-[-0.05em] text-slate-900 sm:text-4xl">
               Create your account
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-400">
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
               Access private opportunities, allocation insights, and portfolio
               updates.
             </p>
@@ -169,10 +168,10 @@ export default function SignupPage() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold text-slate-200">
+              <span className="mb-2 block text-xs font-semibold text-slate-700">
                 First name
               </span>
-              <div className="w-full rounded-xl border border-white/10 bg-[#081321] px-3 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 transition hover:border-blue-300 focus-within:border-blue-600 focus-within:bg-blue-50">
                 <input
                   id="firstName"
                   name="firstName"
@@ -180,15 +179,15 @@ export default function SignupPage() {
                   placeholder="First name"
                   required
                   autoComplete="given-name"
-                  className="h-[58px] w-full bg-transparent text-white placeholder:text-slate-400 focus:outline-none"
+                  className="h-[58px] w-full bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none"
                 />
               </div>
             </label>
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold text-slate-200">
+              <span className="mb-2 block text-xs font-semibold text-slate-700">
                 Last name
               </span>
-              <div className="w-full rounded-xl border border-white/10 bg-[#081321] px-3 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 transition hover:border-blue-300 focus-within:border-blue-600 focus-within:bg-blue-50">
                 <input
                   id="lastName"
                   name="lastName"
@@ -196,16 +195,16 @@ export default function SignupPage() {
                   placeholder="Last name"
                   required
                   autoComplete="family-name"
-                  className="h-[58px] w-full bg-transparent text-white placeholder:text-slate-400 focus:outline-none"
+                  className="h-[58px] w-full bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none"
                 />
               </div>
             </label>
 
             <label className="block md:col-span-2">
-              <span className="mb-2 block text-xs font-semibold text-slate-200">
+              <span className="mb-2 block text-xs font-semibold text-slate-700">
                 Username
               </span>
-              <div className="w-full rounded-xl border border-white/10 bg-[#081321] px-3 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 transition hover:border-blue-300 focus-within:border-blue-600 focus-within:bg-blue-50">
                 <input
                   id="username"
                   name="username"
@@ -216,19 +215,19 @@ export default function SignupPage() {
                   maxLength={30}
                   pattern="[a-zA-Z0-9._-]{3,30}"
                   autoComplete="username"
-                  className="h-[58px] w-full bg-transparent text-white placeholder:text-slate-400 focus:outline-none"
+                  className="h-[58px] w-full bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none"
                 />
               </div>
-              <span className="mt-2 block text-xs text-slate-400">
+              <span className="mt-2 block text-xs text-slate-600">
                 Use 3-30 letters, numbers, dots, underscores, or hyphens.
               </span>
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold text-slate-200">
+              <span className="mb-2 block text-xs font-semibold text-slate-700">
                 Email address
               </span>
-              <div className="w-full rounded-xl border border-white/10 bg-[#081321] px-3 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 transition hover:border-blue-300 focus-within:border-blue-600 focus-within:bg-blue-50">
                 <input
                   id="email"
                   name="email"
@@ -236,15 +235,15 @@ export default function SignupPage() {
                   placeholder="Email address"
                   required
                   autoComplete="email"
-                  className="h-[58px] w-full bg-transparent text-white placeholder:text-slate-400 focus:outline-none"
+                  className="h-[58px] w-full bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none"
                 />
               </div>
             </label>
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold text-slate-200">
+              <span className="mb-2 block text-xs font-semibold text-slate-700">
                 Confirm email
               </span>
-              <div className="w-full rounded-xl border border-white/10 bg-[#081321] px-3 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 transition hover:border-blue-300 focus-within:border-blue-600 focus-within:bg-blue-50">
                 <input
                   id="emailConfirmation"
                   name="emailConfirmation"
@@ -252,38 +251,38 @@ export default function SignupPage() {
                   placeholder="Confirm email address"
                   required
                   autoComplete="email"
-                  className="h-[58px] w-full bg-transparent text-white placeholder:text-slate-400 focus:outline-none"
+                  className="h-[58px] w-full bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none"
                 />
               </div>
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold text-slate-200">
+              <span className="mb-2 block text-xs font-semibold text-slate-700">
                 Phone number
               </span>
-              <div className="w-full rounded-xl border border-white/10 bg-[#081321] px-3 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 transition hover:border-blue-300 focus-within:border-blue-600 focus-within:bg-blue-50">
                 <input
                   id="phone"
                   name="phone"
                   type="tel"
                   placeholder="Phone number"
                   autoComplete="tel"
-                  className="h-[58px] w-full bg-transparent text-white placeholder:text-slate-400 focus:outline-none"
+                  className="h-[58px] w-full bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none"
                 />
               </div>
             </label>
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold text-slate-200">
+              <span className="mb-2 block text-xs font-semibold text-slate-700">
                 Country
               </span>
               <CountrySelect id="country" name="country" required />
             </label>
 
             <label className="block md:col-span-2">
-              <span className="mb-2 block text-xs font-semibold text-slate-200">
+              <span className="mb-2 block text-xs font-semibold text-slate-700">
                 Password
               </span>
-              <div className="flex w-full items-center rounded-xl border border-white/10 bg-[#081321] px-3 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
+              <div className="flex w-full items-center rounded-xl border border-slate-200 bg-slate-50 px-3 transition hover:border-blue-300 focus-within:border-blue-600 focus-within:bg-blue-50">
                 <input
                   id="password"
                   name="password"
@@ -298,9 +297,9 @@ export default function SignupPage() {
                   aria-invalid={
                     passwordValue.length > 0 && passwordValue.length < 8
                   }
-                  className={`h-[58px] min-w-0 flex-1 bg-transparent text-white placeholder:text-slate-400 focus:outline-none ${
+                  className={`h-[58px] min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none ${
                     passwordValue.length > 0 && passwordValue.length < 8
-                      ? "text-red-100"
+                      ? "text-red-800"
                       : ""
                   }`}
                 />
@@ -309,7 +308,7 @@ export default function SignupPage() {
                   onClick={() => setShowPassword((visible) => !visible)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   aria-pressed={showPassword}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border-l border-white/10 text-slate-300 transition hover:bg-white/10 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border-l border-slate-200 text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
                 >
                   {showPassword ? (
                     <EyeOff size={18} aria-hidden="true" />
@@ -322,8 +321,8 @@ export default function SignupPage() {
                 id="password-requirement"
                 className={`mt-2 text-xs ${
                   passwordValue.length > 0 && passwordValue.length < 8
-                    ? "text-red-400"
-                    : "text-slate-400"
+                    ? "text-red-700"
+                    : "text-slate-600"
                 }`}
               >
                 {passwordValue.length > 0 && passwordValue.length < 8
@@ -332,10 +331,10 @@ export default function SignupPage() {
               </p>
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-2 block text-xs font-semibold text-slate-200">
+              <span className="mb-2 block text-xs font-semibold text-slate-700">
                 Confirm password
               </span>
-              <div className="flex w-full items-center rounded-xl border border-white/10 bg-[#081321] px-3 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
+              <div className="flex w-full items-center rounded-xl border border-slate-200 bg-slate-50 px-3 transition hover:border-blue-300 focus-within:border-blue-600 focus-within:bg-blue-50">
                 <input
                   id="passwordConfirmation"
                   name="passwordConfirmation"
@@ -353,7 +352,7 @@ export default function SignupPage() {
                     passwordConfirmationValue.length > 0 &&
                     passwordConfirmationValue !== passwordValue
                   }
-                  className="h-[58px] min-w-0 flex-1 bg-transparent text-white placeholder:text-slate-400 focus:outline-none"
+                  className="h-[58px] min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none"
                 />
                 <button
                   type="button"
@@ -366,7 +365,7 @@ export default function SignupPage() {
                       : "Show password confirmation"
                   }
                   aria-pressed={showPasswordConfirmation}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border-l border-white/10 text-slate-300 transition hover:bg-white/10 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border-l border-slate-200 text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
                 >
                   {showPasswordConfirmation ? (
                     <EyeOff size={18} aria-hidden="true" />
@@ -380,8 +379,8 @@ export default function SignupPage() {
                   id="password-confirmation-status"
                   className={`mt-2 text-xs ${
                     passwordConfirmationValue === passwordValue
-                      ? "text-emerald-300"
-                      : "text-red-400"
+                      ? "text-emerald-800"
+                      : "text-red-700"
                   }`}
                   role="status"
                 >
@@ -393,16 +392,16 @@ export default function SignupPage() {
             </label>
 
             <label className="block md:col-span-2">
-              <span className="mb-2 block text-xs font-semibold text-slate-200">
+              <span className="mb-2 block text-xs font-semibold text-slate-700">
                 Referral username
               </span>
               {referralUsernameFromLink && (
-                <p className="mb-2 text-xs text-cyan-200">
+                <p className="mb-2 text-xs text-blue-700">
                   Referral link detected. The username has been filled in for
                   you.
                 </p>
               )}
-              <div className="w-full rounded-xl border border-white/10 bg-[#081321] px-3 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 transition hover:border-blue-300 focus-within:border-blue-600 focus-within:bg-blue-50">
                 <input
                   id="upline"
                   name="upline"
@@ -410,14 +409,14 @@ export default function SignupPage() {
                   placeholder="Optional referral username"
                   defaultValue={referralUsernameFromLink}
                   autoComplete="off"
-                  className="h-[58px] w-full bg-transparent text-white placeholder:text-slate-400 focus:outline-none"
+                  className="h-[58px] w-full bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none"
                 />
               </div>
             </label>
 
-            <div className="md:col-span-2 border-t border-white/10 pt-6">
-              <h2 className="text-lg font-semibold text-white">Wallet setup</h2>
-              <p className="mt-2 text-xs leading-5 text-slate-400">
+            <div className="md:col-span-2 border-t border-slate-200 pt-6">
+              <h2 className="text-lg font-semibold text-slate-900">Wallet setup</h2>
+              <p className="mt-2 text-xs leading-5 text-slate-600">
                 Optional for now. Add supported wallet addresses to make future
                 deposit and withdrawal requests easier.
               </p>
@@ -425,28 +424,27 @@ export default function SignupPage() {
             {[
               ["litecoinWallet", "Litecoin wallet address"],
               ["bitcoinWallet", "Bitcoin wallet address"],
-              ["bnbWallet", "BNB wallet address"],
               ["ethereumWallet", "Ethereum wallet address"],
             ].map(([name, label]) => (
               <label key={name} className="block md:col-span-2">
-                <span className="mb-2 block text-xs font-semibold text-slate-200">
+                <span className="mb-2 block text-xs font-semibold text-slate-700">
                   {label}
                 </span>
-                <div className="w-full rounded-xl border border-white/10 bg-[#081321] px-3 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 transition hover:border-blue-300 focus-within:border-blue-600 focus-within:bg-blue-50">
                   <input
                     id={name}
                     name={name}
                     type="text"
                     placeholder={`Optional ${label.toLowerCase()}`}
                     autoComplete="off"
-                    className="h-[58px] w-full bg-transparent text-white placeholder:text-slate-400 focus:outline-none"
+                    className="h-[58px] w-full bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none"
                   />
                 </div>
               </label>
             ))}
           </div>
 
-          <label className="flex items-start gap-3 text-sm leading-6 text-slate-300">
+          <label className="flex items-start gap-3 text-sm leading-6 text-slate-700">
             <input
               name="terms"
               type="checkbox"
@@ -455,19 +453,19 @@ export default function SignupPage() {
             />
             <span>
               I agree to the{" "}
-              <Link to="/terms" className="text-sky-400 hover:text-cyan-300">
+              <Link to="/terms" className="text-blue-700 hover:text-blue-700">
                 terms and conditions
               </Link>{" "}
               and understand that investment outcomes are not guaranteed.
             </span>
           </label>
 
-          <div className="mb-5 flex items-center gap-4 text-sm text-slate-200">
+          <div className="mb-5 flex items-center gap-4 text-sm text-slate-700">
             <MapPin size={18} /> MeridianVests Crypto Management Group
           </div>
           <a
             href="mailto:meridianvest948@gmail.com"
-            className="flex items-center gap-4 text-sm text-slate-200 hover:text-sky-400"
+            className="flex items-center gap-4 text-sm text-slate-700 hover:text-blue-700"
           >
             <Mail size={18} /> Contact support
           </a>
@@ -475,7 +473,7 @@ export default function SignupPage() {
             href={WHATSAPP_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 flex items-center gap-4 text-sm text-slate-200 hover:text-green-400"
+            className="mt-3 flex items-center gap-4 text-sm text-slate-700 hover:text-green-800"
           >
             <WhatsAppIcon size={18} /> Chat on WhatsApp
           </a>
@@ -496,7 +494,7 @@ export default function SignupPage() {
             )}
           </button>
 
-          {message && <FeedbackMessage type={messageType}>{message}</FeedbackMessage>}
+          {message && <FeedbackMessage type={messageType} variant="light">{message}</FeedbackMessage>}
         </form>
       </div>
     </div>

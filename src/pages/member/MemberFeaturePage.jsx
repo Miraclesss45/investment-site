@@ -10,9 +10,12 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../../lib/authContext";
-import { createMemberRequest, sendDepositPendingEmail, sendWithdrawalProcessingEmail, updateUserProfile } from "../../lib/firebaseData";
+import { createMemberDepositRequest, createWithdrawalRequest, loadOlderMemberHistory, sendDepositPendingEmail, sendWithdrawalProcessingEmail, updateUserProfile } from "../../lib/firebaseData";
+import { getInvestmentPackages } from "../../lib/packageCatalog";
 import useAccountData from "../../lib/useAccountData";
-import CountrySelect from "../../components/ui/CountrySelect";
+import { getPromoTermsForAmount } from "../../lib/promoTerms";
+import { normalizeReferralRewardStatus, referralRewardStatusLabel } from "../../lib/referralRewards";
+import { hasStoredNonNegativeNumber } from "../../lib/financialMath";
 import {
   buildEmptyFinancialSummary,
   formatMoney,
@@ -33,36 +36,9 @@ const navigation = [
   ["Support", "/support"],
   ["My Referral", "/referral"],
 ];
-const packages = {
-  Starter: {
-    rate: 2.5,
-    minimum: 35,
-    maximum: 3000,
-    description: "Flexible entry plan",
-  },
-  Regular: {
-    rate: 10,
-    minimum: 35,
-    maximum: 10000,
-    description: "Balanced allocation",
-  },
-  Pro: {
-    rate: 20,
-    minimum: 35,
-    maximum: 20000,
-    description: "Advanced strategy",
-  },
-  Premium: {
-    rate: 35,
-    minimum: 35,
-    maximum: null,
-    description: "Priority member support",
-  },
-};
 const depositAssets = [
   "Litecoin",
   "Bitcoin",
-  "BNB",
   "Ethereum",
 ];
 const depositWalletAddresses = {
@@ -72,22 +48,83 @@ const depositWalletAddresses = {
   Bitcoin:
     import.meta.env.VITE_DEPOSIT_BITCOIN_ADDRESS ||
     "bc1qhvylxq67v8k6ksvn8jlg4wekh90tsvnx3dme5e",
-  BNB:
-    import.meta.env.VITE_DEPOSIT_BNB_ADDRESS ||
-    "0x2945Cb6F7A193ea61c63805038900247c10abE7d",
   Ethereum:
     import.meta.env.VITE_DEPOSIT_ETHEREUM_ADDRESS ||
     "0x2945Cb6F7A193ea61c63805038900247c10abE7d",
 };
 const withdrawalAssets = [
-  ["Litecoin", "litecoinWallet", 10],
-  ["Bitcoin", "bitcoinWallet", 25],
-  ["BNB", "bnbWallet", 10],
-  ["Ethereum", "ethereumWallet", 25],
+  ["Litecoin", "litecoinWallet"],
+  ["Bitcoin", "bitcoinWallet"],
+  ["Ethereum", "ethereumWallet"],
 ];
+
+async function getWithdrawalIdempotencyKey(userId, { amount, method, wallet }) {
+  const storageKey = `meridianvests:withdrawal-request:${userId}`;
+  const fingerprintInput = `${Number(amount).toFixed(2)}\n${method}\n${wallet}`;
+  let fingerprint = fingerprintInput;
+  try {
+    if (globalThis.crypto?.subtle) {
+      const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(fingerprintInput));
+      fingerprint = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+    const saved = JSON.parse(window.sessionStorage.getItem(storageKey) || "null");
+    if (saved?.fingerprint === fingerprint && Date.now() - Number(saved.createdAt) < 24 * 60 * 60 * 1000) {
+      return saved.key;
+    }
+    const key = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
+    window.sessionStorage.setItem(storageKey, JSON.stringify({ fingerprint, key, createdAt: Date.now() }));
+    return key;
+  } catch {
+    return globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
+  }
+}
+
+function clearWithdrawalIdempotencyKey(userId, key) {
+  try {
+    const storageKey = `meridianvests:withdrawal-request:${userId}`;
+    const saved = JSON.parse(window.sessionStorage.getItem(storageKey) || "null");
+    if (saved?.key === key) window.sessionStorage.removeItem(storageKey);
+  } catch {
+    // Session storage can be unavailable in private browsing; the request remains safe server-side.
+  }
+}
+const MINIMUM_DEPOSIT = 35;
+const MINIMUM_WITHDRAWAL = 35;
+const PROMO_MINI_NAME = "PROMO MINI PLAN";
+const PROMO_MEGA_NAME = "PROMO MEGA PLAN";
+const PROMO_MINIMUM = 1000;
+const PROMO_THRESHOLD = 5000;
+
+function getPromoPackageTerms(name) {
+  const normalizedName = String(name || "").trim().toUpperCase();
+  if (normalizedName === PROMO_MINI_NAME) {
+    return { name: PROMO_MINI_NAME, minimum: PROMO_MINIMUM, maximum: PROMO_THRESHOLD - 0.01, profitPercent: 100 };
+  }
+  if (normalizedName === PROMO_MEGA_NAME) {
+    return { name: PROMO_MEGA_NAME, minimum: PROMO_THRESHOLD, maximum: null, profitPercent: 500 };
+  }
+  return null;
+}
+
+function getPromoTierForAmount(amount) {
+  if (!Number.isFinite(amount) || amount < PROMO_MINIMUM) return null;
+  return amount >= PROMO_THRESHOLD ? PROMO_MEGA_NAME : PROMO_MINI_NAME;
+}
+
+function packageDailyRate(item) {
+  if (getPromoPackageTerms(item?.name || item?.title)) return null;
+  const namedRate = String(item?.name || item?.title || "").match(/^\s*(\d+(?:\.\d+)?)\s*%\s*Daily\s+for\s+14\s+Days\s*$/i);
+  const configuredRate = Number(item?.returnRate ?? item?.rate);
+  const rate = namedRate ? Number(namedRate[1]) : configuredRate;
+  return Number.isFinite(rate) && rate > 0 ? rate : null;
+}
 
 function transactionCategory(transaction) {
   const type = String(transaction.type || "").toLowerCase();
+  if (["admin-adjustment", "promotional-credit"].includes(transaction.category)
+    && !(transaction.category === "promotional-credit" && type.includes("referral"))) {
+    return "other";
+  }
   if (type.includes("withdraw") || type.includes("debit") || type.includes("payout")) {
     return "withdrawal";
   }
@@ -135,6 +172,28 @@ function transactionTimestamp(transaction) {
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
+function referralRewardDate(value) {
+  const date = value?.toDate?.() || (value ? new Date(value) : null);
+  return date && !Number.isNaN(date.getTime())
+    ? date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "Date unavailable";
+}
+
+function referralRewardTone(status) {
+  const tones = {
+    pending: "border-amber-200 bg-amber-50 text-amber-900",
+    promotional: "border-blue-200 bg-blue-50 text-blue-800",
+    approved: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    paid: "border-slate-200 bg-slate-100 text-slate-700",
+    completed: "border-slate-200 bg-slate-100 text-slate-700",
+    complete: "border-slate-200 bg-slate-100 text-slate-700",
+    settled: "border-slate-200 bg-slate-100 text-slate-700",
+    rejected: "border-rose-200 bg-rose-50 text-rose-800",
+    cancelled: "border-slate-200 bg-slate-100 text-slate-700",
+  };
+  return tones[normalizeReferralRewardStatus(status)] || "border-slate-200 bg-slate-100 text-slate-700";
+}
+
 function filterTransactionsByDate(transactions, fromDate, toDate) {
   const fromTimestamp = fromDate
     ? new Date(`${fromDate}T00:00:00`).getTime()
@@ -159,18 +218,18 @@ function DateRangeControls({
   const invalidRange = fromDate && toDate && fromDate > toDate;
 
   return (
-    <div className="border-b border-white/10 bg-[#081321]/60 p-4 sm:p-6">
+    <div className="border-b border-slate-200 bg-slate-50/60 p-4 sm:p-6">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-sky-400">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-blue-700">
             Find past activity
           </p>
-          <p className="mt-2 text-sm text-slate-400">
-            Select a date range to find an older deposit or withdrawal.
+          <p className="mt-2 text-sm text-slate-600">
+            Date filters cover loaded account activity. Load older entries below to continue further back.
           </p>
         </div>
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="block min-w-0 text-xs font-semibold text-slate-400">
+          <label className="block min-w-0 text-xs font-semibold text-slate-600">
             From
             <input
               type="date"
@@ -178,10 +237,10 @@ function DateRangeControls({
               max={toDate || undefined}
               onChange={(event) => setFromDate(event.target.value)}
               aria-label="Start date"
-              className="mt-2 block h-11 w-full min-w-0 rounded-xl border border-white/10 bg-[#0d1728] px-3 font-['Inter'] text-xs font-medium text-slate-100 shadow-inner shadow-black/10 outline-none transition placeholder:text-slate-600 hover:border-white/20 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10 [color-scheme:dark] sm:w-40 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:transition [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
+              className="mt-2 block h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-800 shadow-sm outline-none transition placeholder:text-slate-600 hover:border-blue-200 focus:border-blue-600 [color-scheme:light] sm:w-40 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:transition [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
             />
           </label>
-          <label className="block min-w-0 text-xs font-semibold text-slate-400">
+          <label className="block min-w-0 text-xs font-semibold text-slate-600">
             To
             <input
               type="date"
@@ -189,21 +248,21 @@ function DateRangeControls({
               min={fromDate || undefined}
               onChange={(event) => setToDate(event.target.value)}
               aria-label="End date"
-              className="mt-2 block h-11 w-full min-w-0 rounded-xl border border-white/10 bg-[#0d1728] px-3 font-['Inter'] text-xs font-medium text-slate-100 shadow-inner shadow-black/10 outline-none transition placeholder:text-slate-600 hover:border-white/20 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10 [color-scheme:dark] sm:w-40 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:transition [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
+              className="mt-2 block h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-800 shadow-sm outline-none transition placeholder:text-slate-600 hover:border-blue-200 focus:border-blue-600 [color-scheme:light] sm:w-40 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:transition [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
             />
           </label>
           <button
             type="button"
             onClick={onReset}
             disabled={!fromDate && !toDate}
-            className="h-10 rounded-lg border border-white/10 px-4 text-xs font-bold text-slate-300 transition hover:border-sky-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-10 rounded-lg border border-slate-200 px-4 text-xs font-bold text-slate-700 transition hover:border-blue-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Clear dates
           </button>
         </div>
       </div>
       {invalidRange && (
-        <p className="mt-3 text-xs text-yellow-200" role="alert">
+        <p className="mt-3 text-xs text-amber-800" role="alert">
           Choose a “From” date that is before the “To” date.
         </p>
       )}
@@ -218,7 +277,7 @@ function AccountPageSkeleton() {
       role="status"
       aria-label="Loading your account"
     >
-      <div className="flex items-center gap-3 text-sm text-slate-400">
+      <div className="flex items-center gap-3 text-sm text-slate-600">
         <span
           className="motion-safe:animate-pulse h-3 w-3 rounded-full bg-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.8)]"
           aria-hidden="true"
@@ -229,7 +288,7 @@ function AccountPageSkeleton() {
         {[1, 2].map((item) => (
           <div
             key={item}
-            className="rounded-2xl border border-white/10 bg-[#0d1728] p-6"
+            className="rounded-2xl border border-slate-200 bg-white p-6"
             aria-hidden="true"
           >
             <div className="motion-safe:animate-pulse h-5 w-40 rounded-full bg-slate-400/10" />
@@ -241,7 +300,7 @@ function AccountPageSkeleton() {
         ))}
       </div>
       <div
-        className="rounded-2xl border border-white/10 bg-[#0d1728] p-6"
+        className="rounded-2xl border border-slate-200 bg-white p-6"
         aria-hidden="true"
       >
         <div className="motion-safe:animate-pulse h-5 w-44 rounded-full bg-slate-400/10" />
@@ -265,11 +324,18 @@ export default function MemberFeaturePage() {
   const { pathname } = useLocation();
   const [profile, setProfile] = useState({});
   const [summary, setSummary] = useState(buildEmptyFinancialSummary());
+  const [olderTransactions, setOlderTransactions] = useState([]);
+  const [historyCursor, setHistoryCursor] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
   const [message, setMessage] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
   const mobileMenuButtonRef = useRef(null);
   const firstMobileLinkRef = useRef(null);
+  const [packages, setPackages] = useState([]);
+  const [packagesLoading, setPackagesLoading] = useState(false);
+  const [packagesError, setPackagesError] = useState("");
 
   useEffect(() => {
     if (!mobileMenuOpen) return undefined;
@@ -301,7 +367,47 @@ export default function MemberFeaturePage() {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
-  const [selectedPackage, setSelectedPackage] = useState("Starter");
+
+  useEffect(() => {
+    if (pathname !== "/deposit") return undefined;
+    let active = true;
+    setPackagesLoading(true);
+    setPackagesError("");
+    const loadPackages = (forceRefresh = false) => getInvestmentPackages({ forceRefresh })
+      .then((items) => {
+        if (!active) return;
+        const normalized = items.map((item) => {
+          const name = String(item.name || item.title || item.id);
+          const promoTerms = getPromoPackageTerms(name);
+          return {
+            ...item,
+            name,
+            rate: packageDailyRate(item),
+            minimum: promoTerms ? promoTerms.minimum : item.minimum ?? null,
+            maximum: promoTerms ? promoTerms.maximum : item.maximum ?? null,
+            duration: promoTerms ? "24 Hours" : item.duration || "",
+          };
+        });
+        setPackages(normalized);
+        setSelectedPackage((current) => normalized.some((item) => item.id === current) ? current : normalized[0]?.id || "");
+      })
+      .catch(() => active && setPackagesError("Investment packages could not be loaded. Please try again later."))
+      .finally(() => active && setPackagesLoading(false));
+    void loadPackages();
+    const refreshTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadPackages(true);
+    }, 60000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void loadPackages(true);
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(refreshTimer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [pathname]);
+  const [selectedPackage, setSelectedPackage] = useState("");
   const [selectedAsset, setSelectedAsset] = useState("Bitcoin");
   const [depositAddressCopied, setDepositAddressCopied] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -317,11 +423,31 @@ export default function MemberFeaturePage() {
   const [withdrawalFromDate, setWithdrawalFromDate] = useState("");
   const [withdrawalToDate, setWithdrawalToDate] = useState("");
 
+  useEffect(() => {
+    setOlderTransactions([]);
+    setHistoryCursor(summary.transactionCursor || null);
+    setHistoryError("");
+  }, [user?.uid, summary.transactionCursor, summary.transactions]);
+
+  const memberTransactions = [...(summary.transactions || []), ...olderTransactions];
+
+  const manuallySelectedPlan = packages.find((item) => item.id === selectedPackage) || packages[0] || null;
+  const enteredDepositAmount = Number(depositAmount);
+  const amountSelectedPromoName = getPromoTierForAmount(enteredDepositAmount);
+  const selectedPlan = getPromoPackageTerms(manuallySelectedPlan?.name) && amountSelectedPromoName
+    ? packages.find((item) => item.name.trim().toUpperCase() === amountSelectedPromoName) || manuallySelectedPlan
+    : manuallySelectedPlan;
+  const selectedPromoTerms = getPromoPackageTerms(selectedPlan?.name);
+  const promoCalculation = selectedPromoTerms ? getPromoTermsForAmount(enteredDepositAmount) : null;
+  const requiredDepositMinimum = Math.max(
+    MINIMUM_DEPOSIT,
+    Number(selectedPlan?.minimum) || 0,
+  );
   const selectedDepositAddress = depositWalletAddresses[selectedAsset] || "";
   const selectedWithdrawal =
     withdrawalAssets.find(([asset]) => asset === selectedAsset) ||
     withdrawalAssets[0];
-  const [selectedWithdrawalAsset, selectedWithdrawalWalletField, selectedWithdrawalFee] =
+  const [selectedWithdrawalAsset, selectedWithdrawalWalletField] =
     selectedWithdrawal;
   const selectedWithdrawalWallet = String(
     profile[selectedWithdrawalWalletField] || "",
@@ -347,6 +473,21 @@ export default function MemberFeaturePage() {
     }
   }
 
+  async function loadOlderTransactions() {
+    if (historyLoading || !historyCursor?.hasMore) return;
+    setHistoryLoading(true);
+    setHistoryError("");
+    try {
+      const page = await loadOlderMemberHistory("transactions", historyCursor, user);
+      setOlderTransactions((current) => [...current, ...(page.items || [])]);
+      setHistoryCursor(page.nextCursor || null);
+    } catch (error) {
+      setHistoryError(error.message || "Older account activity could not be loaded.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
   const accountLoading = account.loading;
   const accountError = account.error;
   useEffect(() => {
@@ -356,10 +497,6 @@ export default function MemberFeaturePage() {
   }, [account.profile, account.summary, accountLoading]);
 
   useEffect(() => {
-    if (accountError) setMessage(accountError);
-  }, [accountError]);
-
-  useEffect(() => {
     if (!profileSaved) return undefined;
     const timeoutId = window.setTimeout(() => setProfileSaved(false), 2500);
     return () => window.clearTimeout(timeoutId);
@@ -367,34 +504,38 @@ export default function MemberFeaturePage() {
 
   async function saveProfile(event) {
     event.preventDefault();
+    setMessage("");
+    if (!account.hasData) {
+      setMessage("Your profile could not be verified. Reload account data before saving changes.");
+      return;
+    }
     if (!user)
       return setMessage(
         "Profile saving is unavailable until Firebase is configured.",
       );
     const formData = new FormData(event.currentTarget);
+    const values = {
+      fullName: formData.get("fullName")?.trim() || "",
+      bitcoinWallet: formData.get("bitcoinWallet")?.trim() || "",
+      ethereumWallet: formData.get("ethereumWallet")?.trim() || "",
+      litecoinWallet: formData.get("litecoinWallet")?.trim() || "",
+    };
+    if (!values.fullName) {
+      setMessage("Full name is required.");
+      return;
+    }
     setProfileSaving(true);
     setProfileSaved(false);
     try {
-      const values = {
-        fullName: formData.get("fullName")?.trim() || "",
-        phone: formData.get("phone")?.trim() || "",
-        country: formData.get("country")?.trim() || "",
-        bitcoinWallet: formData.get("bitcoinWallet")?.trim() || "",
-        bnbWallet: formData.get("bnbWallet")?.trim() || "",
-        ethereumWallet: formData.get("ethereumWallet")?.trim() || "",
-        litecoinWallet: formData.get("litecoinWallet")?.trim() || "",
-      };
       await updateUserProfile(user.uid, values);
       invalidateAccountData(user.uid);
       setProfile((current) => ({ ...current, ...values }));
       setProfileSaved(true);
-      const { summary: refreshedSummary } = await loadAccountData(user.uid);
-      setSummary(refreshedSummary);
     } catch (error) {
       const code = String(error?.code || "");
       setMessage(
         code.includes("permission-denied")
-          ? "Your profile update was denied by Firebase. Check your Firestore rules, then sign in again."
+          ? "Firebase rejected the profile update. Refresh the page and try again; contact support if it keeps happening."
           : "Unable to save your profile right now.",
       );
     } finally {
@@ -412,32 +553,31 @@ export default function MemberFeaturePage() {
     }
 
     const amount = Number(depositAmount);
-    const selectedPlan = packages[selectedPackage];
-    if (
-      !Number.isFinite(amount) ||
-      amount < selectedPlan.minimum ||
-      (selectedPlan.maximum !== null && amount > selectedPlan.maximum)
-    ) {
-      setMessage(
-        `Enter an amount between ${formatMoney(selectedPlan.minimum)} and ${
-          selectedPlan.maximum === null
-            ? "no upper limit"
-            : formatMoney(selectedPlan.maximum)
-        }.`,
-      );
+    if (!selectedPlan) {
+      setMessage("There are no investment packages available right now.");
+      return;
+    }
+    if (!selectedPromoTerms && !selectedPlan.rate) {
+      setMessage("This package has no daily profit rate configured. Please choose another plan or contact support.");
+      return;
+    }
+    const belowMinimum = amount < requiredDepositMinimum;
+    const aboveMaximum = selectedPlan.maximum !== null && selectedPlan.maximum > 0 && amount > selectedPlan.maximum;
+    if (!Number.isFinite(amount) || amount <= 0 || belowMinimum || aboveMaximum) {
+      const minimumGuidance = `at least ${formatMoney(requiredDepositMinimum)}`;
+      const maximumGuidance = selectedPlan.maximum !== null && selectedPlan.maximum > 0
+        ? ` and no more than ${formatMoney(selectedPlan.maximum)}`
+        : "";
+      setMessage(`Enter ${minimumGuidance}${maximumGuidance}.`);
       return;
     }
 
     setDepositSubmitting(true);
     try {
-      const depositorName = profile.fullName || user.displayName || "Not provided";
-      const request = await createMemberRequest(user.uid, "deposits", {
-        plan: selectedPackage,
+      const request = await createMemberDepositRequest({
+        packageId: selectedPlan.id,
         amount,
-        currency: "USD",
         method: selectedAsset,
-        fullName: depositorName,
-        email: user.email || "",
       });
       let emailFailed = false;
       let emailFailureCode = "";
@@ -451,7 +591,7 @@ export default function MemberFeaturePage() {
       navigate("/deposit-pending", {
         replace: true,
         state: {
-          packageName: selectedPackage,
+          packageName: selectedPlan.name,
           amount,
           asset: selectedAsset,
           requestId: request.id,
@@ -486,6 +626,10 @@ export default function MemberFeaturePage() {
   async function submitWithdrawalRequest(event) {
       event.preventDefault();
       setMessage("");
+      if (!account.hasData) {
+        setMessage("Your balance could not be verified. Reload account data before requesting a withdrawal.");
+        return;
+      }
       if (!user) {
         setMessage("Withdrawal requests are unavailable until Firebase is configured.");
         return;
@@ -493,33 +637,33 @@ export default function MemberFeaturePage() {
 
       const amount = Number(withdrawalAmount);
       const wallet = selectedWithdrawalWallet;
-      const fee = selectedWithdrawalFee;
 
-      if (!Number.isFinite(amount) || amount <= 0) {
-        setMessage("Enter a valid withdrawal amount.");
+      if (!Number.isFinite(amount) || amount < MINIMUM_WITHDRAWAL) {
+        setMessage(`The minimum withdrawal is ${formatMoney(MINIMUM_WITHDRAWAL)}.`);
         return;
       }
-      if (amount > summary.withdrawableBalance) {
+      if (amount > summary.withdrawalRequestableBalance) {
         setMessage(
           "The requested amount is greater than your withdrawable balance. Promotional credit cannot be withdrawn.",
         );
         return;
       }
-      if (!wallet) {
-        setMessage(`Add your ${selectedWithdrawalAsset} wallet address in your profile first.`);
-        return;
-      }
 
       setWithdrawalSubmitting(true);
       try {
-        const request = await createMemberRequest(user.uid, "withdrawals", { amount, method: selectedAsset, wallet, fee, email: user.email || "" });
+        const requestValues = { amount, method: selectedWithdrawalAsset, wallet };
+        const idempotencyKey = await getWithdrawalIdempotencyKey(user.uid, requestValues);
+        const request = await createWithdrawalRequest({ ...requestValues, idempotencyKey, email: user.email || "" });
+        clearWithdrawalIdempotencyKey(user.uid, idempotencyKey);
         let emailFailed = false;
         let emailFailureCode = "";
-        try {
-          await sendWithdrawalProcessingEmail(request.id);
-        } catch (error) {
-          emailFailed = true;
-          emailFailureCode = error?.code || "email-delivery-failed";
+        if (!request.idempotent) {
+          try {
+            await sendWithdrawalProcessingEmail(request.id);
+          } catch (error) {
+            emailFailed = true;
+            emailFailureCode = error?.code || "email-delivery-failed";
+          }
         }
         navigate("/withdrawal-pending", {
           replace: true,
@@ -527,7 +671,6 @@ export default function MemberFeaturePage() {
             amount,
             asset: selectedWithdrawalAsset,
             wallet,
-            fee,
             emailFailed,
             emailFailureCode,
           },
@@ -556,10 +699,10 @@ export default function MemberFeaturePage() {
     }[pathname] || "Member account";
 
   return (
-    <div className="min-h-screen bg-[#07111d] text-white">
+    <div className="member-portal min-h-screen bg-slate-50 text-slate-900">
       <SkipToContent />
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-transparent shadow-lg shadow-black/10 backdrop-blur-xl">
-        <div className="mx-auto flex w-[min(1280px,calc(100%-2rem))] items-center justify-between gap-4 py-4 sm:w-[min(1280px,calc(100%-3rem))]">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-transparent shadow-lg shadow-black/10 backdrop-blur-xl">
+        <div className="mx-auto flex w-[min(1360px,calc(100%_-_2rem))] items-center justify-between gap-4 py-3 sm:w-[min(1360px,calc(100%_-_3rem))]">
           <Link
             to="/dashboard"
             className="flex items-center gap-3 text-xl font-extrabold"
@@ -571,7 +714,7 @@ export default function MemberFeaturePage() {
               width="36"
               height="36"
             />
-            Meridian<span className="text-sky-400">Vests</span>
+            Meridian<span className="text-blue-700">Vests</span>
           </Link>
           <div className="flex items-center gap-2">
             <div ref={mobileMenuRef} className="relative lg:hidden">
@@ -582,14 +725,14 @@ export default function MemberFeaturePage() {
                 aria-expanded={mobileMenuOpen}
                 aria-controls="member-portal-menu"
                 onClick={() => setMobileMenuOpen((open) => !open)}
-                className="grid h-10 w-10 place-items-center rounded-full border border-white/15 text-slate-200 transition hover:border-sky-400 hover:text-sky-400"
+                className="grid h-10 w-10 place-items-center rounded-full border border-blue-200 text-slate-700 transition hover:border-blue-400 hover:text-blue-700"
               >
                 {mobileMenuOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
               </button>
               {mobileMenuOpen && (
                 <nav
                   id="member-portal-menu"
-                  className="absolute right-0 top-12 z-30 w-56 rounded-xl border border-white/10 bg-[#101d30] p-2 shadow-2xl"
+                  className="absolute right-0 top-12 z-30 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl"
                 >
                 {navigation.map(([label, href], index) => (
                   <Link
@@ -597,7 +740,7 @@ export default function MemberFeaturePage() {
                     to={href}
                     ref={index === 0 ? firstMobileLinkRef : undefined}
                     aria-current={pathname === href ? "page" : undefined}
-                    className={`block rounded-lg px-3 py-3 text-sm transition hover:bg-white/10 hover:text-sky-400 ${pathname === href ? "bg-sky-400/10 font-semibold text-sky-400" : "text-slate-300"}`}
+                    className={`block rounded-lg px-3 py-3 text-sm transition hover:bg-blue-50 hover:text-blue-700 ${pathname === href ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-700"}`}
                   >
                     {label}
                   </Link>
@@ -609,16 +752,16 @@ export default function MemberFeaturePage() {
               type="button"
               aria-label="Sign out"
               onClick={signOut}
-              className="grid h-10 w-10 place-items-center rounded-xl border border-white/15 bg-white/[0.03] text-slate-300 transition hover:border-rose-300/50 hover:bg-rose-400/10 hover:text-rose-200"
+              className="grid h-10 w-10 place-items-center rounded-xl border border-blue-200 bg-blue-50 text-slate-700 transition hover:border-rose-300/50 hover:bg-rose-50 hover:text-rose-700"
             >
               <LogOut size={17} aria-hidden="true" />
             </button>
           </div>
         </div>
       </header>
-      <div className="mx-auto grid w-[min(1280px,calc(100%-2rem))] gap-6 py-6 sm:w-[min(1280px,calc(100%-3rem))] lg:grid-cols-[220px_1fr]">
-        <aside className="hidden rounded-lg border border-white/10 bg-[#0d1728] p-3 lg:block">
-          <p className="px-3 pb-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-400">
+      <div className="mx-auto grid w-[min(1360px,calc(100%_-_2rem))] gap-5 py-5 sm:w-[min(1360px,calc(100%_-_3rem))] lg:grid-cols-[200px_1fr]">
+        <aside className="hidden self-start rounded-lg border border-slate-200 bg-white p-2.5 lg:sticky lg:top-20 lg:block">
+          <p className="px-3 pb-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-600">
             Member portal
           </p>
           <nav className="grid gap-1 text-sm">
@@ -627,7 +770,7 @@ export default function MemberFeaturePage() {
                 key={href}
                 to={href}
                 aria-current={pathname === href ? "page" : undefined}
-                className={`rounded-md px-3 py-3 hover:bg-white/10 hover:text-sky-400 ${pathname === href ? "bg-sky-400/10 font-semibold text-sky-400" : "text-slate-300"}`}
+                className={`rounded-md px-3 py-2.5 hover:bg-blue-50 hover:text-blue-700 ${pathname === href ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-700"}`}
               >
                 {label}
               </Link>
@@ -635,135 +778,75 @@ export default function MemberFeaturePage() {
           </nav>
         </aside>
         <main id="main-content" tabIndex="-1" className="min-w-0 outline-none">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-sky-400">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-700">
             Member portal
           </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-[-0.04em] sm:text-4xl">
+          <h1 className="mt-2 text-2xl font-bold tracking-[-0.04em] sm:text-3xl">
             {title}
           </h1>
+          {accountError && !accountLoading && (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" role="alert">
+              <p>{accountError}{account.hasData && account.stale ? " Values below are from your last successful refresh." : ""}</p>
+              <button
+                type="button"
+                onClick={() => account.refresh()}
+                disabled={accountLoading}
+                className="mt-3 min-h-10 rounded-lg border border-rose-300 bg-white px-4 py-2 font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-60"
+              >
+                Retry account data
+              </button>
+            </div>
+          )}
           {message && !accountLoading && (
-            <FeedbackMessage className="mt-4" type="warning">{message}</FeedbackMessage>
+            <FeedbackMessage className="mt-4" type="warning" variant="light">{message}</FeedbackMessage>
           )}
           {accountLoading ? (
             <AccountPageSkeleton />
           ) : (
             <>
           {pathname === "/deposit" && (
-            <section className="mt-8 space-y-6">
-              <div className="relative overflow-hidden rounded-2xl border border-sky-400/20 bg-gradient-to-br from-sky-400/15 via-[#0d1728] to-[#0d1728] p-6 sm:p-8">
-                <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-cyan-300/10 blur-3xl" />
-                <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
-                  <div>
-                    <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-cyan-300">
-                      Start from $35
-                    </p>
-                    <h2 className="mt-3 max-w-xl text-2xl font-bold tracking-[-0.04em] text-white sm:text-3xl">
-                      Choose a package built around your next move.
-                    </h2>
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                      Select a plan below, enter your intended amount, and send
-                      a request for support review. Your account balance is not
-                      changed until the request is verified.
-                    </p>
-                  </div>
-                  <div className="shrink-0 rounded-xl border border-white/10 bg-black/20 px-5 py-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                      Minimum deposit
-                    </p>
-                    <p className="mt-1 text-3xl font-extrabold text-white">$35</p>
-                  </div>
-                </div>
-              </div>
-              <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-              <div className="rounded-2xl border border-white/10 bg-[#0d1728] p-5 sm:p-6">
-                <div className="mb-5">
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-sky-400">
-                    01 / Select a plan
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold text-white">
-                    Investment packages
-                  </h2>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {Object.entries(packages).map(
-                    ([name, { rate, minimum, maximum, description }]) => (
-                      <button
-                        key={name}
-                        type="button"
-                        onClick={() => setSelectedPackage(name)}
-                        className={`rounded-xl border p-4 text-left transition ${
-                          selectedPackage === name
-                            ? "border-sky-400 bg-sky-400/10"
-                            : "border-white/10 bg-[#081321] hover:border-sky-400/50"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <span className="font-bold text-white">{name} Plan</span>
-                          <span className="text-lg font-extrabold text-cyan-300">
-                            {rate}%
-                          </span>
-                        </div>
-                        <p className="mt-2 text-xs text-slate-400">
-                          {formatMoney(minimum)} -{" "}
-                          {maximum === null ? "Unlimited" : formatMoney(maximum)}
-                        </p>
-                        <p className="mt-2 text-xs text-slate-500">{description}</p>
-                      </button>
-                    ),
-                  )}
-                </div>
-                <div className="mt-6 grid gap-3 border-t border-white/10 pt-5 text-xs text-slate-300 sm:grid-cols-3">
-                  <span>Daily yield: <strong className="text-white">{packages[selectedPackage].rate}%</strong></span>
-                  <span>Duration: <strong className="text-white">14 days</strong></span>
-                  <span>Deposit return: <strong className="text-white">Yes</strong></span>
-                </div>
-              </div>
-
+            <section className="mt-6 max-w-3xl">
               <form
                 onSubmit={submitDepositRequest}
-                className="rounded-2xl border border-white/10 bg-[#0d1728] p-5 sm:p-6"
+                className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6"
               >
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-sky-400">
-                  02 / Send for review
-                </p>
-                <h2 className="mt-2 text-xl font-bold text-white">
-                  Request a deposit
+                <h2 className="text-lg font-bold text-slate-900">
+                  {selectedPromoTerms ? "Request a promotional deposit" : "Fund your account"}
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Submit your intended amount and asset. Support will confirm
-                  the next steps. No funds are credited automatically.
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  {selectedPromoTerms
+                    ? "Choose a promotional plan and submit your deposit request. The 24-hour term starts when an administrator confirms the payment."
+                    : "Enter an amount, choose how to pay and select a plan. Your request is reviewed before your balance is updated."}
                 </p>
-                <div className="mt-5 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-3 text-xs leading-5 text-cyan-100">
-                  Selected: <strong>{selectedPackage} Plan</strong> ·{" "}
-                  {packages[selectedPackage].rate}% daily yield
-                </div>
-                <label className="mt-5 block text-sm text-slate-300">
-                  Deposit amount (USD)
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm font-medium text-slate-700">
+                  Amount (USD)
                   <input
                     type="number"
-                    min={packages[selectedPackage].minimum}
-                    max={packages[selectedPackage].maximum || undefined}
+                    min={requiredDepositMinimum}
+                    max={selectedPlan?.maximum > 0 ? selectedPlan.maximum : undefined}
                     step="0.01"
                     value={depositAmount}
                     onChange={(event) => setDepositAmount(event.target.value)}
-                    placeholder={formatMoney(packages[selectedPackage].minimum)}
+                    placeholder={formatMoney(requiredDepositMinimum)}
                     required
-                    className="mt-2 h-12 w-full rounded-lg border border-white/10 bg-[#081321] px-3 text-white transition focus:border-sky-400 focus:outline-none"
+                    disabled={!selectedPlan || packagesLoading}
+                    className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 transition focus:border-blue-600 focus:outline-none"
                   />
-                  <span className="mt-2 block text-xs text-slate-500">
-                    Minimum deposit: {formatMoney(packages[selectedPackage].minimum)}
+                  <span className="mt-1.5 block text-xs text-slate-500">
+                    Minimum deposit: {formatMoney(requiredDepositMinimum)}{selectedPlan?.maximum > 0 ? ` · Maximum: ${formatMoney(selectedPlan.maximum)}` : ""}
                   </span>
                 </label>
-                <label className="mt-4 block text-sm text-slate-300">
-                  Deposit asset
+                <label className="block text-sm font-medium text-slate-700">
+                  How would you like to pay?
                   <div className="relative mt-2">
                     <select
                       value={selectedAsset}
                       onChange={handleDepositAssetChange}
-                      className="h-12 w-full appearance-none rounded-xl border border-white/10 bg-[#081321] px-3 pr-11 text-sm text-slate-100 shadow-inner shadow-black/10 outline-none transition hover:border-white/20 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10 [color-scheme:dark]"
+                      className="h-11 w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 px-3 pr-11 text-sm text-slate-800 outline-none transition hover:border-blue-200 focus:border-blue-600 [color-scheme:light]"
                     >
                       {depositAssets.map((asset) => (
-                        <option key={asset} className="bg-[#0d1728] text-white">
+                        <option key={asset} className="bg-white text-slate-900">
                           {asset}
                         </option>
                       ))}
@@ -771,17 +854,57 @@ export default function MemberFeaturePage() {
                     <ChevronDown
                       size={18}
                       aria-hidden="true"
-                      className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-cyan-300"
+                      className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-blue-700"
                     />
                   </div>
                 </label>
-                <div className="mt-5 rounded-xl border border-sky-300/20 bg-sky-300/[0.06] p-4">
+                <label className="block text-sm font-medium text-slate-700 sm:col-span-2">
+                  Select investment plan
+                  <div className="relative mt-2">
+                    <select
+                      value={selectedPlan?.id || ""}
+                      onChange={(event) => setSelectedPackage(event.target.value)}
+                      disabled={packagesLoading || packages.length === 0}
+                      aria-describedby="deposit-plan-details"
+                      className="h-11 w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 px-3 pr-11 text-sm text-slate-800 outline-none transition hover:border-blue-200 focus:border-blue-600 disabled:opacity-60 [color-scheme:light]"
+                    >
+                      {packagesLoading ? <option value="">Loading plans…</option> : packages.length ? packages.map((item) => (
+                        <option key={item.id} value={item.id} className="bg-white text-slate-900">{item.name}</option>
+                      )) : <option value="">No plans available</option>}
+                    </select>
+                    <ChevronDown size={18} aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-blue-700" />
+                  </div>
+                  {packagesError && <span role="alert" className="mt-2 block text-xs text-rose-700">{packagesError}</span>}
+                  {selectedPlan && !selectedPlan.rate && !selectedPromoTerms && <span role="status" className="mt-2 block text-xs text-amber-800">This plan needs a daily profit rate in the admin package catalog before deposits can be accepted.</span>}
+                  {selectedPlan && !selectedPromoTerms && selectedPlan.rate && <span className="mt-1 block text-xs text-slate-600">Daily profit is calculated on the original deposit amount without compounding, and unlocks at maturity.</span>}
+                  {selectedPlan && <span id="deposit-plan-details" className="mt-2 block text-xs text-slate-600">
+                    {selectedPromoTerms ? "24-hour calculation preview · amount determines promo tier" : [selectedPlan.rate ? `${selectedPlan.rate}% daily profit` : null, selectedPlan.duration, "profit unlocks at maturity"].filter(Boolean).join(" · ") || "Package terms are subject to review."}
+                  </span>}
+                </label>
+                {selectedPromoTerms && (
+                  <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 sm:col-span-2" aria-label="Promotional calculation preview">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold text-slate-900">24-hour promotional calculation</h3>
+                      <span className="rounded-full border border-amber-200/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-900">24-hour term</span>
+                    </div>
+                    {promoCalculation ? (
+                      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                        <div><dt className="text-xs text-slate-600">Promotion</dt><dd className="mt-1 font-semibold text-slate-900">{selectedPromoTerms.name === PROMO_MEGA_NAME ? "Mega · 500% profit" : "Mini · 100% profit"}</dd></div>
+                        <div><dt className="text-xs text-slate-600">Projected profit</dt><dd className="mt-1 font-semibold text-amber-900">{formatMoney(promoCalculation.profit)}</dd></div>
+                        <div><dt className="text-xs text-slate-600">Projected total at maturity</dt><dd className="mt-1 font-semibold text-slate-900">{formatMoney(promoCalculation.total)}</dd></div>
+                      </dl>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-700">Enter at least {formatMoney(PROMO_MINIMUM)} to see projected values. Amounts from {formatMoney(PROMO_THRESHOLD)} route to Mega.</p>
+                    )}
+                  </section>
+                )}
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3.5 sm:col-span-2">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-sky-300">
-                        Send {selectedAsset} to this address
+                      <p className="text-xs font-semibold text-slate-700">
+                        {selectedAsset} wallet address
                       </p>
-                      <p className="mt-2 break-all text-sm font-semibold leading-6 text-white">
+                      <p className="mt-1 break-all font-mono text-xs leading-5 text-slate-900 sm:text-sm">
                         {selectedDepositAddress || "Address unavailable"}
                       </p>
                     </div>
@@ -794,7 +917,7 @@ export default function MemberFeaturePage() {
                           ? "Deposit wallet address copied"
                           : "Copy deposit wallet address"
                       }
-                      className={`shrink-0 rounded-lg px-3 py-3 text-slate-950 transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                      className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg text-slate-950 transition disabled:cursor-not-allowed disabled:opacity-40 ${
                         depositAddressCopied
                           ? "bg-green-400"
                           : "bg-sky-400 hover:bg-cyan-300"
@@ -807,57 +930,49 @@ export default function MemberFeaturePage() {
                       )}
                     </button>
                   </div>
-                  <p className="mt-3 text-xs leading-5 text-slate-400">
-                    Send only {selectedAsset} to this wallet address. Verify
-                    the address before submitting your deposit request.
-                  </p>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">Send only {selectedAsset} to this address. Check the network and address carefully before sending.</p>
                 </div>
-                <button
-                  type="submit"
-                  disabled={depositSubmitting}
-                  className="mt-6 w-full rounded-lg bg-gradient-to-r from-sky-400 to-cyan-300 px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-slate-950 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(34,211,238,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {depositSubmitting ? (
-                    <>
-                      <LoaderCircle size={15} className="mr-2 animate-spin" aria-hidden="true" />
-                      Submitting...
-                    </>
-                  ) : (
-                    "Submit deposit request"
-                  )}
-                </button>
-                <Link
-                  to="/support"
-                  className="mt-4 block text-center text-xs font-bold text-sky-300 hover:text-cyan-200"
-                >
-                  Need help? Contact support
-                </Link>
+                </div>
+                  <button
+                    type="submit"
+                    disabled={depositSubmitting || !selectedPlan || (!selectedPromoTerms && !selectedPlan.rate) || packagesLoading}
+                    className="mt-5 h-11 w-full rounded-lg bg-gradient-to-r from-sky-400 to-cyan-300 px-4 text-xs font-bold uppercase tracking-[0.1em] text-slate-950 transition hover:shadow-[0_12px_28px_rgba(34,211,238,0.18)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-48"
+                  >
+                    {depositSubmitting ? (
+                      <>
+                        <LoaderCircle size={15} className="mr-2 animate-spin" aria-hidden="true" />
+                        Submitting...
+                      </>
+                    ) : (
+                      "Make deposit request"
+                    )}
+                  </button>
               </form>
-              </div>
+
             </section>
           )}
           {pathname === "/withdraw" && (
             <section className="mt-8 space-y-6">
-              <div className="rounded-2xl border border-sky-400/20 bg-gradient-to-br from-sky-400/15 via-[#0d1728] to-[#0d1728] p-6 sm:p-8">
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-cyan-300">
+              <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-sky-400/15 via-white to-blue-50 p-5 sm:p-6">
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-blue-700">
                   Secure withdrawal review
                 </p>
                 <div className="mt-4 flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
                   <div>
-                    <h2 className="text-2xl font-bold tracking-[-0.04em] text-white sm:text-3xl">
+                    <h2 className="text-xl font-bold tracking-[-0.04em] text-slate-900 sm:text-2xl">
                       Withdraw with confidence.
                     </h2>
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                      Submit a withdrawal request for review. We verify the
-                      wallet, balance, and network before anything is sent.
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-700">
+                      Submit a withdrawal request for review. Payouts are arranged
+                      offline, so a wallet address is optional.
                     </p>
                   </div>
-                  <div className="shrink-0 rounded-xl border border-white/10 bg-black/20 px-5 py-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                      Available balance
+                  <div className="shrink-0 rounded-lg border border-slate-200 bg-blue-50 px-4 py-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600">
+                      Withdrawable balance
                     </p>
-                    <p className="mt-1 font-['Inter'] text-3xl font-semibold tracking-[-0.05em] text-white">
-                      {formatMoney(summary.availableBalance)}
+                    <p className="mt-1 font-sans text-2xl font-semibold tracking-[-0.05em] text-slate-900">
+                      {account.hasData ? formatMoney(summary.withdrawalRequestableBalance) : "Unavailable"}
                     </p>
                   </div>
                 </div>
@@ -865,25 +980,25 @@ export default function MemberFeaturePage() {
 
               <form
                 onSubmit={submitWithdrawalRequest}
-                className="grid gap-6 rounded-2xl border border-white/10 bg-[#0d1728] p-5 sm:p-7 lg:grid-cols-[1fr_0.9fr]"
+                className="grid gap-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 lg:grid-cols-[1fr_0.9fr]"
               >
                 <div>
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-sky-400">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-blue-700">
                     01 / Withdrawal details
                   </p>
-                  <h2 className="mt-2 text-xl font-bold text-white">
-                    Where should we send it?
+                  <h2 className="mt-2 text-xl font-bold text-slate-900">
+                    Withdrawal details
                   </h2>
-                  <label className="mt-6 block text-sm text-slate-300">
+                  <label className="mt-6 block text-sm text-slate-700">
                     Withdrawal asset
                     <div className="relative mt-2">
                       <select
                         value={selectedAsset}
                         onChange={(event) => setSelectedAsset(event.target.value)}
-                        className="h-12 w-full appearance-none rounded-xl border border-white/10 bg-[#081321] px-3 pr-11 text-sm text-slate-100 shadow-inner shadow-black/10 outline-none transition hover:border-white/20 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10 [color-scheme:dark]"
+                        className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-3 pr-11 text-sm text-slate-800 shadow-sm outline-none transition hover:border-blue-200 focus:border-blue-600 [color-scheme:light]"
                       >
                         {withdrawalAssets.map(([asset]) => (
-                          <option key={asset} className="bg-[#0d1728] text-white">
+                          <option key={asset} className="bg-white text-slate-900">
                             {asset}
                           </option>
                         ))}
@@ -891,17 +1006,17 @@ export default function MemberFeaturePage() {
                       <ChevronDown
                         size={18}
                         aria-hidden="true"
-                        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-cyan-300"
+                        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-blue-700"
                       />
                     </div>
                   </label>
-                  <label className="mt-4 block text-sm text-slate-300">
+                  <label className="mt-4 block text-sm text-slate-700">
                     Amount (USD)
                     <input
                       id="withdrawal-amount"
                       type="number"
-                      min="0.01"
-                      max={summary.withdrawableBalance}
+                      min={MINIMUM_WITHDRAWAL}
+                      max={account.hasData ? summary.withdrawalRequestableBalance : undefined}
                       step="0.01"
                       value={withdrawalAmount}
                       onChange={(event) => setWithdrawalAmount(event.target.value)}
@@ -910,59 +1025,39 @@ export default function MemberFeaturePage() {
                       aria-invalid={
                         withdrawalAmount !== "" &&
                         (!Number.isFinite(Number(withdrawalAmount)) ||
-                          Number(withdrawalAmount) <= 0 ||
-                          Number(withdrawalAmount) > summary.withdrawableBalance)
+                          Number(withdrawalAmount) < MINIMUM_WITHDRAWAL ||
+                          (account.hasData && Number(withdrawalAmount) > summary.withdrawalRequestableBalance))
                       }
                       required
-                      className="mt-2 h-12 w-full rounded-lg border border-white/10 bg-[#081321] px-3 text-white focus:border-sky-400 focus:outline-none"
+                      className="mt-2 h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-slate-900 focus:border-blue-600 focus:outline-none"
                     />
                     <span id="withdrawal-amount-help" className="mt-2 block text-xs font-normal normal-case tracking-normal text-slate-500">
-                      Available to withdraw: {formatMoney(summary.withdrawableBalance)}
+                      Minimum withdrawal: {formatMoney(MINIMUM_WITHDRAWAL)} · Available for a new request: {account.hasData ? formatMoney(summary.withdrawalRequestableBalance) : "Unavailable until account data loads"}
                     </span>
                   </label>
-                  <div className={`mt-4 rounded-xl border p-4 text-xs leading-5 ${selectedWithdrawalWallet ? "border-white/10 bg-[#081321] text-slate-300" : "border-amber-300/25 bg-amber-300/[0.07] text-amber-100"}`}>
-                    <p className="font-bold text-white">Saved {selectedWithdrawalAsset} wallet</p>
-                    {selectedWithdrawalWallet ? (
-                      <p className="mt-2 break-all font-['Inter'] text-slate-300">{selectedWithdrawalWallet}</p>
-                    ) : (
-                      <p className="mt-2">
-                        Add a {selectedWithdrawalAsset} wallet address in{" "}
-                        <Link to="/profile" className="font-bold text-amber-200 underline hover:text-white">
-                          Wallet / Profile
-                        </Link>{" "}
-                        before submitting your request.
-                      </p>
-                    )}
-                  </div>
                 </div>
 
-                <div className="rounded-xl border border-white/10 bg-[#081321] p-5">
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-sky-400">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-blue-700">
                     02 / Review
                   </p>
-                  <h2 className="mt-2 text-xl font-bold text-white">
+                  <h2 className="mt-2 text-xl font-bold text-slate-900">
                     Request summary
                   </h2>
                   <dl className="mt-6 space-y-4 text-sm">
                     <div className="flex justify-between gap-4">
                       <dt className="text-slate-500">Asset</dt>
-                      <dd className="font-bold text-white">{selectedWithdrawalAsset}</dd>
+                      <dd className="font-bold text-slate-900">{selectedWithdrawalAsset}</dd>
                     </div>
                     <div className="space-y-2">
-                      <dt className="text-slate-500">Destination wallet</dt>
-                      <dd className="break-all font-['Inter'] text-xs leading-5 text-white">
-                        {selectedWithdrawalWallet || "Add this wallet in your profile to continue"}
+                      <dt className="text-slate-500">Optional wallet address</dt>
+                      <dd className="break-all font-sans text-xs leading-5 text-slate-900">
+                        {selectedWithdrawalWallet || "No wallet provided — payout will be arranged offline"}
                       </dd>
                     </div>
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">Network fee</dt>
-                      <dd className="font-['Inter'] font-semibold text-white">
-                        {formatMoney(selectedWithdrawalFee)}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-4 border-t border-white/10 pt-4">
+                    <div className="flex justify-between gap-4 border-t border-slate-200 pt-4">
                       <dt className="text-slate-500">You request</dt>
-                      <dd className="font-['Inter'] font-semibold text-cyan-300">
+                      <dd className="font-sans font-semibold text-blue-700">
                         {formatMoney(Number(withdrawalAmount) || 0)}
                       </dd>
                     </div>
@@ -971,8 +1066,8 @@ export default function MemberFeaturePage() {
                     type="submit"
                     disabled={
                       withdrawalSubmitting ||
-                      summary.withdrawableBalance <= 0 ||
-                      !selectedWithdrawalWallet
+                      !account.hasData ||
+                      summary.withdrawalRequestableBalance <= 0
                     }
                     className="mt-7 w-full rounded-lg bg-gradient-to-r from-sky-400 to-cyan-300 px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-slate-950 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -990,23 +1085,23 @@ export default function MemberFeaturePage() {
                   </p>
                 </div>
               </form>
-              <div className="flex flex-col justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm text-slate-400 sm:flex-row sm:items-center">
+              <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-blue-50 p-5 text-sm text-slate-600 sm:flex-row sm:items-center">
                 <span>Need help with a wallet or network?</span>
                 <div className="flex flex-wrap items-center gap-4">
-                  <Link to="/support" className="font-bold text-sky-300 hover:text-cyan-200">
+                  <Link to="/support" className="font-bold text-blue-700 hover:text-blue-700">
                     Contact support →
                   </Link>
-                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-bold text-green-300 hover:text-green-200">
+                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-bold text-green-800 hover:text-green-800">
                     <WhatsAppIcon size={15} /> WhatsApp
                   </a>
                 </div>
               </div>
-              <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1728]">
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                 <div className="p-5 sm:p-6">
-                  <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-sky-400">
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-blue-700">
                     Withdrawal history
                   </p>
-                  <h2 className="mt-2 text-xl font-bold text-white">
+                  <h2 className="mt-2 text-xl font-bold text-slate-900">
                     Find a previous withdrawal
                   </h2>
                 </div>
@@ -1022,14 +1117,16 @@ export default function MemberFeaturePage() {
                 />
                 {(() => {
                   const withdrawals = filterTransactionsByDate(
-                    summary.transactions.filter(
+                    memberTransactions.filter(
                       (item) => transactionCategory(item) === "withdrawal",
                     ),
                     withdrawalFromDate,
                     withdrawalToDate,
                   );
 
-                  return withdrawals.length ? (
+                  return !account.hasData ? (
+                    <p className="px-5 py-8 text-center text-sm text-amber-900" role="status">Withdrawal history is unavailable until account data loads successfully.</p>
+                  ) : withdrawals.length ? (
                     <div className="divide-y divide-white/5">
                       {withdrawals.map((item) => (
                         <div
@@ -1037,31 +1134,38 @@ export default function MemberFeaturePage() {
                           className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
                         >
                           <div>
-                            <p className="font-semibold text-white">
+                            <p className="font-semibold text-slate-900">
                               {formatTransactionType(item.type, "Withdrawal")}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
                               {transactionDate(item)} · {transactionStatus(item)}
                             </p>
                           </div>
-                          <p className="font-['Inter'] font-semibold text-white">
+                          <p className="font-sans font-semibold text-slate-900">
                             −{formatMoney(item.amount)}
                           </p>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="px-5 py-8 text-center text-sm text-slate-400 sm:px-6">
-                      No withdrawals match the selected date range.
-                    </p>
+                    <div className="px-5 py-8 text-center sm:px-6">
+                      <p className="text-sm text-slate-600">
+                        {historyCursor?.hasMore
+                          ? "No withdrawals match in the records loaded so far. Load older activity to check the rest of your history."
+                          : "No withdrawals match the selected date range."}
+                      </p>
+                    </div>
                   );
                 })()}
+                {historyError && <p className="border-t border-slate-100 p-4 text-center text-sm text-rose-700" role="alert">{historyError}</p>}
+                {historyCursor?.hasMore && <div className="border-t border-slate-100 p-4 text-center"><button type="button" onClick={loadOlderTransactions} disabled={historyLoading} className="min-h-11 rounded-xl border border-blue-200 bg-white px-5 py-3 text-sm font-bold text-blue-800 disabled:opacity-60">{historyLoading ? "Loading older activity…" : "Load older withdrawal history"}</button></div>}
               </div>
             </section>
           )}
           {pathname === "/profile" && (
             <>
-              <section className="mt-8 overflow-hidden rounded-2xl border border-sky-300/20 bg-gradient-to-br from-sky-400/10 via-[#0d1728] to-[#0d1728]">
+              <section className="mt-8 overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-sky-400/10 via-white to-blue-50">
+                {!account.hasData && <p className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900" role="status">Profile fields are unavailable until your account data loads successfully.</p>}
                 <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
                   <div className="flex items-center gap-4">
                     <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-sky-400 text-xl font-extrabold text-slate-950">
@@ -1070,23 +1174,23 @@ export default function MemberFeaturePage() {
                         .toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-sky-300">
+                      <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-700">
                         Member identity
                       </p>
-                      <h2 className="mt-1 text-2xl font-bold tracking-[-0.04em] text-white">
+                      <h2 className="mt-1 text-2xl font-bold tracking-[-0.04em] text-slate-900">
                         {profile.fullName || user?.displayName || "Your profile"}
                       </h2>
-                      <p className="mt-1 text-sm text-slate-400">
+                      <p className="mt-1 text-sm text-slate-600">
                         Your username is your permanent referral code.
                       </p>
                     </div>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-black/10 px-4 py-3 sm:min-w-[210px]">
+                  <div className="rounded-xl border border-slate-200 bg-blue-50 px-4 py-3 sm:min-w-[210px]">
                     <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500">
                       Username / referral code
                     </p>
-                    <p className="mt-1 break-all text-lg font-bold text-cyan-200">
-                      {profile.username || user?.displayName || "Unavailable"}
+                    <p className="mt-1 break-all text-lg font-bold text-blue-700">
+                      {account.hasData ? profile.username || "Not set" : "Unavailable"}
                     </p>
                   </div>
                 </div>
@@ -1094,37 +1198,41 @@ export default function MemberFeaturePage() {
               <form
                 key={profile.username || user?.uid}
                 onSubmit={saveProfile}
-                className="mt-5 grid gap-4 rounded-xl border border-white/10 bg-[#0d1728] p-6 sm:grid-cols-2"
+                className="mt-5 grid gap-4 rounded-xl border border-slate-200 bg-white p-6 sm:grid-cols-2"
               >
                 {[
-                  ["fullName", "Full name"],
-                  ["phone", "Phone"],
-                  ["country", "Country"],
-                  ["litecoinWallet", "Litecoin wallet"],
-                  ["bitcoinWallet", "Bitcoin wallet"],
-                  ["bnbWallet", "BNB wallet"],
-                  ["ethereumWallet", "Ethereum wallet"],
-                ].map(([name, label]) => (
-                  <label key={name} className="text-sm text-slate-300">
-                    {label}
-                    {name === "country" ? (
-                      <CountrySelect
-                        id="profile-country"
-                        name={name}
-                        defaultValue={profile[name] || ""}
-                      />
-                    ) : (
+                  ["fullName", "Full name", true],
+                  ["phone", "Phone", false],
+                  ["country", "Country", false],
+                  ["litecoinWallet", "Litecoin wallet", true],
+                  ["bitcoinWallet", "Bitcoin wallet", true],
+                  ["ethereumWallet", "Ethereum wallet", true],
+                ].map(([name, label, editable]) => (
+                  <label key={name} className="text-sm text-slate-700">
+                    <span className="flex items-center justify-between gap-3">
+                      <span>{label}</span>
+                      {!editable && <span className="text-xs font-medium text-slate-500">Read only</span>}
+                    </span>
+                    {editable ? (
                       <input
                         name={name}
                         defaultValue={profile[name] || ""}
-                        className="mt-2 h-12 w-full rounded-lg border border-white/10 bg-[#081321] px-4 text-white shadow-inner shadow-black/10 outline-none transition hover:border-sky-400/45 focus:border-sky-400 focus:bg-[#0b1a2c] focus:ring-2 focus:ring-sky-400/15"
+                        disabled={!account.hasData}
+                        autoComplete={name === "fullName" ? "name" : "off"}
+                        required={name === "fullName"}
+                        maxLength={name === "fullName" ? 120 : 200}
+                        className="mt-2 h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 text-slate-900 shadow-sm outline-none transition hover:border-blue-300 focus:border-blue-600 focus:bg-blue-50"
                       />
+                    ) : (
+                      <div className="mt-2 flex min-h-12 items-center rounded-lg border border-slate-200 bg-slate-100 px-4 text-slate-600">
+                        {account.hasData ? profile[name] || "Not provided" : "Unavailable"}
+                      </div>
                     )}
                   </label>
                 ))}
                 <button
                   type="submit"
-                  disabled={profileSaving}
+                  disabled={profileSaving || !account.hasData}
                   aria-busy={profileSaving}
                   className="inline-flex items-center justify-center rounded-lg bg-sky-400 px-5 py-3 text-xs font-bold uppercase text-slate-950 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
                 >
@@ -1149,7 +1257,7 @@ export default function MemberFeaturePage() {
                   [
                     "Available balance",
                     summary.availableBalance,
-                    "Includes non-withdrawable crypto capital and promotional credit",
+                    "Includes withdrawable funds and promotional credit",
                   ],
                   ["Total deposited", summary.totalDeposit, "Completed deposits"],
                   ["Total earnings", summary.totalEarnings, "Recorded earnings"],
@@ -1161,47 +1269,48 @@ export default function MemberFeaturePage() {
                 ].map(([label, amount, caption]) => (
                   <article
                     key={label}
-                    className="rounded-2xl border border-white/10 bg-[#0d1728] p-5"
+                    className="rounded-2xl border border-slate-200 bg-white p-5"
                   >
-                    <p className="text-xs font-semibold text-slate-400">{label}</p>
-                    <p className="mt-3 font-['Inter'] text-2xl font-semibold tracking-[-0.04em] text-white">
-                      {formatMoney(amount)}
+                    <p className="text-xs font-semibold text-slate-600">{label}</p>
+                    <p className="mt-3 font-sans text-2xl font-semibold tracking-[-0.04em] text-slate-900">
+                      {account.hasData ? formatMoney(amount) : "Unavailable"}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">{caption}</p>
                   </article>
                 ))}
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1728]">
-                <div className="flex flex-col justify-between gap-4 border-b border-white/10 p-5 sm:flex-row sm:items-center sm:p-6">
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="flex flex-col justify-between gap-4 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:p-6">
                   <div>
-                    <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-sky-400">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-700">
                       Account ledger
                     </p>
-                    <h2 className="mt-2 text-xl font-bold text-white">
+                    <h2 className="mt-2 text-xl font-bold text-slate-900">
                       Transaction history
                     </h2>
-                    <p className="mt-1 text-sm text-slate-400">
-                      A record of completed activity posted to your account.
+                    <p className="mt-1 text-sm text-slate-600">
+                      Completed activity posted to your account. Filters cover the records loaded so far.
                     </p>
                   </div>
                   <Link
                     to="/support"
-                    className="text-xs font-bold uppercase tracking-[0.12em] text-sky-300 hover:text-cyan-200"
+                    className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700 hover:text-blue-700"
                   >
                     Need help? Contact support
                   </Link>
-                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-green-300 hover:text-green-200">
+                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-green-800 hover:text-green-800">
                     <WhatsAppIcon size={14} /> WhatsApp
                   </a>
                 </div>
 
-                <div className="flex flex-wrap gap-2 border-b border-white/10 p-4 sm:px-6">
+                <div className="flex flex-wrap gap-2 border-b border-slate-200 p-4 sm:px-6">
                   {[
                     ["all", "All activity"],
                     ["deposit", "Deposits"],
                     ["withdrawal", "Withdrawals"],
                     ["earning", "Earnings"],
+                    ["other", "Adjustments & bonuses"],
                   ].map(([value, label]) => (
                     <button
                       key={value}
@@ -1209,8 +1318,8 @@ export default function MemberFeaturePage() {
                       onClick={() => setTransactionFilter(value)}
                       className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
                         transactionFilter === value
-                          ? "border-sky-400 bg-sky-400/10 text-sky-300"
-                          : "border-white/10 text-slate-400 hover:border-white/25 hover:text-white"
+                          ? "border-sky-400 bg-blue-50 text-blue-700"
+                          : "border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700"
                       }`}
                     >
                       {label}
@@ -1230,7 +1339,7 @@ export default function MemberFeaturePage() {
 
                 {(() => {
                   const filteredTransactions = filterTransactionsByDate(
-                    summary.transactions.filter(
+                    memberTransactions.filter(
                       (item) =>
                         transactionFilter === "all" ||
                         transactionCategory(item) === transactionFilter,
@@ -1239,9 +1348,14 @@ export default function MemberFeaturePage() {
                     transactionToDate,
                   );
 
-                  return filteredTransactions.length ? (
+                  return !account.hasData ? (
+                    <div className="px-6 py-14 text-center" role="status">
+                      <h3 className="font-semibold text-slate-900">Transaction data unavailable</h3>
+                      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">We could not confirm your transaction history. Retry account data before relying on balances or records.</p>
+                    </div>
+                  ) : filteredTransactions.length ? (
                     <div>
-                      <div className="hidden grid-cols-[1.35fr_1fr_1fr_0.8fr] gap-4 border-b border-white/10 px-6 py-3 text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500 sm:grid">
+                      <div className="hidden grid-cols-[1.35fr_1fr_1fr_0.8fr] gap-4 border-b border-slate-200 px-6 py-3 text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500 sm:grid">
                           <span>Activity</span>
                           <span>Date</span>
                           <span>Status</span>
@@ -1249,7 +1363,15 @@ export default function MemberFeaturePage() {
                         </div>
                         {filteredTransactions.map((item) => {
                           const category = transactionCategory(item);
-                          const isOutgoing = category === "withdrawal";
+                          const amountIsValid = hasStoredNonNegativeNumber(item.amount);
+                          const isOutgoing = category === "withdrawal"
+                            || Number(item.balanceDelta) < 0
+                            || Number(item.bonusDelta) < 0;
+                          const categoryLabel = item.category === "promotional-credit"
+                            ? "Promotional credit"
+                            : item.category === "admin-adjustment"
+                              ? "Account adjustment"
+                              : category;
                           const status = String(
                             item.status || "completed",
                           ).toLowerCase();
@@ -1257,26 +1379,26 @@ export default function MemberFeaturePage() {
                             ["completed", "complete", "approved", "settled", "success"].includes(
                               status,
                             )
-                              ? "bg-emerald-400/10 text-emerald-300"
+                              ? "bg-emerald-400/10 text-emerald-800"
                               : status === "pending"
-                                ? "bg-yellow-300/10 text-yellow-200"
-                                : "bg-slate-400/10 text-slate-300";
+                                ? "bg-amber-50 text-amber-800"
+                                : "bg-slate-400/10 text-slate-700";
 
                           return (
                             <div
                               key={item.id}
-                              className="grid grid-cols-2 gap-x-3 gap-y-2 border-b border-white/5 bg-white/[0.02] px-4 py-4 text-sm last:border-0 sm:grid-cols-[1.35fr_1fr_1fr_0.8fr] sm:gap-4 sm:bg-transparent sm:px-6"
+                              className="grid grid-cols-2 gap-x-3 gap-y-2 border-b border-slate-100 bg-slate-50 px-4 py-4 text-sm last:border-0 sm:grid-cols-[1.35fr_1fr_1fr_0.8fr] sm:gap-4 sm:bg-transparent sm:px-6"
                             >
                               <div className="min-w-0">
-                                <p className="truncate font-semibold text-white">
+                                <p className="truncate font-semibold text-slate-900">
                                   {formatTransactionType(item.type, "Account activity")}
                                 </p>
                                 <p className="mt-1 text-xs capitalize text-slate-500">
-                                  {category}
+                                  {categoryLabel}
                                   {item.currency ? ` · ${item.currency}` : ""}
                                 </p>
                               </div>
-                              <span className="order-3 self-center text-xs text-slate-400 sm:order-none sm:text-sm">
+                              <span className="order-3 self-center text-xs text-slate-600 sm:order-none sm:text-sm">
                                 {transactionDate(item)}
                               </span>
                               <span className="order-4 self-center sm:order-none">
@@ -1284,8 +1406,8 @@ export default function MemberFeaturePage() {
                                   {transactionStatus(item)}
                                 </span>
                               </span>
-                              <span className={`order-2 self-center text-right font-bold sm:order-none ${isOutgoing ? "text-white" : "text-emerald-300"}`}>
-                                {isOutgoing ? "−" : "+"}
+                              <span className={`order-2 self-center text-right font-bold sm:order-none ${!amountIsValid ? "text-slate-500" : isOutgoing ? "text-slate-900" : "text-emerald-800"}`}>
+                                {amountIsValid ? isOutgoing ? "−" : "+" : ""}
                                 {formatMoney(item.amount)}
                               </span>
                             </div>
@@ -1294,13 +1416,15 @@ export default function MemberFeaturePage() {
                     </div>
                   ) : (
                     <div className="px-6 py-14 text-center">
-                      <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-sky-400/10 text-xl text-sky-300">
+                      <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-xl text-blue-700">
                         —
                       </div>
-                      <h3 className="mt-4 font-semibold text-white">
-                        No {transactionFilter === "all" ? "" : `${transactionFilter} `}transactions yet
+                      <h3 className="mt-4 font-semibold text-slate-900">
+                        {historyCursor?.hasMore
+                          ? `No matching ${transactionFilter === "all" ? "" : `${transactionFilter} `}transactions in the activity loaded so far`
+                          : `No ${transactionFilter === "all" ? "" : `${transactionFilter} `}transactions yet`}
                       </h3>
-                      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">
+                      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
                         Completed deposits, withdrawals, and earnings will
                         appear here once they are posted to your ledger.
                       </p>
@@ -1315,8 +1439,24 @@ export default function MemberFeaturePage() {
                 })()}
               </div>
 
-              <div className="rounded-xl border border-sky-400/15 bg-sky-400/5 p-5 text-sm leading-6 text-slate-300">
-                <strong className="text-white">Ledger note:</strong> Transaction
+              <div className="flex flex-col items-center gap-3 py-5">
+                {historyError && <p className="text-sm font-medium text-rose-700" role="alert">{historyError}</p>}
+                {historyCursor?.hasMore ? (
+                  <button
+                    type="button"
+                    onClick={loadOlderTransactions}
+                    disabled={historyLoading}
+                    className="min-h-11 rounded-xl border border-blue-200 bg-white px-5 py-3 text-sm font-bold text-blue-800 transition hover:border-blue-400 hover:bg-blue-50 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {historyLoading ? "Loading older activity…" : "Load older transaction history"}
+                  </button>
+                ) : (
+                  <p className="text-center text-xs text-slate-500">All account activity has been loaded.</p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-sky-400/15 bg-blue-50 p-5 text-sm leading-6 text-slate-700">
+                <strong className="text-slate-900">Ledger note:</strong> Transaction
                 history reflects entries confirmed by MeridianVests. Pending
                 deposit and withdrawal requests are reviewed separately and do
                 not change your balance until approved.
@@ -1324,37 +1464,79 @@ export default function MemberFeaturePage() {
             </section>
           )}
           {pathname === "/referral" && (
-            <section className="mt-8 overflow-hidden rounded-2xl border border-sky-300/20 bg-gradient-to-br from-sky-400/10 via-[#0d1728] to-[#0d1728] p-6 sm:p-8">
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-sky-300">
+            <section className="mt-8 overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-sky-400/10 via-white to-blue-50 p-6 sm:p-8">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-700">
                 Referral center
               </p>
-              <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-white">
+              <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-900">
                 Invite with your username
               </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-400">
+              <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
                 Share this link so new members arrive with your username
                 automatically filled in on the signup form.
               </p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-white/10 bg-black/10 p-4">
+              <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-xl border border-slate-200 bg-blue-50 p-4">
                   <p className="text-xs text-slate-500">Your referral username</p>
-                  <p className="mt-2 break-all text-lg font-bold text-cyan-200">
-                    {profile.username || "Loading..."}
+                  <p className="mt-2 break-all text-lg font-bold text-blue-700">
+                    {account.hasData ? profile.username || "Not set" : "Unavailable"}
                   </p>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-black/10 p-4">
-                  <p className="text-xs text-slate-500">Successful referrals</p>
-                  <p className="mt-2 text-lg font-bold text-white">
-                    {summary.referralCount}
+                <div className="rounded-xl border border-slate-200 bg-blue-50 p-4">
+                  <p className="text-xs text-slate-500">Verified referrals</p>
+                  <p className="mt-2 text-lg font-bold text-slate-900">
+                    {account.hasData ? summary.referralCount : "Unavailable"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-blue-50 p-4">
+                  <p className="text-xs text-slate-500">Referral credit</p>
+                  <p className="mt-2 text-lg font-bold text-blue-800">
+                    {account.hasData ? formatMoney(summary.referralCredit) : "Unavailable"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-blue-50 p-4">
+                  <p className="text-xs text-slate-500">Total promotional credit</p>
+                  <p className="mt-2 text-lg font-bold text-slate-900">
+                    {account.hasData ? formatMoney(summary.promotionalCredit) : "Unavailable"}
                   </p>
                 </div>
               </div>
-              <p className="mt-5 text-sm text-slate-400">
-                Recorded commission:{" "}
-                <span className="font-['Inter'] font-semibold text-white">
-                  {formatMoney(summary.commission)}
-                </span>
+              <p className="mt-4 rounded-xl border border-blue-100 bg-white/80 p-4 text-sm leading-6 text-slate-600">
+                A referral counts after the new member verifies their email and signs in. The $5 referral credit is promotional, is included in your total promotional credit, and is not withdrawable.
               </p>
+              <div className="mt-7">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">Recent referral activity</h3>
+                    <p className="mt-1 text-sm text-slate-600">The most recent verification and credit status updates for members who used your referral link.</p>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-500">{account.hasData ? `${summary.referralRewardItems.length} records` : "Unavailable"}</span>
+                </div>
+                {!account.hasData ? (
+                  <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Referral activity could not be loaded. Retry account data before relying on these totals.</p>
+                ) : summary.referralRewardItems.length ? (
+                  <ul className="mt-3 divide-y divide-blue-100 overflow-hidden rounded-xl border border-blue-100 bg-white">
+                    {summary.referralRewardItems.map((reward) => (
+                      <li key={reward.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {reward.referredUsername || "Referred member"}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">{referralRewardDate(reward.creditedAt || reward.createdAt)}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-bold text-slate-900">{formatMoney(reward.amount)}</span>
+                          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${referralRewardTone(reward.status)}`}>
+                            {referralRewardStatusLabel(reward.status)}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 rounded-xl border border-blue-100 bg-white p-4 text-sm text-slate-600">No referrals have been attributed to your username yet.</p>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={copyReferral}

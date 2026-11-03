@@ -12,7 +12,7 @@ export default function ProtectedRoute({ children }) {
 
   if (error) {
     return (
-      <div className="grid min-h-screen place-items-center bg-[#07111d] px-6 text-center text-white">
+      <div className="grid min-h-screen place-items-center bg-slate-50 px-6 text-center text-slate-900">
         <div className="max-w-md">
           <h1 className="text-xl font-bold">We could not load your session</h1>
           <p className="mt-3 text-sm text-slate-300">{error}</p>

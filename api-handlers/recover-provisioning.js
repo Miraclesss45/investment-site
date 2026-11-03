@@ -1,7 +1,8 @@
 import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { parseFirebaseServiceAccount } from "../server/firebase-service-account.js";
+import { loadFirebaseServiceAccount } from "../server/firebase-service-account.js";
+import { getAdminAccountAccessState, isActiveAdminProfile } from "../server/admin-access.js";
 
 const MINIMUM_ORPHAN_AGE_MS = 15 * 60 * 1000;
 
@@ -13,9 +14,7 @@ function sendJson(res, statusCode, body) {
 
 function getFirebaseAdmin() {
   if (getApps().length) return getApp();
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!serviceAccount) throw new Error("Firebase service account is not configured.");
-  return initializeApp({ credential: cert(parseFirebaseServiceAccount(serviceAccount)) });
+  return initializeApp({ credential: cert(loadFirebaseServiceAccount()) });
 }
 
 async function authorize(req, app) {
@@ -30,11 +29,24 @@ async function authorize(req, app) {
     error.statusCode = 401;
     throw error;
   }
-  const token = await getAuth(app).verifyIdToken(authorization.slice(7));
+  const auth = getAuth(app);
+  const token = await auth.verifyIdToken(authorization.slice(7), true);
   if (token.admin !== true && String(token.role || "").trim().toLowerCase() !== "admin") {
     const error = new Error("Administrator privileges are required.");
     error.statusCode = 403;
     throw error;
+  }
+  const [authUser, profileSnapshot] = await Promise.all([
+    auth.getUser(token.uid),
+    getFirestore(app).collection("users").doc(token.uid).get(),
+  ]);
+  const profile = profileSnapshot.exists ? profileSnapshot.data() : null;
+  if (authUser.disabled || !isActiveAdminProfile(profile)) {
+    const accessState = getAdminAccountAccessState(profile, authUser.disabled);
+    throw Object.assign(new Error("Active administrator access is required."), {
+      statusCode: 403,
+      code: `admin-${accessState}`,
+    });
   }
 }
 
@@ -45,7 +57,10 @@ function timestampMillis(value) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") return sendJson(res, 405, { error: "Method not allowed." });
+  if (req.method !== "GET") {
+    res.setHeader("Allow", "GET");
+    return sendJson(res, 405, { error: "Method not allowed." });
+  }
 
   try {
     const app = getFirebaseAdmin();
@@ -54,14 +69,14 @@ export default async function handler(req, res) {
     const auth = getAuth(app);
     const cutoff = Date.now() - MINIMUM_ORPHAN_AGE_MS;
     const candidates = await db.collection("accountProvisioning")
-      .where("status", "==", "pending")
+      .where("status", "in", ["pending", "failed"])
       .limit(100)
       .get();
     const recovered = [];
 
     for (const journal of candidates.docs) {
       const entry = journal.data();
-      if (!["start", "auth-created"].includes(entry.stage)) continue;
+      if (!["start", "auth-created", "cleanup-failed"].includes(entry.stage)) continue;
       if (timestampMillis(entry.updatedAt || entry.timestamp) > cutoff) continue;
       if (!entry.email) continue;
 

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 export function parseFirebaseServiceAccount(raw) {
   if (!raw) throw new Error("Firebase service account is not configured.");
 
@@ -19,4 +21,13 @@ export function parseFirebaseServiceAccount(raw) {
       throw new Error("Firebase service account credentials are invalid.");
     }
   }
+}
+
+export function loadFirebaseServiceAccount() {
+  const configuredJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+  const configuredFile = process.env.FIREBASE_SERVICE_ACCOUNT_FILE;
+  const raw = configuredJson || (configuredFile
+    ? readFileSync(configuredFile, "utf8")
+    : "");
+  return parseFirebaseServiceAccount(raw);
 }

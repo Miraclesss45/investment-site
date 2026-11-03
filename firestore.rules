@@ -5,7 +5,18 @@ service cloud.firestore {
     function isAdministrator() {
       return request.auth != null
         && (request.auth.token.get("admin", false) == true
-          || request.auth.token.get("role", "") == "admin");
+          || request.auth.token.get("role", "") == "admin")
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("role", "") == "admin"
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("disabled", false) != true
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("authDisabled", false) != true
+        && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("deletionStatus", null) == null
+          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("deletionStatus", null) == false
+          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("deletionStatus", null) == ""
+        )
+        && !(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("status", "")
+          in ["disabled", "Disabled", "suspended", "Suspended", "blocked", "Blocked", "blacklisted", "Blacklisted", "deleting", "Deleting"]);
     }
 
     function validSupportStatus(status) {
@@ -43,6 +54,15 @@ service cloud.firestore {
         && data.read == false;
     }
 
+    function validSupportSearchTokens(data) {
+      return !("searchTokens" in data)
+        || (data.searchTokens is list && data.searchTokens.size() <= 15000);
+    }
+
+    function validSupportSearchIndexState(data) {
+      return !("searchIndexTruncated" in data) || data.searchIndexTruncated is bool;
+    }
+
     match /supportConversations/{conversationId} {
       function conversationBelongsToUser() {
         return request.auth != null
@@ -64,13 +84,15 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll([
           "userId", "userName", "userEmail", "userCountry", "userType", "status",
           "assignedAgent", "createdAt", "updatedAt", "lastMessage",
-          "lastMessageId", "lastMessageAt", "unreadForUser", "unreadForAgent"
+            "lastMessageId", "lastMessageAt", "unreadForUser", "unreadForAgent", "searchTokens"
         ])
         && request.resource.data.keys().hasOnly([
           "userId", "userName", "userEmail", "userCountry", "userType", "status",
           "assignedAgent", "createdAt", "updatedAt", "lastMessage",
-          "lastMessageId", "lastMessageAt", "unreadForUser", "unreadForAgent"
+            "lastMessageId", "lastMessageAt", "unreadForUser", "unreadForAgent", "searchTokens", "searchIndexTruncated"
         ])
+        && validSupportSearchTokens(request.resource.data)
+          && validSupportSearchIndexState(request.resource.data)
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.userName is string
         && request.resource.data.userName.size() > 0
@@ -106,7 +128,9 @@ service cloud.firestore {
           )
           || (
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(["unreadForAgent"])
-            && request.resource.data.unreadForAgent == 0
+            && request.resource.data.unreadForAgent is int
+            && request.resource.data.unreadForAgent >= 0
+            && request.resource.data.unreadForAgent <= resource.data.unreadForAgent
           )
           || (
             request.resource.data.diff(resource.data).affectedKeys().hasAll([
@@ -138,8 +162,10 @@ service cloud.firestore {
           || (
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               "status", "assignedAgent", "lastMessage", "lastMessageId",
-              "lastMessageAt", "updatedAt", "unreadForUser"
+                "lastMessageAt", "updatedAt", "unreadForUser", "searchTokens", "searchIndexTruncated"
             ])
+            && validSupportSearchTokens(request.resource.data)
+              && validSupportSearchIndexState(request.resource.data)
             && resource.data.get("archived", false) != true
             && request.resource.data.status == "waiting"
             && request.resource.data.assignedAgent == (
@@ -163,21 +189,25 @@ service cloud.firestore {
             (
               request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 "status", "lastMessage", "lastMessageId", "lastMessageAt",
-                "updatedAt", "unreadForAgent"
+                "updatedAt", "unreadForAgent", "searchTokens", "searchIndexTruncated"
               ])
+              && validSupportSearchTokens(request.resource.data)
+              && validSupportSearchIndexState(request.resource.data)
               && resource.data.get("archived", false) != true
               && request.resource.data.status == "open"
               && request.resource.data.lastMessageId != resource.data.lastMessageId
               && request.resource.data.lastMessageAt == request.time
               && request.resource.data.updatedAt == request.time
-              && request.time > resource.data.lastMessageAt + duration.value(1, "s")
+
               && request.resource.data.unreadForAgent == resource.data.unreadForAgent + 1
               && request.resource.data.unreadForUser == resource.data.unreadForUser
               && hasCustomerMessageAfter(conversationId, request.resource.data)
             )
             || (
               request.resource.data.diff(resource.data).affectedKeys().hasOnly(["unreadForUser"])
-              && request.resource.data.unreadForUser == 0
+              && request.resource.data.unreadForUser is int
+              && request.resource.data.unreadForUser >= 0
+              && request.resource.data.unreadForUser <= resource.data.unreadForUser
             )
           )
         );
@@ -260,139 +290,126 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if request.auth != null
         && (request.auth.uid == userId
-          || request.auth.token.admin == true
-          || request.auth.token.role == "admin");
-      allow create: if request.auth != null
-        && request.auth.uid == userId
-        && request.resource.data.uid == userId
-        && request.resource.data.role == "member"
-        && request.resource.data.termsAccepted == true;
+          || isAdministrator());
+      // Profiles are provisioned by the trusted account API. Client-created
+      // profiles could otherwise supply financial fields consumed by payouts.
+      allow create: if false;
       allow update: if request.auth != null
         && request.auth.uid == userId
-        && request.resource.data.uid == resource.data.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           "fullName",
-          "phone",
-          "country",
           "bitcoinWallet",
-          "bnbWallet",
           "ethereumWallet",
           "litecoinWallet"
         ]);
-      allow delete: if request.auth != null
-        && (request.auth.token.admin == true || request.auth.token.role == "admin");
+      allow delete: if isAdministrator();
 
       match /notifications/{notificationId} {
         allow read: if request.auth != null
           && (request.auth.uid == userId
-            || request.auth.token.admin == true
-            || request.auth.token.role == "admin");
+            || isAdministrator());
         allow write: if false;
       }
 
       match /transactions/{transactionId} {
         allow read: if request.auth != null
           && (request.auth.uid == userId
-            || request.auth.token.admin == true
-            || request.auth.token.role == "admin");
+            || isAdministrator());
         allow write: if false;
       }
 
       match /investments/{investmentId} {
         allow read: if request.auth != null
           && (request.auth.uid == userId
-            || request.auth.token.admin == true
-            || request.auth.token.role == "admin");
+            || isAdministrator());
         allow write: if false;
       }
 
       match /referralRewards/{rewardId} {
         allow read: if request.auth != null
           && (request.auth.uid == userId
-            || request.auth.token.admin == true
-            || request.auth.token.role == "admin");
+            || isAdministrator());
         allow write: if false;
       }
 
       match /deposits/{depositId} {
         allow read: if request.auth != null
           && (request.auth.uid == userId
-            || request.auth.token.admin == true
-            || request.auth.token.role == "admin");
-        allow create: if request.auth != null
-          && request.auth.uid == userId
-          && request.resource.data.status == "pending";
+            || isAdministrator());
+        // Deposit requests and their immutable package terms are written by the trusted API.
+        allow create: if false;
         allow update, delete: if false;
       }
 
       match /withdrawals/{withdrawalId} {
         allow read: if request.auth != null
           && (request.auth.uid == userId
-            || request.auth.token.admin == true
-            || request.auth.token.role == "admin");
-        allow create: if request.auth != null
-          && request.auth.uid == userId
-          && request.resource.data.status == "pending"
-          && request.resource.data.wallet is string
-          && request.resource.data.wallet.size() > 0
-          && ((request.resource.data.method == "Litecoin"
-              && request.resource.data.wallet == get(/databases/$(database)/documents/users/$(userId)).data.litecoinWallet)
-            || (request.resource.data.method == "Bitcoin"
-              && request.resource.data.wallet == get(/databases/$(database)/documents/users/$(userId)).data.bitcoinWallet)
-            || (request.resource.data.method == "BNB"
-              && request.resource.data.wallet == get(/databases/$(database)/documents/users/$(userId)).data.bnbWallet)
-            || (request.resource.data.method == "Ethereum"
-              && request.resource.data.wallet == get(/databases/$(database)/documents/users/$(userId)).data.ethereumWallet));
+            || isAdministrator());
+        // Withdrawal requests go through the trusted API so available funds and
+        // existing pending requests can be checked and reserved atomically.
+        allow create, update, delete: if false;
         allow update, delete: if false;
       }
 
       match /supportTickets/{ticketId} {
         allow read: if request.auth != null
           && (request.auth.uid == userId
-            || request.auth.token.admin == true
-            || request.auth.token.role == "admin");
+            || isAdministrator());
         allow create: if request.auth != null
           && request.auth.uid == userId
-          && request.resource.data.status == "open";
+          && request.resource.data.keys().hasAll([
+            "fullName", "email", "subject", "message", "status", "createdAt"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "fullName", "email", "subject", "message", "status", "createdAt"
+          ])
+          && request.resource.data.fullName is string
+          && request.resource.data.fullName.size() > 0
+          && request.resource.data.fullName.size() <= 120
+          && request.resource.data.email is string
+          && request.resource.data.email.size() <= 254
+          && request.resource.data.subject is string
+          && request.resource.data.subject.size() > 0
+          && request.resource.data.subject.size() <= 180
+          && request.resource.data.message is string
+          && request.resource.data.message.size() > 0
+          && request.resource.data.message.size() <= 4000
+          && request.resource.data.status == "open"
+          && request.resource.data.createdAt == request.time;
         allow update, delete: if false;
       }
 
     }
 
-    // Username reservation and referral lookup run through trusted API routes.
-    // The client no longer needs to enumerate these UID mappings.
+    // Username reservation and referral lookup are handled by trusted API routes.
     match /usernames/{username} {
       allow read: if false;
-      allow create: if request.auth != null
-        && request.resource.data.uid == request.auth.uid;
-      allow update: if request.auth != null
-        && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == request.auth.uid;
+      allow create, update: if false;
       allow delete: if false;
     }
 
     match /packages/{packageId} {
-      allow read: if request.auth != null;
+      // The public catalog API returns only approved display fields.
+      allow read: if false;
       allow write: if false;
     }
 
     match /audit/{auditId} {
-      allow read: if request.auth != null
-        && (request.auth.token.admin == true || request.auth.token.role == "admin");
+      allow read: if isAdministrator();
       allow write: if false;
     }
 
     match /adminActions/{actionId} {
-      allow read: if request.auth != null
-        && (request.auth.token.admin == true || request.auth.token.role == "admin");
+      allow read: if isAdministrator();
       allow write: if false;
     }
 
     // Ledger entries and audit records are append-only server records. The
-    // Admin SDK is the only writer; clients must never manufacture balances.
+    // Admin SDK is the only writer; a member can read only their own ledger
+    // rows so admin credits and debits appear in the member transaction list.
     match /ledger/{entryId} {
-      allow read: if request.auth != null
-        && (request.auth.token.admin == true || request.auth.token.role == "admin");
+      allow read: if isAdministrator()
+        || (request.auth != null && resource.data.userId == request.auth.uid);
       allow write: if false;
     }
 
@@ -404,8 +421,7 @@ service cloud.firestore {
     // - "cleanup-failed": Auth account was meant to be deleted but deletion failed
     // - "auth-deleted": Orphaned Auth account successfully cleaned up
     match /accountProvisioning/{entryId} {
-      allow read: if request.auth != null
-        && (request.auth.token.admin == true || request.auth.token.role == "admin");
+      allow read: if isAdministrator();
       allow write: if false;
     }
   }

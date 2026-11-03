@@ -6,8 +6,19 @@ A Vite + React + Tailwind application for the MeridianVest member portal and pub
 
 ```bash
 npm install
+npm run dev:vercel
+```
+
+In a second terminal, run the Vite frontend:
+
+```bash
 npm run dev
 ```
+
+Vite forwards every `/api/*` request to the local Vercel Functions server on
+port 5174. Install the Vercel CLI (`npm install -g vercel`) if it is not
+available, and link the project when prompted. Running only `npm run dev`
+serves the frontend without the server endpoints.
 
 Copy `.env.example` to `.env` and fill in the Firebase web app values before testing login locally. The values come from **Firebase Console -> Project settings -> Your apps -> Web app**.
 
@@ -66,7 +77,9 @@ firebase login
 firebase deploy --only firestore:rules
 ```
 
-Review `firestore.rules` before deploying to production. The rules allow each signed-in member to access only their own records, while username lookup is intentionally public for email-or-username login.
+Review `firestore.rules` before deploying to production. Members can access
+only their own records. Username mappings are reserved and looked up by trusted
+server code; member sign-in uses the account email.
 
 ## Deposit email notifications
 
@@ -74,15 +87,16 @@ Deposit requests are saved to Firestore. The member receives one pending
 confirmation email at the verified email address on their Firebase Authentication
 account (Gmail addresses are supported). After an administrator confirms the
 offline payment and credits the deposit, the member receives one success email.
-Both use the server-only SMTP settings listed in `DEPLOYMENT.md`. A failed
+Both use the server-only email settings listed in `DEPLOYMENT.md`. A failed
 pending email can be retried from the confirmation page; administrators can retry
-a failed success email from the Deposits list.
+failed deposit emails from the Deposits list and withdrawal success emails from
+withdrawal details without repeating a payout.
 
 ## Support ticket email notifications
 
 Support requests are saved under the member's Firestore profile, then the
 server sends a branded notification to the support inbox and a confirmation to
-the member's verified account email. Both use the SMTP settings in
+the member's verified account email. Both use the email settings in
 `DEPLOYMENT.md`. If email delivery fails, the saved ticket remains available
 in the admin portal and the member can retry the notifications from the support
 form.
@@ -97,6 +111,13 @@ normal not-found page.
 Set admin authorization in Firebase Auth custom claims or by a trusted backend
 process; never store admin credentials in frontend code or browser environment
 variables.
+
+Administrators can use **Add funds** in the control room to issue a withdrawable
+account credit. Previous admin-issued credits that were labeled promotional
+are also withdrawable. Referral rewards remain non-withdrawable. Credited funds
+are available for withdrawal even while committed to an active investment.
+An early withdrawal reduces the principal returned at maturity by the amount
+paid out; the package's original profit calculation is unchanged.
 
 ### Granting your first admin access
 
@@ -131,15 +152,15 @@ admin Deposits page to enter the amount received in USD. This action does not
 process a payment, contact a payment provider, or verify a blockchain
 transaction.
 
-The protected admin API validates recent authentication, requires a reason and
-a positive amount, and uses a Firestore transaction to credit the member's
+The protected admin API validates recent authentication and a positive amount,
+and uses a Firestore transaction to credit the member's
 available balance, create a completed ledger entry, mark the request settled,
 and write an audit record. A deterministic settlement record prevents the same
 deposit request from being credited twice.
 
 Administrators may delete only pending, rejected, or cancelled request
-documents. Deletion requires recent authentication, a password, a reason, and
-the exact `DELETE DEPOSIT` confirmation. Approved, completed, settled, or
+documents. Deletion requires recent authentication, a password, and the exact
+`DELETE DEPOSIT` confirmation. Approved, completed, settled, or
 credited requests are locked and cannot be deleted. Deletion does not change
 the member profile, balance, or transaction history and is recorded in the
 audit history. Deposit rows show the requesting member's stored username and

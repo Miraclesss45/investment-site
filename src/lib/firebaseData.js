@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, serverTimestamp, updateDoc } from "firebase/firestore";
 import { EmailAuthProvider, getIdToken, reauthenticateWithCredential, updatePassword } from "firebase/auth";
 import { firebaseAuth } from "./firebase";
 import { firestoreDb } from "./firebaseFirestore";
@@ -73,8 +73,24 @@ export async function sendSupportTicketEmails(ticketId) {
   return data;
 }
 
+const MEMBER_EDITABLE_PROFILE_FIELDS = [
+  "fullName",
+  "bitcoinWallet",
+  "ethereumWallet",
+  "litecoinWallet",
+];
+
 export async function updateUserProfile(userId, values) {
-  return updateDoc(doc(firestoreDb, "users", userId), values);
+  const updates = Object.fromEntries(
+    MEMBER_EDITABLE_PROFILE_FIELDS
+      .filter((field) => Object.prototype.hasOwnProperty.call(values || {}, field))
+      .map((field) => [field, String(values[field] ?? "").trim()]),
+  );
+  if (!userId || !firestoreDb || Object.keys(updates).length === 0) {
+    throw new Error("No editable profile details were provided.");
+  }
+  // updateDoc replaces these existing fields in place; it does not append duplicate profile data.
+  return updateDoc(doc(firestoreDb, "users", userId), updates);
 }
 
 export async function createMemberRequest(userId, type, values) {
@@ -83,6 +99,76 @@ export async function createMemberRequest(userId, type, values) {
     status: "pending",
     createdAt: serverTimestamp(),
   });
+}
+
+export async function createMemberDepositRequest(values, user = firebaseAuth?.currentUser) {
+  if (!user) throw new Error("Sign in before requesting a deposit.");
+  const token = await getIdToken(user, true);
+  const result = await fetch("/api/create-deposit-request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(values),
+  });
+  const data = await result.json().catch(() => ({}));
+  if (!result.ok) {
+    const error = new Error(data.error || "The deposit request could not be saved.");
+    error.code = data.code || `deposit-request-${result.status}`;
+    throw error;
+  }
+  return data;
+}
+
+export async function loadOlderMemberHistory(kind, cursor, user = firebaseAuth?.currentUser) {
+  if (!user) throw new Error("Sign in before loading account history.");
+  const token = await getIdToken(user);
+  const result = await fetch("/api/member-history", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ kind, cursor }),
+  });
+  const data = await result.json().catch(() => ({}));
+  if (!result.ok) {
+    const error = new Error(data.error || "Older account history could not be loaded.");
+    error.code = data.code || `member-history-${result.status}`;
+    throw error;
+  }
+  return data;
+}
+
+export async function createWithdrawalRequest(values) {
+  const user = firebaseAuth?.currentUser;
+  if (!user) throw new Error("Sign in before requesting a withdrawal.");
+  const token = await getIdToken(user, true);
+  const result = await fetch("/api/create-withdrawal-request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(values),
+  });
+  const payload = await result.json().catch(() => ({}));
+  if (!result.ok) {
+    const error = new Error(payload.error || "The withdrawal request could not be created.");
+    error.code = payload.code || `withdrawal-request-${result.status}`;
+    error.status = result.status;
+    throw error;
+  }
+  return { id: payload.id, idempotent: payload.idempotent === true };
+}
+
+export async function processDueInvestments() {
+  const user = firebaseAuth?.currentUser;
+  if (!user) throw new Error("Sign in before refreshing investment accrual.");
+  const token = await getIdToken(user, true);
+  const result = await fetch("/api/settle-matured-investments", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const payload = await result.json().catch(() => ({}));
+  if (!result.ok) {
+    const error = new Error(payload.error || "Investment accrual could not be refreshed.");
+    error.code = payload.code || `investment-maturity-${result.status}`;
+    throw error;
+  }
+  return payload;
 }
 
 export async function sendWithdrawalProcessingEmail(withdrawalId) {
@@ -218,6 +304,48 @@ export async function getAdminPage(resource, cursor = "") {
   };
 }
 
+export async function getAdminSupportHistoryPage({
+  search = "",
+  filter = "all",
+  archived = false,
+  cursor = "",
+  signal,
+} = {}) {
+  if (!firebaseAuth?.currentUser) throw new Error("You must be signed in as an administrator.");
+  const token = await getIdToken(firebaseAuth.currentUser, true);
+  const params = new URLSearchParams({
+    resource: "admin-support-history",
+    page: "1",
+    search: String(search || "").trim().slice(0, 160),
+    filter,
+    archived: archived ? "1" : "0",
+  });
+  if (cursor) params.set("cursor", cursor);
+  const result = await fetch(`/api/admin-data?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal,
+  });
+  const payload = (result.headers.get("content-type") || "").includes("application/json")
+    ? await result.json().catch(() => ({}))
+    : null;
+  if (!payload) {
+    throw new Error("The admin API is not running. Use the deployed admin endpoint or start the Vercel development server.");
+  }
+  if (!result.ok) {
+    const error = new Error(payload.error || "Support conversation history could not be searched.");
+    error.code = payload.code || `admin-http-${result.status}`;
+    throw error;
+  }
+  return {
+    items: Array.isArray(payload.items) ? payload.items : [],
+    nextCursor: typeof payload.nextCursor === "string" ? payload.nextCursor : "",
+    hasMore: payload.hasMore === true,
+    scanned: Number(payload.scanned) || 0,
+    searchIndexComplete: payload.searchIndexComplete === true,
+    searchIndexTruncatedCount: Number(payload.searchIndexTruncatedCount) || 0,
+  };
+}
+
 export async function getAdminRecord(resource, userId, id, collectionName = resource) {
   if (!firebaseAuth?.currentUser) throw new Error("You must be signed in as an administrator.");
   const token = await getIdToken(firebaseAuth.currentUser, true);
@@ -245,23 +373,6 @@ export async function getAdminRecord(resource, userId, id, collectionName = reso
 
 export async function requestAdminAction(action, payload) {
   return adminRequest("POST", { action, payload });
-}
-
-export async function syncPaperTradingMarket() {
-  if (!firebaseAuth?.currentUser) return null;
-  const token = await getIdToken(firebaseAuth.currentUser);
-  const result = await fetch("/api/paper-trading-sync", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({}),
-  });
-  const data = await result.json().catch(() => ({}));
-  if (!result.ok) {
-    const error = new Error(data.error || "Crypto trading market sync failed.");
-    error.code = data.code || `paper-trading-sync-${result.status}`;
-    throw error;
-  }
-  return data;
 }
 
 export async function reauthenticateAdmin(password) {

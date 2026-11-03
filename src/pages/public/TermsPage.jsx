@@ -36,22 +36,22 @@ const sections = [
 export default function TermsPage() {
   return (
     <PublicPage>
-      <main id="main-content" tabIndex="-1" className="bg-[#07111d]/80 px-4 py-12 sm:py-16 lg:py-24">
+      <main id="main-content" tabIndex="-1" className="bg-slate-50/80 px-4 py-12 sm:py-16 lg:py-24">
         <div className="mx-auto w-full max-w-[900px]">
-          <Reveal className="mb-10 border-b border-white/10 pb-10 sm:mb-14 sm:pb-14">
-            <p className="mb-5 flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">
+          <Reveal className="mb-10 border-b border-slate-200 pb-10 sm:mb-14 sm:pb-14">
+            <p className="mb-5 flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-700">
               <span className="block h-2.5 w-2.5 bg-sky-400" /> Legal
               information
             </p>
-            <h1 className="text-[clamp(2.25rem,7vw,3.5rem)] font-semibold leading-[1.08] tracking-[-0.05em] text-white">
+            <h1 className="text-[clamp(2.25rem,7vw,3.5rem)] font-semibold leading-[1.08] tracking-[-0.05em] text-slate-900">
               Terms and conditions
             </h1>
-            <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-300">
+            <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-700">
               Please read these terms before creating an account. By selecting
               the agreement checkbox during signup, you confirm that you have
               read and accepted these conditions.
             </p>
-            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-sky-300">
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
               Last updated: September 17, 2026
             </p>
           </Reveal>
@@ -61,13 +61,13 @@ export default function TermsPage() {
               <Reveal
                 as="section"
                 key={title}
-                className="border-b border-white/10 pb-8 last:border-b-0 sm:pb-10"
+                className="border-b border-slate-200 pb-8 last:border-b-0 sm:pb-10"
                 style={{ "--reveal-delay": `${index * 90}ms` }}
               >
-                <h2 className="text-xl font-semibold tracking-[-0.03em] text-white sm:text-2xl">
+                <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-900 sm:text-2xl">
                   {index + 1}. {title}
                 </h2>
-                <div className="mt-4 space-y-4 text-sm leading-7 text-slate-300">
+                <div className="mt-4 space-y-4 text-sm leading-7 text-slate-700">
                   {paragraphs.map((paragraph) => (
                     <p key={paragraph}>{paragraph}</p>
                   ))}
@@ -76,7 +76,7 @@ export default function TermsPage() {
             ))}
           </div>
 
-          <div className="mt-10 flex flex-col gap-4 border-t border-white/10 pt-8 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-10 flex flex-col gap-4 border-t border-slate-200 pt-8 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
             <span>Questions about these terms?</span>
             <Link
               to="/support"

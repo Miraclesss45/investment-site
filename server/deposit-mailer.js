@@ -7,31 +7,22 @@ import {
   getFirebaseAdminApp,
   sendConfiguredEmail,
 } from "./withdrawal-mailer.js";
+import { EMAIL_LOGO_CID, makeBrandedEmail } from "./email-template.js";
+import { getMemberEmailName } from "./member-email-name.js";
 
 const DEPOSIT_EMAILS = {
   pending: {
     field: "pending",
-    subject: "Deposit request received | MeridianVest",
-    heading: "DEPOSIT REQUEST RECEIVED",
+    subject: "Deposit request received | MeridianVests",
+    heading: "YOUR DEPOSIT REQUEST HAS BEEN RECEIVED",
   },
   successful: {
     field: "successful",
-    subject: "Deposit successful | MeridianVest",
-    heading: "DEPOSIT SUCCESSFUL",
+    subject: "Deposit credited | MeridianVests",
+    heading: "YOUR DEPOSIT HAS BEEN CREDITED",
   },
 };
 const EMAIL_LEASE_MS = 2 * 60 * 1000;
-const LOGO_CID = "meridianvest-logo";
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[character]);
-}
 
 function getAmount(value) {
   const amount = Number(value);
@@ -40,22 +31,42 @@ function getAmount(value) {
     : "the requested amount";
 }
 
-function makeEmail(kind, deposit, depositId) {
+export function buildDepositEmailContent(kind, deposit, depositId) {
+  const memberName = getMemberEmailName(deposit);
   const amount = getAmount(kind === "successful"
     ? deposit.creditedAmount ?? deposit.receivedAmount ?? deposit.amount
     : deposit.amount);
   const plan = String(deposit.plan || deposit.packageName || "Selected plan");
+  const normalizedPlan = plan.trim().toUpperCase();
   const asset = String(deposit.method || deposit.asset || "Selected asset");
+  const promoPercent = normalizedPlan === "PROMO MINI PLAN"
+    ? 100
+    : normalizedPlan === "PROMO MEGA PLAN" ? 500 : null;
+  const greeting = kind === "successful"
+    ? `Congratulations, ${memberName}!`
+    : `Dear ${memberName}.`;
   const message = kind === "pending"
-    ? "We received your deposit request. It is awaiting administrator review. This email confirms the request only; no funds have been credited yet. We will email you again once your deposit has been approved and credited."
-    : "Your deposit has been approved and credited to your account. Thank you for choosing MeridianVest.";
-  const escapedMessage = escapeHtml(message);
-  const escapedAmount = escapeHtml(amount);
-  const escapedPlan = escapeHtml(plan);
-  const escapedAsset = escapeHtml(asset);
-  const escapedId = escapeHtml(depositId);
-  const html = `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#0f172a"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 12px;background:#f1f5f9"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden"><tr><td style="padding:28px 32px;background:#07111d"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td><img src="cid:${LOGO_CID}" width="44" height="44" alt="MeridianVest" style="display:block;border:0;border-radius:8px"></td><td style="padding-left:12px;color:#fff;font-size:20px;font-weight:bold">Meridian<span style="color:#38bdf8">Vest</span></td></tr></table></td></tr><tr><td style="padding:32px"><h1 style="margin:0 0 16px;font-size:24px;line-height:1.3">${DEPOSIT_EMAILS[kind].heading}</h1><p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.7">${escapedMessage}</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2e8f0;border-radius:10px"><tr><td style="padding:14px 16px;color:#64748b;font-size:13px">${kind === "pending" ? "Requested amount (USD)" : "Credited amount (USD)"}</td><td align="right" style="padding:14px 16px;font-weight:bold">${escapedAmount}</td></tr><tr><td style="padding:14px 16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:13px">Package</td><td align="right" style="padding:14px 16px;border-top:1px solid #e2e8f0;font-weight:bold">${escapedPlan}</td></tr><tr><td style="padding:14px 16px;border-top:1px solid #e2e8f0;color:#64748b;font-size:13px">Payment asset</td><td align="right" style="padding:14px 16px;border-top:1px solid #e2e8f0;font-weight:bold">${escapedAsset}</td></tr></table><p style="margin:20px 0 0;color:#64748b;font-size:12px">Request ID: ${escapedId}</p><p style="margin:24px 0 0;color:#64748b;font-size:13px;line-height:1.6">For help, contact MeridianVest support. This is an automated notification; please do not reply with sensitive account details.</p></td></tr></table></td></tr></table></body></html>`;
-  const text = `${DEPOSIT_EMAILS[kind].heading}\n\n${message}\n\n${kind === "pending" ? "Requested" : "Credited"} amount (USD): ${amount}\nPackage: ${plan}\nPayment asset: ${asset}\nRequest ID: ${depositId}\n\nFor help, contact MeridianVest support.`;
+    ? `We have received your deposit request for ${amount}. It is now under review by the MeridianVests team. Your account has not been credited yet. We will email you when the review is complete.`
+    : promoPercent !== null
+      ? `Your deposit of ${amount} has been credited to ${plan}, and the 24-hour investment term has started. Promotional returns are not guaranteed and are subject to the platform terms and applicable regulations. Sign in to your MeridianVests dashboard for the recorded start time and maturity details.`
+      : `Your deposit of ${amount} has been approved and credited to your ${plan} investment account. Your investment term is now active. Sign in to your MeridianVests dashboard for the recorded start time and maturity details.`;
+  const html = makeBrandedEmail({
+    heading: DEPOSIT_EMAILS[kind].heading,
+    greeting,
+    message,
+    details: [
+      {
+        label: kind === "pending" ? "Requested amount (USD)" : "Credited amount (USD)",
+        value: amount,
+      },
+      { label: "Package", value: plan },
+      { label: "Payment asset", value: asset },
+      { label: "Provided address", value: "n/a" },
+    ],
+    reference: { label: "Request ID", value: depositId },
+    footer: "For help, contact MeridianVests support. This is an automated notification; please do not reply with sensitive account details.",
+  });
+  const text = `${DEPOSIT_EMAILS[kind].heading}\n\n${greeting}\n\n${message}\n\n${kind === "pending" ? "Requested" : "Credited"} amount (USD): ${amount}\nPackage: ${plan}\nPayment asset: ${asset}\nProvided address: n/a\nRequest ID: ${depositId}\n\nFor help, contact MeridianVests support.`;
   return {
     subject: DEPOSIT_EMAILS[kind].subject,
     text,
@@ -112,12 +123,19 @@ export async function deliverDepositEmail({ db, profileId, depositId, kind, retr
     if (!account.email || account.emailVerified !== true) {
       throw Object.assign(new Error("The member needs a verified email address."), { code: "member-email-unavailable" });
     }
-    const email = makeEmail(kind, claim.deposit, depositId);
+    const profileSnapshot = await db.collection("users").doc(profileId).get();
+    const profile = profileSnapshot.data() || {};
+    const email = buildDepositEmailContent(kind, {
+      ...claim.deposit,
+      displayName: profile.displayName,
+      authDisplayName: account.displayName,
+      username: profile.username,
+    }, depositId);
     const logo = await fs.readFile(join(process.cwd(), "public", "meridianvest-favicon.png"));
     await sendConfiguredEmail({
       to: account.email,
       ...email,
-      attachments: [{ filename: "meridianvest-logo.png", content: logo, cid: LOGO_CID }],
+      attachments: [{ filename: "meridianvest-logo.png", content: logo, contentType: "image/png", contentDisposition: "inline", cid: EMAIL_LOGO_CID }],
     });
     await depositRef.update({
       [statePath]: {
@@ -134,6 +152,9 @@ export async function deliverDepositEmail({ db, profileId, depositId, kind, retr
       depositId,
       kind,
       code: error?.code || null,
+      responseCode: error?.responseCode || null,
+      providerCode: error?.providerCode || null,
+      command: error?.command || null,
       failureCode: failure.code,
     });
     await depositRef.update({
@@ -142,6 +163,9 @@ export async function deliverDepositEmail({ db, profileId, depositId, kind, retr
         attemptCount: (Number(claim.deposit.emailNotifications?.[emailState.field]?.attemptCount) || 0) + 1,
         failedAt: FieldValue.serverTimestamp(),
         errorCode: failure.code,
+        errorMessage: failure.message,
+        providerCode: error?.providerCode || null,
+        responseCode: Number.isInteger(error?.responseCode) ? error.responseCode : null,
       },
     });
     return { status: "failed", code: failure.code, error: failure.message };

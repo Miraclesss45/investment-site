@@ -12,7 +12,7 @@ export function Reveal({
   return (
     <Component
       ref={revealRef}
-      className={`transition-[transform,opacity] duration-700 ease-out motion-reduce:transition-none ${
+      className={`transition-[translate,opacity] duration-700 ease-out ${
         isVisible
           ? "translate-y-0 opacity-100"
           : "translate-y-6 opacity-0"

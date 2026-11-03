@@ -11,6 +11,22 @@
     {
       "path": "/api/recover-provisioning",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/accrue-investments",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/process-account-deletions",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/reconcile-account-status",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/reindex-support-search",
+      "schedule": "0 6 * * *"
     }
   ],
   "rewrites": [

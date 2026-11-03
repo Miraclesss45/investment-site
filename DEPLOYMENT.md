@@ -52,16 +52,30 @@ VITE_FIREBASE_STORAGE_BUCKET=<value>
 VITE_FIREBASE_MESSAGING_SENDER_ID=<value>
 VITE_FIREBASE_APP_ID=<value>
 FIREBASE_SERVICE_ACCOUNT=<complete JSON object>
-SMTP_HOST=<outgoing SMTP hostname shown by Truehost>
-SMTP_PORT=<outgoing SMTP port shown by Truehost>
-SMTP_SECURE=<true for implicit TLS, false for STARTTLS>
-SMTP_USER=<full Truehost mailbox address>
-SMTP_PASS=<Truehost mailbox password>
-MAIL_FROM=<MeridianVest <same mailbox address>>
+CRON_SECRET=<random secret with at least 16 characters>
+SMTP_HOST=mail.meridianvests.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=notifications@meridianvests.com
+SMTP_PASS=<password for the notifications mailbox>
+MAIL_FROM=MeridianVests <notifications@meridianvests.com>
+EMAIL_PROVIDER=smtp
 ```
 
 **Important:** Store `FIREBASE_SERVICE_ACCOUNT` as the complete JSON string from your Firebase service account key.
 SMTP variables are server-only: do not prefix them with `VITE_`, place them in frontend code, or commit their real values. `MAIL_FROM` should use the Truehost mailbox/domain that is authorized to send. After changing Vercel variables, redeploy for them to take effect.
+
+Alternatively, use an HTTP email provider:
+
+```
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=<server-only API key>
+MAIL_FROM=MeridianVests <notifications@meridianvests.com>
+```
+
+Verify the sender domain and `MAIL_FROM` with the provider first. Keep the key
+server-only and do not add a `VITE_` prefix. When `EMAIL_PROVIDER=resend` is set,
+email is sent through the provider's HTTPS API and the SMTP settings are ignored.
 
 ### Support chat prerequisites
 
@@ -109,6 +123,12 @@ after changing Production variables. `vercel env ls` confirms that variable
 names are configured, but does not verify that Truehost accepts SMTP connections
 from the runtime.
 
+Deploy the checked-in Firestore indexes when releasing this admin list update:
+
+```bash
+firebase deploy --only firestore:indexes
+```
+
 To find the SMTP settings in Truehost:
 
 1. Sign in to the Truehost client area or hosting control panel for your domain.
@@ -150,31 +170,34 @@ In Firebase Console:
 Backend functions are available at:
 
 - `POST /api/admin-data` - Admin dashboard data and operations
+- `GET /api/packages` - Public catalog fields shared by the public and member package pages
 - `GET /api/admin-data?resource=admins` - Read-only current administrator directory
 - `POST /api/create-referral-reward` - Referral reward processing
 - `POST /api/send-deposit-email` - Sends the member's pending deposit confirmation
 - `POST /api/send-withdrawal-email` - Sends the authenticated member's withdrawal-processing email
 - `POST /api/send-support-email` - Sends support-team and member confirmation emails for a saved ticket
+- `GET /api/accrue-investments` - Server-side investment accrual and maturity settlement; Vercel Cron runs daily at 1:00 a.m. Lagos time and authenticates with `CRON_SECRET`
 
 The member receives one pending deposit email after the request is saved and one
 success email after an administrator credits the deposit. Both go to the verified
 email on the member's Firebase Authentication account; Gmail addresses are supported.
-Deposit and withdrawal messages use the configured SMTP sender. Both withdrawal
-emails include the USD request amount and selected payout asset, and
-display `(n/a)` for the wallet address. The actual payout wallet remains saved as an
-immutable request snapshot for administrator review and payout. Firestore rules
-require it to match the member's saved wallet for the selected asset when the request
-is created.
+Deposit and withdrawal messages use the configured email sender. Both withdrawal
+emails include the USD request amount and selected payout asset but omit wallet
+addresses. A saved wallet is optional; when present, it is kept as an immutable
+request snapshot and must match the member's saved wallet for the selected asset.
+Withdrawal payouts are arranged offline by administrators.
 
 Pending and on-hold requests appear in the decision queue on the admin Withdrawals
 page, where administrators can reject a request or approve it after sending the
-payout externally to the displayed wallet. Approval is the final in-app action: it
+payout through their offline process. A wallet address is not required. Approval is the final in-app action: it
 atomically completes the withdrawal, updates the member balance and ledger once,
 records the audit event, and attempts the branded success email. Administrators must
 not approve before sending the payout. The action requires recent password
-reauthentication and a confirmation that the payout was already sent. If SMTP
+reauthentication and a confirmation that the payout was already sent. If email
 delivery fails, the completed withdrawal remains recorded and the failed notification
-is saved on the request.
+is saved on the request. Administrators can inspect the safe failure category and
+retry only the success email from withdrawal details; the retry cannot change the
+completed payout or ledger.
 
 Administrators can delete unpaid withdrawal requests from that page. Deletion
 requires recent password reauthentication and typing `DELETE WITHDRAWAL`; no

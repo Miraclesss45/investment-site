@@ -20,6 +20,33 @@ import { createReferralReward } from "../../lib/firebaseData";
 import FeedbackMessage from "../../components/ui/FeedbackMessage";
 import { resolveUserRole } from "../../lib/userRole";
 
+function MeridianLogo() {
+  return (
+    <svg
+      aria-label="MeridianVests logo"
+      role="img"
+      viewBox="0 0 768 768"
+      className="h-12 w-12 shrink-0 rounded-xl ring-1 ring-slate-200"
+    >
+      <rect width="768" height="768" rx="112" fill="#020A24" />
+      <path d="M176 219L252 276V501L176 550V219Z" fill="#FAFAFA" />
+      <path d="M252 276L441 429L381 492L252 374V276Z" fill="url(#loginLogoBlueA)" />
+      <path d="M592 201L501 244L381 376L441 429L592 269V201Z" fill="url(#loginLogoBlueB)" />
+      <path d="M592 290L512 371V501L592 550V290Z" fill="#FAFAFA" />
+      <defs>
+        <linearGradient id="loginLogoBlueA" x1="252" y1="276" x2="441" y2="492" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#20D7F0" />
+          <stop offset="1" stopColor="#0879F3" />
+        </linearGradient>
+        <linearGradient id="loginLogoBlueB" x1="381" y1="429" x2="592" y2="201" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#1054E9" />
+          <stop offset="1" stopColor="#20D7F0" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
 function isSafeInternalPath(path) {
   return (
     typeof path === "string" &&
@@ -182,74 +209,68 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050b14] text-white">
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
       <div className="pointer-events-none absolute left-[-14rem] top-[-14rem] h-[38rem] w-[38rem] rounded-full bg-sky-500/15 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-16rem] right-[-10rem] h-[38rem] w-[38rem] rounded-full bg-cyan-400/10 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-[-16rem] right-[-10rem] h-[38rem] w-[38rem] rounded-full bg-cyan-50 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(56,189,248,0.08),transparent_38%)]" />
 
-      <div className="relative flex h-[76px] items-center justify-between border-b border-white/[0.08] bg-[#07111d]/50 px-5 sm:px-10">
+      <div className="relative flex h-[76px] items-center justify-between border-b border-blue-100 bg-slate-50/50 px-5 sm:px-10">
         <Link
           to="/"
           aria-label="Back to home"
-          className="flex items-center gap-2 text-sm font-semibold text-slate-400 transition hover:text-white"
+          className="flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-900"
         >
           <span className="text-lg">←</span> Back to home
         </Link>
         <Link
           to="/signup"
-          className="rounded-full border border-sky-300/20 bg-sky-300/10 px-4 py-2 text-sm font-semibold text-sky-200 transition hover:border-sky-200/40 hover:bg-sky-300/15"
+          className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 transition hover:border-sky-200/40 hover:bg-sky-300/15"
         >
           Create account <span className="ml-1">→</span>
         </Link>
       </div>
 
-      <div className="relative mx-auto grid w-[min(1120px,calc(100%-2rem))] items-center gap-10 py-12 sm:w-[min(1120px,calc(100%-4rem))] lg:grid-cols-[0.9fr_1.1fr] lg:gap-20 lg:py-20">
-        <div className="hidden motion-safe:transition motion-safe:duration-700 lg:block">
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-sky-300">
+      <div className="relative mx-auto grid w-full max-w-[1120px] min-w-0 grid-cols-[minmax(0,1fr)] items-center gap-10 px-4 py-12 sm:px-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-20 lg:py-20">
+        <div className="hidden transition duration-700 lg:block">
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-700">
             <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" /> Private member access
           </div>
-          <h1 className="max-w-xl text-5xl font-semibold leading-[1.02] tracking-[-0.07em] text-white xl:text-7xl">
+          <h1 className="max-w-xl text-5xl font-semibold leading-[1.02] tracking-[-0.07em] text-slate-900 xl:text-7xl">
             Your next move starts with clarity.
           </h1>
-          <p className="mt-6 max-w-md text-base leading-8 text-slate-400">
+          <p className="mt-6 max-w-md text-base leading-8 text-slate-600">
             Enter your member portal to review opportunities, follow your portfolio,
             and keep every important update in one place.
           </p>
         </div>
 
-        <div className="motion-safe:transition motion-safe:duration-700 rounded-[2rem] border border-white/[0.12] bg-[#0b1626]/80 p-6 shadow-[0_30px_90px_rgba(2,8,23,0.45)] backdrop-blur-2xl sm:p-10">
+        <div className="transition duration-700 w-full min-w-0 rounded-[2rem] border border-blue-100 bg-white/90 p-5 shadow-[0_30px_90px_rgba(30,64,175,0.12)] backdrop-blur-2xl sm:p-10">
           <div className="mb-8 flex items-center gap-3">
-            <img
-              className="h-12 w-12 rounded-xl object-cover ring-1 ring-white/20"
-              src="/meridianvest-logo.svg"
-              alt="MeridianVests"
-              width="48"
-              height="48"
-            />
+            <MeridianLogo />
             <div>
               <p className="text-sm font-extrabold tracking-[-0.03em]">
-                Meridian<span className="text-sky-400">Vests</span>
+                Meridian<span className="text-blue-700">Vests</span>
               </p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-slate-600">
                 {adminLogin ? "Administrator portal" : "Member portal"}
               </p>
             </div>
           </div>
 
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <h2 className="text-3xl font-semibold tracking-[-0.05em] text-white">
+          <form className="min-w-0 space-y-5" onSubmit={handleSubmit}>
+            <h2 className="text-3xl font-semibold tracking-[-0.05em] text-slate-900">
               {adminLogin ? "Administrator sign in" : "Welcome back"}
             </h2>
-            <p className="text-sm leading-6 text-slate-400">
+            <p className="text-sm leading-6 text-slate-600">
               {adminLogin
                 ? "Use your authorized Firebase account to access the admin dashboard."
                 : "Sign in with the email address used to create your account."}
             </p>
 
-            <label className="block text-[12px] font-bold text-slate-200">
+            <label className="block text-[12px] font-bold text-slate-700">
               <span className="mb-2 block">Email address</span>
-              <div className="flex h-[58px] w-full items-center rounded-xl border border-white/10 bg-[#081321] px-4 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
-                <UserRound size={18} className="text-sky-300" />
+              <div className="flex h-[58px] w-full min-w-0 items-center rounded-xl border border-slate-200 bg-slate-50 px-4">
+                <UserRound size={18} className="shrink-0 text-blue-700" />
                 <input
                   id="login-identifier"
                   name="identifier"
@@ -257,15 +278,15 @@ export default function LoginPage() {
                   autoComplete="username"
                   placeholder="you@example.com"
                   required
-                  className="ml-3 h-full w-full bg-transparent text-white placeholder:text-slate-400 focus:outline-none"
+                  className="ml-3 h-full min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none autofill:shadow-[inset_0_0_0_1000px_#f8fafc] autofill:[-webkit-text-fill-color:#0f172a]"
                 />
               </div>
             </label>
 
-            <label className="block text-[12px] font-bold text-slate-200">
+            <label className="block text-[12px] font-bold text-slate-700">
               <span className="mb-2 block">Password</span>
-              <div className="flex h-[58px] w-full items-center rounded-xl border border-white/10 bg-[#081321] px-4 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
-                <ShieldCheck size={18} className="text-sky-300" />
+              <div className="flex h-[58px] w-full min-w-0 items-center rounded-xl border border-slate-200 bg-slate-50 px-4">
+                <ShieldCheck size={18} className="shrink-0 text-blue-700" />
                 <input
                   id="login-password"
                   name="password"
@@ -273,22 +294,22 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   placeholder="Enter your password"
                   required
-                  className="ml-3 h-full w-full bg-transparent text-white placeholder:text-slate-400 focus:outline-none"
+                  className="ml-3 h-full min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-600 focus:outline-none autofill:shadow-[inset_0_0_0_1000px_#f8fafc] autofill:[-webkit-text-fill-color:#0f172a]"
                 />
                 <button
                   type="button"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   onClick={() => setShowPassword((visible) => !visible)}
-                  className="ml-2 rounded-md p-1 text-slate-400 transition hover:text-sky-300"
+                  className="ml-2 shrink-0 rounded-md p-1 text-slate-600 transition hover:text-blue-700"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </label>
 
-            {message && <FeedbackMessage type={messageType}>{message}</FeedbackMessage>}
+            {message && <FeedbackMessage type={messageType} variant="light">{message}</FeedbackMessage>}
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <button
                 type="submit"
                 disabled={loading}
@@ -303,11 +324,11 @@ export default function LoginPage() {
                   "Sign in"
                 )}
               </button>
-              <div className="flex items-center gap-3 text-xs text-slate-400">
-                <button type="button" onClick={handlePasswordReset} className="hover:text-sky-300">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-600">
+                <button type="button" onClick={handlePasswordReset} className="hover:text-blue-700">
                   Reset password
                 </button>
-                <button type="button" onClick={handleVerificationResend} className="hover:text-sky-300">
+                <button type="button" onClick={handleVerificationResend} className="hover:text-blue-700">
                   Resend verification
                 </button>
               </div>

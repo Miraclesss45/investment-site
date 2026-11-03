@@ -1,7 +1,7 @@
 export default function BrandLoader({ label = "Loading your MeridianVests experience" }) {
   return (
     <div
-      className="grid min-h-screen place-items-center bg-[#07111d] px-6 text-white"
+      className="grid min-h-screen place-items-center bg-slate-50 px-6 text-slate-900"
       role="status"
       aria-label={label}
     >

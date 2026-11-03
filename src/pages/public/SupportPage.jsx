@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Check, Copy, LoaderCircle, MapPin, MessageCircle } from "lucide-react";
 import { useAuth } from "../../lib/authContext";
 import { saveSupportTicket, sendSupportTicketEmails } from "../../lib/firebaseData";
-import { SUPPORT_CHAT_OPEN_EVENT } from "../../lib/supportChat";
+import { SUPPORT_CHAT_OPEN_EVENT } from "../../lib/supportChatEvents";
 import { PublicPage } from "../../components/site/SiteChrome";
 import heroAsset from "../../assets/uploads/banner-5.webp";
 import heroAssetMedium from "../../assets/uploads/banner-5-1440.webp";
@@ -91,7 +91,7 @@ export default function SupportPage() {
 
   return (
     <PublicPage>
-      <main id="main-content" tabIndex="-1" className="bg-[#07111d]/70">
+      <main id="main-content" tabIndex="-1" className="bg-slate-50/70">
         <section className="relative grid min-h-[clamp(16rem,35vw,20rem)] place-items-center overflow-hidden text-center">
           <img
             className="absolute inset-0 h-full w-full object-cover"
@@ -105,15 +105,15 @@ export default function SupportPage() {
             decoding="async"
           />
           <div
-            className="absolute inset-0 bg-[#050b14]/[0.72]"
+            className="absolute inset-0 bg-blue-950/70"
             aria-hidden="true"
           />
-          <div className="relative z-10 mx-auto w-[min(1160px,calc(100%-2rem))] sm:w-[min(1160px,calc(100%-3rem))] lg:w-[min(1160px,calc(100%-5rem))]">
+          <div className="relative z-10 mx-auto w-[min(1160px,calc(100%_-_2rem))] sm:w-[min(1160px,calc(100%_-_3rem))] lg:w-[min(1160px,calc(100%_-_5rem))]">
             <h1 className="mb-6 text-[clamp(2.25rem,7vw,4rem)] font-semibold tracking-[-0.05em] text-white">
               Support Center
             </h1>
-            <p className="flex items-center justify-center gap-4 text-sm font-semibold text-white">
-              <Link to="/" className="text-sky-400">
+            <p className="flex items-center justify-center gap-4 text-sm font-semibold text-blue-100">
+              <Link to="/" className="text-cyan-200">
                 Home
               </Link>{" "}
               : Request Assistance
@@ -122,14 +122,14 @@ export default function SupportPage() {
         </section>
         <section className="px-4 py-16 sm:py-[94px]">
           <div className="mx-auto grid w-full max-w-[1160px] gap-12 lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="motion-safe:transition motion-safe:duration-700">
-              <div className="mb-6 flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">
+            <div className="transition duration-700">
+              <div className="mb-6 flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-700">
                 <span className="block h-2.5 w-2.5 bg-sky-400" /> Support
               </div>
-              <h2 className="mb-5 text-[clamp(2rem,7vw,2.7rem)] font-semibold tracking-[-0.05em] text-white">
+              <h2 className="mb-5 text-[clamp(2rem,7vw,2.7rem)] font-semibold tracking-[-0.05em] text-slate-900">
                 Request assistance.
               </h2>
-              <p className="mb-9 text-sm leading-8 text-slate-300">
+              <p className="mb-9 text-sm leading-8 text-slate-700">
                 Request assistance with registration, packages, deposits,
                 withdrawals, or any other part of your MeridianVests member
                 experience.
@@ -138,33 +138,33 @@ export default function SupportPage() {
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new Event(SUPPORT_CHAT_OPEN_EVENT))}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-xs font-extrabold uppercase tracking-[0.12em] text-cyan-100 transition hover:border-cyan-200 hover:bg-cyan-300/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-300/30 bg-cyan-50 px-4 py-3 text-xs font-extrabold uppercase tracking-[0.12em] text-blue-800 transition hover:border-cyan-200 hover:bg-cyan-300/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
                 >
                   <MessageCircle size={16} /> Start live chat
                 </button>
                 <button
                   type="button"
                   onClick={copySupportAddress}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-sky-400/10 px-4 py-3 text-xs font-extrabold uppercase tracking-[0.12em] text-sky-200 transition hover:border-sky-300 hover:bg-sky-400/15"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-blue-50 px-4 py-3 text-xs font-extrabold uppercase tracking-[0.12em] text-blue-800 transition hover:border-sky-300 hover:bg-sky-400/15"
                   aria-live="polite"
                 >
                   {emailCopied ? <Check size={16} /> : <Copy size={16} />}
                   {emailCopied ? "Email copied" : "Copy support email"}
                 </button>
               </div>
-              <div className="flex items-center gap-4 text-sm text-slate-200">
+              <div className="flex items-center gap-4 text-sm text-slate-700">
                 <MapPin size={18} /> MeridianVests Crypto Management Group
               </div>
             </div>
             {canSubmitTicket ? (
               <form
-                className="motion-safe:transition motion-safe:duration-700 rounded-[0.625rem] border border-white/10 bg-[#050b14] p-5 shadow-[0_20px_45px_rgba(2,8,23,0.28)] sm:p-8"
+                className="transition duration-700 rounded-[0.625rem] border border-slate-200 bg-slate-50 p-5 shadow-[0_20px_45px_rgba(2,8,23,0.28)] sm:p-8"
                 onSubmit={handleSubmit}
               >
-                <h3 className="mb-7 text-2xl font-semibold text-white">
+                <h3 className="mb-7 text-2xl font-semibold text-slate-900">
                   Send a support ticket
                 </h3>
-                <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-300">
+                <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-700">
                   Full name
                   <input
                     name="fullName"
@@ -172,10 +172,10 @@ export default function SupportPage() {
                     placeholder="Your full name"
                     required
                     maxLength={120}
-                    className="mt-2 h-12 w-full rounded-md border border-white/10 bg-[#101d30] px-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+                    className="mt-2 h-12 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-600 focus:border-blue-600 focus:outline-none"
                   />
                 </label>
-                <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-300">
+                <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-700">
                   Email address
                   <input
                     name="email"
@@ -183,10 +183,10 @@ export default function SupportPage() {
                     placeholder="name@example.com"
                     required
                     maxLength={254}
-                    className="mt-2 h-12 w-full rounded-md border border-white/10 bg-[#101d30] px-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+                    className="mt-2 h-12 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-600 focus:border-blue-600 focus:outline-none"
                   />
                 </label>
-                <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-300">
+                <label className="mb-5 block text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-700">
                   Message
                   <textarea
                     name="message"
@@ -194,7 +194,7 @@ export default function SupportPage() {
                     required
                     minLength={10}
                     maxLength={4000}
-                    className="mt-2 min-h-[145px] w-full rounded-md border border-white/10 bg-[#101d30] px-3 py-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+                    className="mt-2 min-h-[145px] w-full rounded-md border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 placeholder:text-slate-600 focus:border-blue-600 focus:outline-none"
                   />
                 </label>
                 <button
@@ -212,13 +212,13 @@ export default function SupportPage() {
                     "Submit request"
                   )}
                 </button>
-                {message && <FeedbackMessage className="mt-4" type={messageType}>{message}</FeedbackMessage>}
+                {message && <FeedbackMessage className="mt-4" type={messageType} variant="light">{message}</FeedbackMessage>}
                 {emailRetryAvailable && (
                   <button
                     type="button"
                     onClick={retrySupportEmails}
                     disabled={emailRetrying}
-                    className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg border border-amber-200/30 px-4 text-xs font-bold text-amber-100 transition hover:bg-amber-100/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg border border-amber-200 px-4 text-xs font-bold text-amber-900 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {emailRetrying ? <LoaderCircle size={14} className="animate-spin" /> : null}
                     {emailRetrying ? "Retrying email..." : "Retry email notifications"}
@@ -226,23 +226,23 @@ export default function SupportPage() {
                 )}
               </form>
             ) : (
-              <section className="rounded-[0.625rem] border border-white/10 bg-[#050b14] p-5 shadow-[0_20px_45px_rgba(2,8,23,0.28)] sm:p-8">
-                <h3 className="text-2xl font-semibold text-white">
+              <section className="transition duration-700 rounded-[0.625rem] border border-slate-200 bg-slate-50 p-5 shadow-[0_20px_45px_rgba(2,8,23,0.28)] sm:p-8">
+                <h3 className="text-2xl font-semibold text-slate-900">
                   Choose how to get help
                 </h3>
-                <p className="mt-3 text-sm leading-6 text-slate-300">
+                <p className="mt-3 text-sm leading-6 text-slate-700">
                   Start a live chat now, or sign in to submit a support ticket.
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Link
                     to="/login"
-                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-4 text-xs font-bold text-white transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-blue-200 px-4 text-xs font-bold text-slate-900 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
                   >
                     Sign in
                   </Link>
                   <Link
                     to="/signup"
-                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-4 text-xs font-bold text-white transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-blue-200 px-4 text-xs font-bold text-slate-900 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
                   >
                     Create an account
                   </Link>

@@ -31,12 +31,12 @@ const faqContent = {
     {
       question: "What deposit currencies are supported?",
       answer:
-        "The current deposit options are Litecoin, Bitcoin, BNB, and Ethereum. Always select the correct asset and network before sending funds.",
+        "The current deposit options are Litecoin, Bitcoin, and Ethereum. Always select the correct asset and network before sending funds.",
     },
     {
       question: "What are the package durations?",
       answer:
-        "The current public packages use a 14-calendar-day duration. Review the package terms and current details before submitting a request.",
+        "Review the selected package details before submitting a request. Contact support if a package's terms are missing or unclear.",
     },
     {
       question: "Will my deposit be returned?",
@@ -49,11 +49,6 @@ const faqContent = {
       question: "How long does it take for my withdrawal to be sent?",
       answer:
         "Withdrawals are requests for review, not instant transfers. Timing depends on account review, available funds, platform processing, and network confirmation. Contact support if you need an update.",
-    },
-    {
-      question: "Are there any withdrawal fees?",
-      answer:
-        "The current listed network fees are $10 for Litecoin and BNB, and $25 for Bitcoin and Ethereum. Confirm the fee shown in the withdrawal summary before submitting.",
     },
     {
       question: "Which wallet addresses can I use?",
@@ -103,8 +98,8 @@ export default function FaqPage() {
 
   return (
     <PublicPage>
-      <main id="main-content" tabIndex="-1" className="bg-[#07111d]/70 px-4 py-12 sm:py-16 lg:py-[94px]">
-        <div className="mx-auto w-[min(1160px,calc(100%-2rem))] sm:w-[min(1160px,calc(100%-3rem))] lg:w-[min(1160px,calc(100%-5rem))]">
+      <main id="main-content" tabIndex="-1" className="bg-slate-50/70 px-4 py-12 sm:py-16 lg:py-[94px]">
+        <div className="mx-auto w-[min(1160px,calc(100%_-_2rem))] sm:w-[min(1160px,calc(100%_-_3rem))] lg:w-[min(1160px,calc(100%_-_5rem))]">
           <div
             className="mx-auto mb-10 grid min-w-0 max-w-[520px] grid-cols-[repeat(3,minmax(0,1fr))] gap-2 sm:mb-14 sm:flex sm:justify-center sm:gap-3"
             role="tablist"
@@ -123,7 +118,7 @@ export default function FaqPage() {
                 className={
                   tab === activeTab
                     ? "h-11 min-w-0 w-full overflow-hidden rounded-full bg-sky-400 px-1 text-[10px] font-extrabold uppercase tracking-[0.04em] text-ellipsis text-slate-950 sm:min-w-[120px] sm:px-5 sm:text-[11px] sm:tracking-[0.12em]"
-                    : "h-11 min-w-0 w-full overflow-hidden rounded-full border border-white/10 bg-white/5 px-1 text-[10px] font-extrabold uppercase tracking-[0.04em] text-ellipsis text-slate-100 sm:min-w-[120px] sm:px-5 sm:text-[11px] sm:tracking-[0.12em]"
+                    : "h-11 min-w-0 w-full overflow-hidden rounded-full border border-slate-200 bg-blue-50 px-1 text-[10px] font-extrabold uppercase tracking-[0.04em] text-ellipsis text-slate-800 sm:min-w-[120px] sm:px-5 sm:text-[11px] sm:tracking-[0.12em]"
                 }
                 onClick={() => selectTab(tab)}
               >
@@ -133,20 +128,20 @@ export default function FaqPage() {
           </div>
           <div className="grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:gap-14">
             <Reveal>
-              <div className="mb-6 flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">
+              <div className="mb-6 flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-700">
                 <span className="block h-2.5 w-2.5 bg-sky-400" /> FAQ
               </div>
-              <h1 className="mb-5 text-[clamp(2rem,7vw,2.625rem)] font-semibold leading-[1.12] tracking-[-0.05em] text-white">
+              <h1 className="mb-5 text-[clamp(2rem,7vw,2.625rem)] font-semibold leading-[1.12] tracking-[-0.05em] text-slate-900">
                 Answers for members who value clarity.
               </h1>
-              <p className="text-sm leading-7 text-slate-300">
+              <p className="text-sm leading-7 text-slate-700">
                 We focus on straightforward explanations, transparent decision
                 points, and useful guidance at each stage of the journey.
               </p>
             </Reveal>
             <div
               id={`faq-panel-${activeTab.toLowerCase()}`}
-              className="space-y-4 border-t border-white/10 pt-4"
+              className="space-y-4 border-t border-slate-200 pt-4"
               role="tabpanel"
               aria-labelledby={`faq-tab-${activeTab.toLowerCase()}`}
               tabIndex="0"
@@ -155,14 +150,14 @@ export default function FaqPage() {
                 <Reveal
                   as="div"
                   key={question}
-                  className="rounded-lg border border-white/10 bg-[#0d1728]"
+                  className="rounded-lg border border-slate-200 bg-white"
                   style={{ "--reveal-delay": `${index * 80}ms` }}
                 >
                   <button
                     type="button"
                     id={`faq-question-${activeTab.toLowerCase()}-${index}`}
                     aria-controls={`faq-answer-${activeTab.toLowerCase()}-${index}`}
-                    className="flex w-full items-center justify-between gap-3 p-4 text-left text-base font-semibold text-white transition hover:text-sky-400 sm:gap-4 sm:p-5 sm:text-lg"
+                    className="flex w-full items-center justify-between gap-3 p-4 text-left text-base font-semibold text-slate-900 transition hover:text-blue-700 sm:gap-4 sm:p-5 sm:text-lg"
                     aria-expanded={openQuestion === question}
                     onClick={() =>
                       setOpenQuestion((current) =>
@@ -173,7 +168,7 @@ export default function FaqPage() {
                     {question}
                     <ChevronRight
                       size={20}
-                      className={`shrink-0 transition-transform ${openQuestion === question ? "rotate-90 text-sky-400" : ""}`}
+                      className={`shrink-0 transition-transform ${openQuestion === question ? "rotate-90 text-blue-700" : ""}`}
                     />
                   </button>
                   <div
@@ -183,7 +178,7 @@ export default function FaqPage() {
                     aria-labelledby={`faq-question-${activeTab.toLowerCase()}-${index}`}
                   >
                     <div className="min-h-0 overflow-hidden">
-                      <p className="px-5 pb-5 text-sm leading-7 text-slate-300">
+                      <p className="px-5 pb-5 text-sm leading-7 text-slate-700">
                         {answer}
                       </p>
                     </div>

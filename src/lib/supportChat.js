@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  arrayUnion,
   getDocs,
   getFirestore,
   limit,
@@ -12,9 +13,10 @@ import {
   setDoc,
   startAfter,
   updateDoc,
-  writeBatch,
 } from "firebase/firestore";
 import { firebaseApp } from "./firebase";
+import { getSupportSearchTokens } from "./supportSearch";
+import { markSupportMessagesAsRead } from "./supportChatRead";
 
 export const SUPPORT_CONVERSATION_STATUSES = [
   "open",
@@ -26,7 +28,8 @@ export const SUPPORT_CONVERSATION_STATUSES = [
 
 const CONVERSATIONS = "supportConversations";
 const MAX_MESSAGE_LENGTH = 4000;
-export const SUPPORT_CHAT_OPEN_EVENT = "meridianvest:open-support-chat";
+const MAX_CONVERSATION_SEARCH_TOKENS = 15000;
+export { SUPPORT_CHAT_OPEN_EVENT } from "./supportChatEvents";
 
 function getDb() {
   if (!firebaseApp) {
@@ -62,11 +65,40 @@ export function subscribeToAdminConversations(onValue, onError) {
   const conversationsQuery = query(
     collection(getDb(), CONVERSATIONS),
     orderBy("updatedAt", "desc"),
-    limit(100),
+    limit(101),
   );
   return onSnapshot(conversationsQuery, (snapshot) => {
-    onValue(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+    const pageDocuments = snapshot.docs.slice(0, 100);
+    onValue(
+      pageDocuments.map((item) => ({ ...item.data(), id: item.id })),
+      { hasMore: snapshot.docs.length > pageDocuments.length, nextCursor: pageDocuments.at(-1) || null },
+    );
   }, onError);
+}
+
+export function subscribeToAdminConversation(conversationId, onValue, onError) {
+  return onSnapshot(
+    doc(getDb(), CONVERSATIONS, conversationId),
+    (snapshot) => onValue(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null),
+    onError,
+  );
+}
+
+export async function getOlderAdminConversations(cursor) {
+  if (!cursor) return { items: [], nextCursor: null, hasMore: false };
+  const conversationsQuery = query(
+    collection(getDb(), CONVERSATIONS),
+    orderBy("updatedAt", "desc"),
+    startAfter(cursor),
+    limit(101),
+  );
+  const snapshot = await getDocs(conversationsQuery);
+  const pageDocuments = snapshot.docs.slice(0, 100);
+  return {
+    items: pageDocuments.map((item) => ({ ...item.data(), id: item.id })),
+    nextCursor: pageDocuments.at(-1) || null,
+    hasMore: snapshot.docs.length > pageDocuments.length,
+  };
 }
 
 export function subscribeToMessages(conversationId, onValue, onError) {
@@ -115,6 +147,7 @@ export async function sendCustomerMessage(user, identity, text) {
   if (!safeName || !safeEmail) {
     throw new Error("Enter your name and email to start a support conversation.");
   }
+  const searchTokens = getSupportSearchTokens(safeName, safeEmail, user.uid, message.text);
 
   await runTransaction(getDb(), async (transaction) => {
     const conversationSnapshot = await transaction.get(conversationRef);
@@ -132,6 +165,7 @@ export async function sendCustomerMessage(user, identity, text) {
         lastMessage: message.text,
         lastMessageId: messageRef.id,
         lastMessageAt: serverTimestamp(),
+        searchTokens,
         unreadForUser: 0,
         unreadForAgent: 1,
       });
@@ -140,6 +174,12 @@ export async function sendCustomerMessage(user, identity, text) {
       if (conversation.userId !== user.uid) {
         throw new Error("This support conversation is not available to your account.");
       }
+      const storedTokens = Array.isArray(conversation.searchTokens) ? conversation.searchTokens : [];
+      const existingTokens = new Set(storedTokens);
+      const availableTokenSlots = Math.max(MAX_CONVERSATION_SEARCH_TOKENS - storedTokens.length, 0);
+      const missingSearchTokens = searchTokens.filter((token) => !existingTokens.has(token));
+      const newSearchTokens = missingSearchTokens.slice(0, availableTokenSlots);
+      const searchIndexTruncated = newSearchTokens.length < missingSearchTokens.length;
       transaction.update(conversationRef, {
         status: "open",
         lastMessage: message.text,
@@ -147,6 +187,8 @@ export async function sendCustomerMessage(user, identity, text) {
         lastMessageAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         unreadForAgent: (Number(conversation.unreadForAgent) || 0) + 1,
+        ...(newSearchTokens.length ? { searchTokens: arrayUnion(...newSearchTokens) } : {}),
+        ...(searchIndexTruncated ? { searchIndexTruncated: true } : {}),
       });
     }
     transaction.set(messageRef, message);
@@ -158,6 +200,7 @@ export async function sendAdminMessage(user, conversationId, text) {
   if (!user?.uid) throw new Error("An administrator session is required to reply.");
   const conversationRef = doc(getDb(), CONVERSATIONS, conversationId);
   const { messageRef, data: message } = makeMessage(conversationId, user, "agent", text);
+  const searchTokens = getSupportSearchTokens(message.text);
 
   await runTransaction(getDb(), async (transaction) => {
     const conversationSnapshot = await transaction.get(conversationRef);
@@ -166,6 +209,11 @@ export async function sendAdminMessage(user, conversationId, text) {
     if (["resolved", "closed"].includes(conversation.status)) {
       throw new Error("Reopen this conversation before replying.");
     }
+    const storedTokens = Array.isArray(conversation.searchTokens) ? conversation.searchTokens : [];
+    const existingTokens = new Set(storedTokens);
+    const availableTokenSlots = Math.max(MAX_CONVERSATION_SEARCH_TOKENS - storedTokens.length, 0);
+    const newSearchTokens = searchTokens.filter((token) => !existingTokens.has(token)).slice(0, availableTokenSlots);
+    const missingSearchTokens = searchTokens.filter((token) => !existingTokens.has(token));
     transaction.update(conversationRef, {
       status: "waiting",
       assignedAgent: conversation.assignedAgent || user.uid,
@@ -174,6 +222,8 @@ export async function sendAdminMessage(user, conversationId, text) {
       lastMessageAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       unreadForUser: (Number(conversation.unreadForUser) || 0) + 1,
+      ...(newSearchTokens.length ? { searchTokens: arrayUnion(...newSearchTokens) } : {}),
+      ...(newSearchTokens.length < missingSearchTokens.length ? { searchIndexTruncated: true } : {}),
     });
     transaction.set(messageRef, message);
   });
@@ -229,22 +279,22 @@ export async function setConversationArchived(user, conversationId, archived) {
   });
 }
 
-export async function markMessagesAsRead(conversationId, viewerType, messageDocs = [], force = false) {
-  const incomingType = viewerType === "agent" ? "customer" : "agent";
-  const batch = writeBatch(getDb());
-  let hasChanges = false;
-  for (const messageDoc of messageDocs) {
-    if (messageDoc.data().senderType === incomingType && messageDoc.data().read !== true) {
-      batch.update(messageDoc.ref, { read: true });
-      hasChanges = true;
-    }
-  }
-  const unreadField = viewerType === "agent" ? "unreadForAgent" : "unreadForUser";
-  if (hasChanges || force) {
-    batch.update(doc(getDb(), CONVERSATIONS, conversationId), { [unreadField]: 0 });
-    hasChanges = true;
-  }
-  if (hasChanges) await batch.commit();
+export function markMessagesAsRead(
+  conversationId,
+  viewerType,
+  messageDocs = [],
+  force = false,
+  observedLastMessageId = null,
+) {
+  const db = getDb();
+  return markSupportMessagesAsRead(
+    db,
+    doc(db, CONVERSATIONS, conversationId),
+    viewerType,
+    messageDocs,
+    force,
+    observedLastMessageId,
+  );
 }
 
 export async function setSupportTyping(conversationId, userId, isTyping) {

@@ -7,14 +7,6 @@ export function useReveal(options = {}) {
   useEffect(() => {
     const element = revealRef.current;
 
-    if (
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      setIsVisible(true);
-      return undefined;
-    }
-
     if (!element || !("IntersectionObserver" in window)) {
       setIsVisible(true);
       return undefined;

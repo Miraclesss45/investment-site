@@ -6,6 +6,7 @@ import ProtectedRoute from "./components/routing/ProtectedRoute";
 import AdminRoute from "./components/routing/AdminRoute";
 import ScrollToTop from "./components/routing/ScrollToTop";
 import BrandLoader from "./components/ui/BrandLoader";
+import SupportChatMount from "./components/support/SupportChatMount";
 
 const HomePage = lazy(() => import("./pages/public/HomePage"));
 const AboutPage = lazy(() => import("./pages/public/AboutPage"));
@@ -28,8 +29,6 @@ const MemberFeaturePage = lazy(
 );
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const AdminPage = lazy(() => import("./pages/admin/AdminPage"));
-const SupportChatWidget = lazy(() => import("./components/support/SupportChatWidget"));
-
 function LoadingScreen() {
   return <BrandLoader />;
 }
@@ -98,9 +97,7 @@ export default function AppShell() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
-        <Suspense fallback={null}>
-          <SupportChatWidget />
-        </Suspense>
+        <SupportChatMount />
       </LanguageProvider>
     </AuthProvider>
   );

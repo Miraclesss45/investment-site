@@ -79,12 +79,12 @@ export default function SupportChatComposer({
   }
 
   return (
-    <form ref={formRef} onSubmit={submit} className="border-t border-white/10 bg-[#091522] p-3 sm:p-4">
+    <form ref={formRef} onSubmit={submit} className="border-t border-blue-100 bg-white p-3 sm:p-4">
       {disabled ? (
-        <p className="mb-2 text-xs text-amber-200">Reopen this conversation to send a reply.</p>
+        <p className="mb-2 text-xs text-amber-800">Reopen this conversation to send a reply.</p>
       ) : null}
-      {error ? <p role="alert" className="mb-2 text-xs text-rose-300">{error}</p> : null}
-      <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-[#101d30] p-2 focus-within:border-cyan-300/50">
+      {error ? <p role="alert" className="mb-2 text-xs text-rose-700">{error}</p> : null}
+      <div className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 focus-within:border-blue-400">
         <label className="sr-only" htmlFor={`support-message-${conversationId}`}>Type a message</label>
         <textarea
           id={`support-message-${conversationId}`}
@@ -100,13 +100,13 @@ export default function SupportChatComposer({
           rows={1}
           placeholder={disabled ? "Conversation closed" : "Write a message…"}
           disabled={disabled || sending}
-          className="max-h-32 min-h-10 flex-1 resize-y bg-transparent px-2 py-2 text-sm leading-5 text-white outline-none placeholder:text-slate-500 disabled:cursor-not-allowed"
+          className="max-h-32 min-h-10 flex-1 resize-y bg-transparent px-2 py-2 text-sm leading-5 text-slate-900 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
         />
         <button
           type="submit"
           disabled={disabled || sending || !draft.trim()}
           aria-label={sending ? "Sending message" : "Send message"}
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-300 text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"
+          className="admin-blue-action grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-600 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {sending ? <LoaderCircle size={17} className="animate-spin" /> : <Send size={16} />}
         </button>

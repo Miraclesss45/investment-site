@@ -115,8 +115,15 @@ try {
     admin: true,
     role: "admin",
   });
+  await admin.firestore().collection("users").doc(user.uid).set({
+    uid: user.uid,
+    email: user.email || email,
+    role: "admin",
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
 
   console.log(`Admin access granted to ${email}.`);
+  console.log("The Firebase profile role was synchronized with the admin claim.");
   console.log("Sign out completely, then sign in again to refresh the admin claim.");
 } catch (error) {
   console.error(`Unable to grant admin access: ${error.message}`);

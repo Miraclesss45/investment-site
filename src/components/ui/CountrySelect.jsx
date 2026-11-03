@@ -43,29 +43,29 @@ export default function CountrySelect({
             onChange={handleSelectChange}
             required={required}
             autoComplete="country-name"
-            className="!bg-none h-[58px] w-full appearance-none rounded-xl border border-white/10 bg-[#081321] px-4 pr-11 text-sm text-slate-100 shadow-inner shadow-black/10 outline-none transition hover:border-white/20 focus:border-cyan-300 focus:bg-[#0b1a2c] focus:ring-4 focus:ring-cyan-300/10 [color-scheme:dark]"
+            className="!bg-none h-[58px] w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm text-slate-900 shadow-sm outline-none transition hover:border-blue-300 focus:border-blue-600 focus:bg-blue-50 [color-scheme:light]"
           >
             <option value="" disabled>
               Select your country
             </option>
             {countryOptions.map((country) => (
-              <option key={country} value={country} className="bg-[#0d1728] text-white">
+              <option key={country} value={country} className="bg-white text-slate-900">
                 {country}
               </option>
             ))}
-            <option value="Other" className="bg-[#0d1728] text-white">
+            <option value="Other" className="bg-white text-slate-900">
               Other
             </option>
           </select>
           <ChevronDown
             size={18}
             aria-hidden="true"
-            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-cyan-300"
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-blue-600"
           />
         </>
       ) : (
         <div>
-          <div className="w-full rounded-xl border border-white/10 bg-[#081321] px-3 transition hover:border-sky-400/45 focus-within:border-sky-400 focus-within:bg-[#0b1a2c]">
+          <div className="w-full rounded-xl border border-slate-200 bg-white px-3 transition hover:border-blue-300 focus-within:border-blue-600 focus-within:bg-blue-50">
             <input
               id={id}
               name={name}
@@ -76,7 +76,7 @@ export default function CountrySelect({
               autoComplete="country-name"
               maxLength={100}
               required={required}
-              className="h-[58px] w-full bg-transparent text-sm text-white placeholder:text-slate-400 focus:outline-none"
+              className="h-[58px] w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none"
             />
           </div>
           <button
@@ -85,7 +85,7 @@ export default function CountrySelect({
               setSelectedCountry("");
               setCustomCountry("");
             }}
-            className="mt-2 text-xs font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+            className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
           >
             Choose from the country list
           </button>

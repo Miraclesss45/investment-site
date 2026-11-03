@@ -92,7 +92,13 @@ export default function SupportChatThread({
         ));
         for (const item of unreadMessages) handledReadIdsRef.current.add(item.id);
         if (isFirstSnapshot || unreadMessages.length) {
-          markMessagesAsRead(conversationId, viewerType, unreadMessages, isFirstSnapshot)
+          markMessagesAsRead(
+            conversationId,
+            viewerType,
+            unreadMessages,
+            isFirstSnapshot,
+            messageDocs[0]?.id || null,
+          )
             .catch((reason) => {
               console.error("Support message read status could not be updated.", reason);
               setReadError("Read status could not be updated yet.");
@@ -194,17 +200,17 @@ export default function SupportChatThread({
   }, [conversation?.userName, typingUsers.length, viewerType]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#07111d]">
+    <div className="flex min-h-0 flex-1 flex-col bg-white">
       {showHeader ? (
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 border-b border-blue-100 px-4 py-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">
+            <p className="truncate text-sm font-semibold text-slate-900">
               {viewerType === "agent" ? conversation?.userName || "Customer" : "Support"}
             </p>
-            <p className="text-[11px] text-slate-400">{statusLabel(conversation?.status)}</p>
+            <p className="text-xs text-slate-600">{statusLabel(conversation?.status)}</p>
           </div>
           {viewerType === "agent" && conversation?.userEmail ? (
-            <a href={`mailto:${encodeURIComponent(conversation.userEmail)}`} className="max-w-[45%] truncate text-xs text-cyan-200 hover:text-cyan-100">
+            <a href={`mailto:${encodeURIComponent(conversation.userEmail)}`} className="max-w-[45%] truncate text-xs text-blue-700 hover:text-blue-900">
               {conversation.userEmail}
             </a>
           ) : null}
@@ -220,40 +226,40 @@ export default function SupportChatThread({
         aria-live="polite"
         aria-label="Conversation messages"
       >
-        {olderError ? <p role="alert" className="rounded-lg border border-rose-300/20 bg-rose-300/[0.06] px-3 py-2 text-xs text-rose-200">{olderError}</p> : null}
+        {olderError ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{olderError}</p> : null}
         {hasOlder ? (
           <button
             type="button"
             onClick={loadOlder}
             disabled={loadingOlder}
-            className="mx-auto flex min-h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-cyan-200 hover:bg-white/[0.05] disabled:opacity-60"
+            className="mx-auto flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60"
           >
             {loadingOlder ? <LoaderCircle size={14} className="animate-spin" /> : null}
             Load earlier messages
           </button>
         ) : null}
         {loading ? (
-          <div className="grid min-h-32 place-items-center text-sm text-slate-400">
+          <div className="grid min-h-32 place-items-center text-sm text-slate-600">
             <span className="inline-flex items-center gap-2"><LoaderCircle size={16} className="animate-spin" />Loading messages…</span>
           </div>
         ) : error ? (
-          <p role="alert" className="rounded-xl border border-rose-300/20 bg-rose-300/[0.06] p-3 text-xs text-rose-200">{error}</p>
+          <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{error}</p>
         ) : messages.length ? (
           <>
-          {readError ? <p role="status" className="rounded-lg bg-amber-300/[0.06] px-3 py-2 text-xs text-amber-100">{readError}</p> : null}
+          {readError ? <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">{readError}</p> : null}
           {messages.map((item) => {
             const message = item.data();
             const own = message.senderId === user?.uid;
             return (
               <div key={item.id} className={`flex ${own ? "justify-end" : "justify-start"}`}>
-                <article className={`max-w-[86%] rounded-2xl px-3.5 py-2.5 sm:max-w-[78%] ${
+                <article className={`support-chat-message max-w-[86%] rounded-2xl px-3.5 py-2.5 sm:max-w-[78%] ${
                   own
-                    ? "rounded-br-md bg-cyan-300 text-slate-950"
-                    : "rounded-bl-md border border-white/10 bg-[#122033] text-slate-100"
+                    ? "support-chat-message-own rounded-br-md bg-blue-600 text-white"
+                    : "support-chat-message-other rounded-bl-md border border-blue-100 bg-blue-50 text-slate-900"
                 }`}>
-                  {!own ? <p className="mb-1 text-[10px] font-bold text-cyan-200">{message.senderType === "agent" ? "Support" : conversation?.userName || "Customer"}</p> : null}
+                  {!own ? <p className="mb-1 text-xs font-bold text-blue-700">{message.senderType === "agent" ? "Support" : conversation?.userName || "Customer"}</p> : null}
                   <p className="whitespace-pre-wrap break-words text-sm leading-5">{message.text}</p>
-                  <div className={`mt-1 flex items-center justify-end gap-2 text-[9px] ${own ? "text-slate-800/70" : "text-slate-400"}`}>
+                  <div className={`mt-1 flex items-center justify-end gap-2 text-xs ${own ? "text-blue-100" : "text-slate-500"}`}>
                     <time>{messageTime(message.createdAt)}</time>
                     {own && message.read ? <span>Read</span> : null}
                   </div>
@@ -263,9 +269,9 @@ export default function SupportChatThread({
           })}
           </>
         ) : (
-          <p className="py-12 text-center text-sm text-slate-400">Start the conversation by sending a message.</p>
+          <p className="py-12 text-center text-sm text-slate-600">Start the conversation by sending a message.</p>
         )}
-        {typingLabel ? <p className="px-2 text-xs italic text-slate-400">{typingLabel}</p> : null}
+        {typingLabel ? <p className="px-2 text-xs italic text-slate-600">{typingLabel}</p> : null}
       </div>
     </div>
   );

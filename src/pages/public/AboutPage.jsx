@@ -31,15 +31,15 @@ export default function AboutPage() {
             className="absolute inset-0 h-full w-full object-cover"
           />
           <div
-            className="absolute inset-0 bg-[#050b14]/[0.72]"
+            className="absolute inset-0 bg-blue-950/70"
             aria-hidden="true"
           />
-          <div className="relative z-10 mx-auto w-[min(1160px,calc(100%-2rem))] sm:w-[min(1160px,calc(100%-3rem))] lg:w-[min(1160px,calc(100%-5rem))]">
-            <h1 className="motion-safe:transition motion-safe:duration-700 mb-6 text-[clamp(2.25rem,7vw,2.625rem)] font-semibold tracking-[-0.05em] text-white">
+          <div className="relative z-10 mx-auto w-[min(1160px,calc(100%_-_2rem))] sm:w-[min(1160px,calc(100%_-_3rem))] lg:w-[min(1160px,calc(100%_-_5rem))]">
+            <h1 className="transition duration-700 mb-6 text-[clamp(2.25rem,7vw,2.625rem)] font-semibold tracking-[-0.05em] text-white">
               About MeridianVests.
             </h1>
-            <p className="flex items-center justify-center gap-4 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-200">
-              <Link to="/" className="text-sky-400">
+            <p className="flex items-center justify-center gap-4 text-[11px] font-bold uppercase tracking-[0.12em] text-blue-100">
+              <Link to="/" className="text-cyan-200">
                 Home
               </Link>{" "}
               / About Us
@@ -48,17 +48,17 @@ export default function AboutPage() {
         </section>
 
         <section className="bg-transparent">
-          <div className="mx-auto grid w-[min(1160px,calc(100%-2rem))] gap-10 py-12 sm:w-[min(1160px,calc(100%-3rem))] sm:py-16 md:grid-cols-3 lg:w-[min(1160px,calc(100%-5rem))]">
+          <div className="mx-auto grid w-[min(1160px,calc(100%_-_2rem))] gap-10 py-12 sm:w-[min(1160px,calc(100%_-_3rem))] sm:py-16 md:grid-cols-3 lg:w-[min(1160px,calc(100%_-_5rem))]">
             <Reveal
               as="article"
               className="grid grid-cols-[auto_1fr] items-start gap-4 md:gap-5"
             >
-              <ShieldCheck className="mt-1 shrink-0 text-sky-300" size={36} />
+              <ShieldCheck className="mt-1 shrink-0 text-blue-700" size={36} />
               <div>
                 <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
                   Trust-centered service
                 </h2>
-                <p className="text-[15px] leading-8 text-slate-300">
+                <p className="text-[15px] leading-8 text-slate-700">
                   Every interaction is shaped around clarity, responsiveness,
                   and long-tail member confidence.
                 </p>
@@ -69,12 +69,12 @@ export default function AboutPage() {
               className="grid grid-cols-[auto_1fr] items-start gap-4 md:gap-5"
               style={{ "--reveal-delay": "120ms" }}
             >
-              <CreditCard className="mt-1 shrink-0 text-sky-300" size={36} />
+              <CreditCard className="mt-1 shrink-0 text-blue-700" size={36} />
               <div>
                 <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
                   Stable capital pathways
                 </h2>
-                <p className="text-[15px] leading-8 text-slate-300">
+                <p className="text-[15px] leading-8 text-slate-700">
                   We curate options that aim to preserve principal, support
                   income, and maintain operational transparency.
                 </p>
@@ -85,12 +85,12 @@ export default function AboutPage() {
               className="grid grid-cols-[auto_1fr] items-start gap-4 md:gap-5"
               style={{ "--reveal-delay": "240ms" }}
             >
-              <Star className="mt-1 shrink-0 text-sky-300" size={36} />
+              <Star className="mt-1 shrink-0 text-blue-700" size={36} />
               <div>
                 <h2 className="mb-4 text-xl font-semibold sm:text-2xl">
                   Disciplined execution
                 </h2>
-                <p className="text-[15px] leading-8 text-slate-300">
+                <p className="text-[15px] leading-8 text-slate-700">
                   Members gain access to opportunities supported by research,
                   structure, and a disciplined review process.
                 </p>
@@ -99,16 +99,16 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="bg-[#050b14]/55">
-          <div className="mx-auto grid w-[min(1160px,calc(100%-2rem))] items-center gap-10 py-16 sm:w-[min(1160px,calc(100%-3rem))] sm:gap-14 sm:py-20 lg:w-[min(1160px,calc(100%-5rem))] lg:grid-cols-[0.92fr_1.08fr] lg:gap-16 lg:py-[110px]">
+        <section className="bg-slate-50/55">
+          <div className="mx-auto grid w-[min(1160px,calc(100%_-_2rem))] items-center gap-10 py-16 sm:w-[min(1160px,calc(100%_-_3rem))] sm:gap-14 sm:py-20 lg:w-[min(1160px,calc(100%_-_5rem))] lg:grid-cols-[0.92fr_1.08fr] lg:gap-16 lg:py-[110px]">
             <Reveal>
-              <div className="mb-8 flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">
+              <div className="mb-8 flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-700">
                 <span className="block h-2.5 w-2.5 bg-sky-400" /> Our story
               </div>
-              <h2 className="mb-10 text-[clamp(2rem,7vw,2.95rem)] font-semibold leading-[1.12] tracking-[-0.05em] text-white sm:mb-14">
+              <h2 className="mb-10 text-[clamp(2rem,7vw,2.95rem)] font-semibold leading-[1.12] tracking-[-0.05em] text-slate-900 sm:mb-14">
                 Crypto management made clearer and more intentional.
               </h2>
-              <ul className="list-disc space-y-6 pl-5 text-sm leading-8 text-slate-300">
+              <ul className="list-disc space-y-6 pl-5 text-sm leading-8 text-slate-700">
                 <li>
                   MeridianVests was designed for members who want a simpler
                   pathway into crypto investment and earning opportunities.
@@ -144,8 +144,8 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="bg-[#101d30]/75 pb-20 pt-0">
-          <div className="mx-auto w-[min(1160px,calc(100%-2rem))] sm:w-[min(1160px,calc(100%-3rem))] lg:w-[min(1160px,calc(100%-5rem))]">
+        <section className="bg-white/75 pb-20 pt-0">
+          <div className="mx-auto w-[min(1160px,calc(100%_-_2rem))] sm:w-[min(1160px,calc(100%_-_3rem))] lg:w-[min(1160px,calc(100%_-_5rem))]">
             <Reveal
               as="div"
               className="mx-auto w-full max-w-[720px]"
@@ -162,10 +162,10 @@ export default function AboutPage() {
                 loading="lazy"
                 decoding="async"
               />
-              <p className="mt-5 rounded-xl border border-sky-300/15 bg-sky-300/[0.06] px-5 py-4 text-center text-sm leading-7 text-slate-300">
-                The certificate reflects <strong className="text-white">Legacy Pro Alliance Ltd</strong>{" "}
+              <p className="mt-5 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-center text-sm leading-7 text-slate-700">
+                The certificate reflects <strong className="text-slate-900">Legacy Pro Alliance Ltd</strong>{" "}
                 as the registered legal entity associated with this service.
-                <strong className="text-white"> MeridianVests</strong> is the
+                <strong className="text-slate-900"> MeridianVests</strong> is the
                 public-facing brand presented on this website.
               </p>
             </Reveal>

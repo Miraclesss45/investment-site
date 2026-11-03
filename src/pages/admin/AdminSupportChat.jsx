@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Archive,
@@ -12,14 +12,18 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../lib/authContext";
 import { getSafeErrorMessage } from "../../lib/authHelpers";
+import { getAdminSupportHistoryPage } from "../../lib/adminApi";
 import {
   sendAdminMessage,
+  getOlderAdminConversations,
+  subscribeToAdminConversation,
   setConversationArchived,
   SUPPORT_CONVERSATION_STATUSES,
   updateConversationStatus,
 } from "../../lib/supportChat";
 import SupportChatComposer from "../../components/support/SupportChatComposer";
 import SupportChatThread from "../../components/support/SupportChatThread";
+import { conversationMatchesSupportSearch, getSupportSearchQueryTerms } from "../../lib/supportSearch";
 
 const STATUS_LABELS = {
   open: "Open",
@@ -42,7 +46,21 @@ function statusTone(status) {
   return "border-emerald-300/20 bg-emerald-300/[0.08] text-emerald-200";
 }
 
-export default function AdminSupportChat({ archiveView = false, sharedConversations = null, sharedError = "" }) {
+function matchesConversation(item, { archiveView, filter, search }) {
+  if ((item.archived === true) !== archiveView) return false;
+  const status = String(item.status || "open").toLowerCase();
+  if (!archiveView && filter === "unread" && Number(item.unreadForAgent || 0) <= 0) return false;
+  if (!archiveView && filter !== "all" && filter !== "unread" && status !== filter) return false;
+  const normalized = search.trim().toLowerCase();
+  if (!normalized) return true;
+  if (item.serverSearchMatch === true) return true;
+  const queryTerms = getSupportSearchQueryTerms(normalized);
+  if (queryTerms.length) return conversationMatchesSupportSearch(item, queryTerms);
+  return [item.userName, item.userEmail, item.userId, item.lastMessage]
+    .filter(Boolean).join(" ").toLowerCase().includes(normalized);
+}
+
+export default function AdminSupportChat({ archiveView = false, sharedConversations = null, conversationPage = null, sharedCounts = null, onCountsRefresh, sharedError = "" }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const conversations = sharedConversations;
@@ -53,6 +71,112 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
   const [error, setError] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
   const [archiveSaving, setArchiveSaving] = useState(false);
+  const [olderConversations, setOlderConversations] = useState([]);
+  const [olderCursor, setOlderCursor] = useState(null);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [searchIndexComplete, setSearchIndexComplete] = useState(false);
+  const [searchIndexTruncatedCount, setSearchIndexTruncatedCount] = useState(0);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const paginationInitialized = useRef(false);
+  const previousRemoteMode = useRef(archiveView || filter !== "all" || Boolean(query.trim()));
+  const selectedOlderConversationRef = useRef(null);
+  const olderConversationsRef = useRef(olderConversations);
+  const remoteMode = archiveView || filter !== "all" || Boolean(query.trim());
+  const selectedIsLive = Boolean(conversations?.some((item) => item.id === selectedId));
+  const conversationsLoading = remoteMode ? historyLoading : conversations === null;
+
+  useEffect(() => {
+    if (remoteMode || !conversationPage || paginationInitialized.current) return;
+    paginationInitialized.current = true;
+    setOlderCursor(conversationPage.nextCursor || null);
+    setHasOlder(conversationPage.hasMore === true);
+  }, [conversationPage, remoteMode]);
+
+  useEffect(() => {
+    olderConversationsRef.current = olderConversations;
+  }, [olderConversations]);
+
+  useEffect(() => {
+    const selectedOlder = olderConversationsRef.current.find((item) => item.id === selectedId);
+    if (!selectedOlder || selectedIsLive) return undefined;
+    selectedOlderConversationRef.current = selectedOlder;
+    let firstSnapshot = true;
+    const unsubscribe = subscribeToAdminConversation(selectedId, (fresh) => {
+      if (!fresh) {
+        olderConversationsRef.current = olderConversationsRef.current.filter((item) => item.id !== selectedId);
+        setOlderConversations((current) => current.filter((item) => item.id !== selectedId));
+        return;
+      }
+      const previous = selectedOlderConversationRef.current;
+      const changedQueueState = previous && (
+        Number(previous.unreadForAgent || 0) !== Number(fresh.unreadForAgent || 0)
+        || String(previous.status || "open") !== String(fresh.status || "open")
+        || Boolean(previous.archived) !== Boolean(fresh.archived)
+      );
+      selectedOlderConversationRef.current = fresh;
+      olderConversationsRef.current = olderConversationsRef.current.map((item) => (
+        item.id === fresh.id ? { ...item, ...fresh } : item
+      ));
+      setOlderConversations((current) => current.map((item) => (
+        item.id === fresh.id ? { ...item, ...fresh } : item
+      )));
+      if (firstSnapshot || changedQueueState) onCountsRefresh?.();
+      firstSnapshot = false;
+    }, (reason) => console.error("An older support conversation could not be refreshed.", reason));
+    return () => {
+      unsubscribe();
+      if (selectedOlderConversationRef.current?.id === selectedId) {
+        selectedOlderConversationRef.current = null;
+      }
+    };
+  }, [onCountsRefresh, selectedId, selectedIsLive]);
+
+  useEffect(() => {
+    if (previousRemoteMode.current !== remoteMode) {
+      previousRemoteMode.current = remoteMode;
+      paginationInitialized.current = false;
+      setOlderConversations([]);
+      setOlderCursor(null);
+      setHasOlder(false);
+      if (!remoteMode) setHistoryLoading(false);
+    }
+  }, [remoteMode]);
+
+  useEffect(() => {
+    if (!remoteMode) return undefined;
+    const controller = new AbortController();
+    setOlderConversations([]);
+    setOlderCursor(null);
+    setHasOlder(false);
+    setSearchIndexComplete(false);
+    setSearchIndexTruncatedCount(0);
+    setHistoryLoading(true);
+    setError("");
+    const timer = window.setTimeout(() => {
+      getAdminSupportHistoryPage({
+        search: query,
+        filter,
+        archived: archiveView,
+        signal: controller.signal,
+      }).then((page) => {
+        if (controller.signal.aborted) return;
+        setOlderConversations(page.items);
+        setOlderCursor(page.nextCursor || null);
+        setHasOlder(page.hasMore === true);
+        setSearchIndexComplete(page.searchIndexComplete === true);
+        setSearchIndexTruncatedCount(Number(page.searchIndexTruncatedCount) || 0);
+      }).catch((reason) => {
+        if (!controller.signal.aborted) setError(getSafeErrorMessage(reason, "Support history could not be searched."));
+      }).finally(() => {
+        if (!controller.signal.aborted) setHistoryLoading(false);
+      });
+    }, query.trim() ? 250 : 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [archiveView, filter, query, remoteMode]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 767px)");
@@ -62,21 +186,15 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
     return () => mediaQuery.removeEventListener("change", updateViewport);
   }, []);
 
+  const allConversations = useMemo(() => {
+    const live = conversations || [];
+    const liveIds = new Set(live.map((item) => item.id));
+    return [...live, ...olderConversations.filter((item) => !liveIds.has(item.id))];
+  }, [conversations, olderConversations]);
+
   const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return (conversations || []).filter((item) => {
-      const archived = item.archived === true;
-      const matchesFilter = archiveView
-        ? archived
-        : !archived && (filter === "all"
-          || (filter === "unread" ? Number(item.unreadForAgent || 0) > 0 : item.status === filter));
-      const text = [item.userName, item.userEmail, item.userId, item.lastMessage]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return matchesFilter && (!normalized || text.includes(normalized));
-    });
-  }, [archiveView, conversations, filter, query]);
+    return allConversations.filter((item) => matchesConversation(item, { archiveView, filter, search: query }));
+  }, [allConversations, archiveView, filter, query]);
 
   useEffect(() => {
     if (archiveView) {
@@ -92,10 +210,39 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
     }
   }, [archiveView, filtered, isMobile, selectedId]);
 
-  const selected = conversations?.find((item) => item.id === selectedId) || null;
-  const unreadTotal = (conversations || []).reduce((sum, item) => (
+  const selected = allConversations.find((item) => item.id === selectedId) || null;
+  const loadedUnreadTotal = allConversations.reduce((sum, item) => (
     item.archived === true ? sum : sum + (Number(item.unreadForAgent) || 0)
   ), 0);
+  const unreadTotal = Number.isFinite(Number(sharedCounts?.unreadMessageCount))
+    ? Number(sharedCounts.unreadMessageCount)
+    : loadedUnreadTotal;
+  const hasGlobalCounts = Number.isFinite(Number(sharedCounts?.unreadMessageCount));
+
+  async function loadOlderConversations() {
+    if (!hasOlder || !olderCursor || loadingOlder) return;
+    setLoadingOlder(true);
+    setError("");
+    try {
+      const page = remoteMode
+        ? await getAdminSupportHistoryPage({ search: query, filter, archived: archiveView, cursor: olderCursor })
+        : await getOlderAdminConversations(olderCursor);
+      setOlderConversations((current) => {
+        const known = new Set(current.map((item) => item.id));
+        return [...current, ...page.items.filter((item) => !known.has(item.id))];
+      });
+      setOlderCursor(page.nextCursor || null);
+      setHasOlder(page.hasMore === true);
+      if (remoteMode && query.trim()) {
+        setSearchIndexComplete(page.searchIndexComplete === true);
+        setSearchIndexTruncatedCount(Number(page.searchIndexTruncatedCount) || 0);
+      }
+    } catch (reason) {
+      setError(getSafeErrorMessage(reason, "Older conversations could not be loaded."));
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
 
   async function changeStatus(status) {
     if (!selected || statusSaving || selected.status === status) return;
@@ -143,7 +290,7 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">Member communications</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white">{archiveView ? "Archived support chats" : "Support chat"}</h1>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{archiveView ? "Archived support chats" : "Support chat"}</h1>
           <p className="mt-1 text-sm text-slate-400">{archiveView ? "Browse archived conversations and open their retained message history." : "Reply to customer messages in real time."}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -156,8 +303,8 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
               <Archive size={14} /> Archive
             </button>
           )}
-          <div className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-2.5 text-xs text-slate-300">
-            {archiveView ? <><span className="font-bold text-white">{filtered.length}</span> archived chat{filtered.length === 1 ? "" : "s"}</> : <><span className="font-bold text-white">{unreadTotal}</span> unread message{unreadTotal === 1 ? "" : "s"}</>}
+          <div className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-2.5 text-xs text-slate-300" role={conversationsLoading ? "status" : undefined} aria-live={conversationsLoading ? "polite" : undefined}>
+            {conversationsLoading ? "Loading conversations…" : archiveView ? <><span className="font-bold text-slate-900">{filtered.length}</span> archived chats loaded</> : hasGlobalCounts ? <><span className="font-bold text-slate-900">{unreadTotal}</span> unread messages across all chats</> : <><span className="font-bold text-slate-900">{loadedUnreadTotal}</span> unread messages in {allConversations.length} loaded chats</>}
           </div>
         </div>
       </header>
@@ -172,10 +319,15 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
               <Search size={15} className="absolute left-3 top-3 text-slate-500" />
               <input
                 type="search"
+                name="admin-chat-search"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search name, email, message"
-                className="h-10 w-full rounded-xl border border-white/10 bg-[#081321] pl-9 pr-3 text-xs text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/50"
+                placeholder="Search name, email, ID or latest message"
+                className="h-11 w-full rounded-xl border border-white/10 bg-[#081321] pl-9 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-cyan-300 focus:border-cyan-300/50"
               />
             </label>
             {!archiveView ? (
@@ -185,7 +337,7 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
                   id="support-chat-filter"
                   value={filter}
                   onChange={(event) => setFilter(event.target.value)}
-                  className="h-10 w-full rounded-xl border border-white/10 bg-[#081321] px-3 text-xs text-slate-200 outline-none focus:border-cyan-300/50"
+                  className="h-11 w-full rounded-xl border border-white/10 bg-[#081321] px-3 text-sm text-slate-200 outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus:border-cyan-300/50"
                 >
                   <option value="all">All conversations</option>
                   <option value="unread">Unread</option>
@@ -199,8 +351,8 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
               )}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {conversations === null ? (
-              <div className="grid min-h-40 place-items-center text-sm text-slate-400"><LoaderCircle size={17} className="animate-spin" /></div>
+            {historyLoading || (!remoteMode && conversations === null) ? (
+              <div className="grid min-h-40 place-items-center gap-2 text-sm text-slate-400" role="status" aria-live="polite"><LoaderCircle size={17} className="animate-spin" /><span>Loading conversations…</span></div>
             ) : filtered.length ? filtered.map((item) => {
               const unread = item.archived === true ? 0 : Number(item.unreadForAgent || 0);
               const active = selectedId === item.id;
@@ -211,37 +363,39 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
                   onClick={() => setSelectedId(item.id)}
                   aria-current={active ? "true" : undefined}
                   className={`block w-full border-b border-white/[0.06] px-3 py-3 text-left transition sm:px-4 ${
-                    active ? "bg-cyan-300/[0.08]" : "hover:bg-white/[0.035]"
+                    active ? "admin-support-conversation-selected" : "hover:bg-white/[0.035]"
                   }`}
                 >
                   <span className="flex items-start justify-between gap-2">
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold text-white">{item.userName || "Guest"}</span>
-                      <span className="mt-0.5 block truncate text-[11px] text-slate-400">{item.userEmail || item.userId}</span>
+                      <span className="admin-support-conversation-name block truncate text-sm font-bold text-slate-900">{item.userName || "Guest"}</span>
+                      <span className="admin-support-conversation-email mt-0.5 block truncate text-xs text-slate-400">{item.userEmail || item.userId}</span>
                     </span>
-                    {unread ? <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-cyan-300 px-1 text-[10px] font-bold text-slate-950">{unread}</span> : null}
+                    {unread ? <span className="admin-support-conversation-unread grid h-6 min-w-6 shrink-0 place-items-center rounded-full px-1 text-xs font-bold">{unread}</span> : null}
                   </span>
-                  <span className="mt-2 block truncate text-xs text-slate-300">{item.lastMessage || "No messages yet"}</span>
+                  <span className="admin-support-conversation-preview mt-2 block truncate text-sm text-slate-300">{item.lastMessage || "No messages yet"}</span>
                   <span className="mt-2 flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span className={`rounded-md border px-2 py-0.5 text-[9px] font-bold ${statusTone(item.status)}`}>{STATUS_LABELS[item.status] || "Open"}</span>
-                      {item.archived === true ? <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-slate-400"><Archive size={11} /> Archived</span> : null}
+                      <span className={`admin-support-conversation-status rounded-md border px-2 py-1 text-xs font-bold ${statusTone(item.status)}`}>{STATUS_LABELS[item.status] || "Open"}</span>
+                      {item.archived === true ? <span className="admin-support-conversation-archived inline-flex items-center gap-1 text-xs font-semibold text-slate-400"><Archive size={12} /> Archived</span> : null}
                     </span>
-                    <time className="truncate text-[10px] text-slate-500">{formatTime(item.lastMessageAt || item.updatedAt)}</time>
+                    <time className="admin-support-conversation-time truncate text-xs text-slate-500">{formatTime(item.lastMessageAt || item.updatedAt)}</time>
                   </span>
                 </button>
               );
             }) : (
               <div className="px-5 py-12 text-center">
                 <MessageCircle className="mx-auto text-slate-600" size={24} />
-                <p className="mt-3 text-sm font-semibold text-slate-300">{error ? "Inbox unavailable" : archiveView ? "No archived conversations" : "No conversations found"}</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{error ? "Check Firebase access and reload." : archiveView ? "Resolved chats will appear here after they are archived." : "New messages will appear here automatically."}</p>
+                <p className="mt-3 text-sm font-semibold text-slate-300">{error || sharedError ? "Inbox unavailable" : remoteMode && hasOlder ? "No matches in this batch" : query.trim() ? "No conversations match your search" : archiveView ? "No archived conversations found" : "No conversations found"}</p>
+                <p className="mt-1 text-sm leading-5 text-slate-400">{error || sharedError ? "Check Firebase access and reload." : hasOlder ? "More history remains. Load the next batch to continue searching." : archiveView ? "Resolved chats will appear here after they are archived." : query.trim() ? "Try a different name, email, ID, or latest message." : "New messages will appear here automatically."}</p>
               </div>
             )}
           </div>
-          <p className="border-t border-white/10 px-4 py-2 text-center text-[10px] text-slate-500">
-            Showing up to 100 most recently updated conversations
-          </p>
+          <div className="admin-support-pagination border-t border-white/10 px-3 py-3 text-center text-sm text-slate-400" aria-live="polite">
+            <span>{conversationsLoading ? "Loading conversation history…" : remoteMode ? query.trim() ? `Search checks participant details and indexed message text across conversation history. ${searchIndexComplete ? "Historical indexing is complete." : "Older messages are still being indexed, so results may be incomplete."} ${filtered.length} matching chats loaded${hasOlder ? "; more matching records are available" : "; no more matching records are available"}.` : `This server-side filter is paginated across conversation history. ${filtered.length} conversations loaded${hasOlder ? "; older records remain" : "; history is fully loaded"}.` : `Search and filters cover the ${allConversations.length} conversations loaded so far.`}</span>
+            {remoteMode && query.trim() && searchIndexTruncatedCount > 0 && <p className="mt-2 text-amber-200">{searchIndexTruncatedCount} unusually long conversation{searchIndexTruncatedCount === 1 ? " has" : "s have"} reached the search index limit; older message terms may be missing from results.</p>}
+            {hasOlder && <button type="button" onClick={loadOlderConversations} disabled={loadingOlder || historyLoading} className="mt-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:cursor-wait disabled:opacity-60">{loadingOlder ? <><LoaderCircle size={15} className="animate-spin" />Loading older conversations…</> : remoteMode ? "Load more search results" : "Load older conversations"}</button>}
+          </div>
         </aside>
 
         <div className={`${selectedId ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-col`}>
@@ -258,18 +412,18 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
                     <ArrowLeft size={17} />
                   </button>
                   <div className="min-w-0">
-                    <h2 className="truncate text-sm font-bold text-white">{selected.userName || "Guest"}</h2>
-                    <a href={`mailto:${encodeURIComponent(selected.userEmail || "")}`} className="block truncate text-[11px] text-cyan-200 hover:text-cyan-100">
+                    <h2 className="truncate text-sm font-bold text-slate-900">{selected.userName || "Guest"}</h2>
+                    <a href={`mailto:${encodeURIComponent(selected.userEmail || "")}`} className="block truncate text-xs text-cyan-200 hover:text-cyan-100">
                       {selected.userEmail || "No email recorded"}
                     </a>
-                    <p className="truncate text-[10px] text-slate-500">
+                    <p className="truncate text-xs text-slate-500">
                       {selected.userType === "guest" ? "Guest" : `UID ${selected.userId}`}
                       {selected.userCountry ? ` · ${selected.userCountry}` : ""}
                     </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-400">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-400">
                     <span className="sr-only">Conversation status</span>
                     <select
                       aria-label="Conversation status"
@@ -305,7 +459,7 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
                 <div className="border-b border-amber-300/10 bg-amber-300/[0.05] px-4 py-2 text-xs text-amber-100">
                   <p>Archived history is retained. Restore this conversation to reply or return it to the active inbox.</p>
                   {selected.archivedAt ? (
-                    <p className="mt-1 text-[10px] text-amber-100/70">
+                    <p className="mt-1 text-xs text-amber-100/70">
                       Archived {formatTime(selected.archivedAt)} · administrator {selected.archivedBy || "unknown"}
                     </p>
                   ) : null}
@@ -328,7 +482,7 @@ export default function AdminSupportChat({ archiveView = false, sharedConversati
                   />
                 )}
               </div>
-              <div className="flex items-center gap-2 border-t border-white/5 px-4 py-2 text-[10px] text-slate-500">
+              <div className="flex items-center gap-2 border-t border-white/5 px-4 py-2 text-xs text-slate-400">
                 <CheckCheck size={13} />
                 Replies update for the customer immediately.
                 <CircleHelp size={13} className="ml-auto" />

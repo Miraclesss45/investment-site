@@ -107,10 +107,7 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    if (
-      testimonialPaused ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
+    if (testimonialPaused) {
       return undefined;
     }
 
@@ -122,11 +119,11 @@ export default function HomePage() {
   }, [testimonialPaused]);
 
   return (
-    <div className="relative isolate min-h-screen overflow-x-clip bg-transparent text-white">
+    <div className="public-home relative isolate min-h-screen overflow-x-clip bg-slate-50 text-slate-900">
       <SiteHeader />
 
       <main id="main-content" tabIndex="-1">
-        <section className="hero-section relative flex min-h-[560px] items-center overflow-hidden bg-[#050b14] sm:min-h-[640px] lg:min-h-[700px]">
+        <section className="hero-section relative flex min-h-[560px] items-center overflow-hidden bg-blue-950 sm:min-h-[640px] lg:min-h-[700px]">
           <img
             className="hero-image absolute inset-0 h-full w-full object-cover object-[62%_center] sm:object-center"
             src={imageSources.hero}
@@ -137,8 +134,8 @@ export default function HomePage() {
             alt="Modern glass buildings at night"
             fetchPriority="high"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#050b14]/95 via-[#050b14]/70 to-[#050b14]/30" aria-hidden="true" />
-          <div className="hero-content relative mx-auto w-[min(1160px,calc(100%-2rem))] py-20 sm:w-[min(1160px,calc(100%-3rem))] sm:py-28 lg:w-[min(1160px,calc(100%-5rem))]">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-950/95 via-blue-950/70 to-blue-950/30" aria-hidden="true" />
+          <div className="hero-content relative mx-auto w-[min(1160px,calc(100%_-_2rem))] py-20 sm:w-[min(1160px,calc(100%_-_3rem))] sm:py-28 lg:w-[min(1160px,calc(100%_-_5rem))]">
             <h1 className="max-w-3xl text-[clamp(2.2rem,7vw,4.25rem)] font-extrabold leading-[1.03] tracking-[-0.04em] text-white text-balance">
               <span className="block">
                 Invest With
@@ -150,7 +147,7 @@ export default function HomePage() {
                 And Control
               </span>
             </h1>
-            <p className="mt-7 max-w-xl text-[15px] font-medium leading-7 text-slate-200 sm:mt-9 sm:text-xl sm:leading-8">
+            <p className="mt-7 max-w-xl text-[15px] font-medium leading-7 text-blue-50 sm:mt-9 sm:text-xl sm:leading-8">
               Explore straightforward investment plans, review your account
               activity, and get support when you need it.
             </p>
@@ -163,12 +160,12 @@ export default function HomePage() {
               </Link>
               <Link
                 to="/login"
-                className="interactive-lift inline-flex h-14 w-full items-center justify-center gap-3 rounded-xl border border-white/20 bg-white/5 px-5 text-sm font-extrabold uppercase tracking-[0.06em] text-white backdrop-blur-sm hover:border-cyan-300/50 hover:bg-white/10 sm:min-w-[210px] sm:w-auto sm:px-7"
+                className="interactive-lift inline-flex h-14 w-full items-center justify-center gap-3 rounded-xl border border-white/30 bg-white/10 px-5 text-sm font-extrabold uppercase tracking-[0.06em] text-white backdrop-blur-sm hover:border-cyan-200 hover:bg-white/15 sm:min-w-[210px] sm:w-auto sm:px-7"
               >
                 Member login <ArrowUpRight size={24} />
               </Link>
             </div>
-            <p className="mt-5 text-xs font-semibold tracking-wide text-slate-300">
+            <p className="mt-5 text-xs font-semibold tracking-wide text-blue-100">
               Clear terms&nbsp;&nbsp;·&nbsp;&nbsp;Secure account access&nbsp;&nbsp;·&nbsp;&nbsp;Dedicated support
             </p>
           </div>
@@ -176,22 +173,22 @@ export default function HomePage() {
 
         <section
           ref={whatWeDoRef}
-          className={`px-0 py-16 transition-[transform,opacity] duration-700 ease-out motion-reduce:transition-none sm:py-[92px] ${whatWeDoVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}
+          className={`px-0 py-16 transition-[translate,opacity] duration-700 ease-out sm:py-[92px] ${whatWeDoVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}
         >
-          <div className="mx-auto grid w-[min(1160px,calc(100%-2rem))] items-center gap-10 sm:w-[min(1160px,calc(100%-3rem))] sm:gap-14 lg:w-[min(1160px,calc(100%-5rem))] lg:grid-cols-[1fr_1.05fr] lg:gap-16">
+          <div className="mx-auto grid w-[min(1160px,calc(100%_-_2rem))] items-center gap-10 sm:w-[min(1160px,calc(100%_-_3rem))] sm:gap-14 lg:w-[min(1160px,calc(100%_-_5rem))] lg:grid-cols-[1fr_1.05fr] lg:gap-16">
             <div>
-              <div className="mb-6 flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">
+              <div className="mb-6 flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-800">
                 <span className="block h-2.5 w-2.5 bg-sky-400" /> What we do
               </div>
-              <h2 className="text-[clamp(2rem,7vw,2.45rem)] font-semibold leading-[1.12] tracking-[-0.05em] text-white">
+              <h2 className="text-[clamp(2rem,7vw,2.45rem)] font-semibold leading-[1.12] tracking-[-0.05em] text-slate-900">
                 Make clearer decisions with MeridianVests
               </h2>
-              <p className="mt-5 text-sm leading-8 text-slate-300">
+              <p className="mt-5 text-sm leading-8 text-slate-700">
                 Use our technology, investment plans, support team, and
                 real-time insights to make your member experience clear from
                 registration through withdrawal.
               </p>
-              <ul className="mt-6 list-disc space-y-3 pl-5 text-sm leading-7 text-slate-300">
+              <ul className="mt-6 list-disc space-y-3 pl-5 text-sm leading-7 text-slate-700">
                 <li>
                   MeridianVests is an innovative platform designed to work in a
                   evolving digital-asset landscape.
@@ -207,7 +204,7 @@ export default function HomePage() {
               </ul>
             </div>
             <img
-              className={`aspect-[4/3] h-auto w-full rounded-b-[10px] object-cover transition-[transform,opacity] delay-150 duration-700 ease-out motion-reduce:transition-none sm:aspect-[16/10] lg:aspect-[4/3] ${whatWeDoVisible ? "translate-x-0 opacity-100" : "translate-x-6 opacity-0"}`}
+              className={`aspect-[4/3] h-auto w-full rounded-b-[10px] object-cover transition-[translate,opacity] delay-150 duration-700 ease-out sm:aspect-[16/10] lg:aspect-[4/3] ${whatWeDoVisible ? "translate-x-0 opacity-100" : "translate-x-6 opacity-0"}`}
               src={imageSources.feature}
               srcSet={`${featureAssetSmall} 480w, ${featureAsset} 720w`}
               sizes="(min-width: 1024px) 540px, 100vw"
@@ -222,23 +219,23 @@ export default function HomePage() {
 
         <section
           ref={featuresRef}
-          className={`px-0 py-16 transition-[transform,opacity] duration-700 ease-out motion-reduce:transition-none sm:py-[94px] ${featuresVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}
+          className={`px-0 py-16 transition-[translate,opacity] duration-700 ease-out sm:py-[94px] ${featuresVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}
         >
-          <div className="mx-auto w-[min(1160px,calc(100%-2rem))] sm:w-[min(1160px,calc(100%-3rem))] lg:w-[min(1160px,calc(100%-5rem))]">
-            <div className="mb-6 flex items-center justify-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">
+          <div className="mx-auto w-[min(1160px,calc(100%_-_2rem))] sm:w-[min(1160px,calc(100%_-_3rem))] lg:w-[min(1160px,calc(100%_-_5rem))]">
+            <div className="mb-6 flex items-center justify-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-800">
               <span className="block h-2.5 w-2.5 bg-sky-400" /> Why MeridianVests
             </div>
-            <h2 className="mx-auto mb-10 max-w-2xl text-center text-[clamp(2rem,7vw,2.45rem)] font-semibold leading-[1.12] tracking-[-0.05em] text-white sm:mb-14">
+            <h2 className="mx-auto mb-10 max-w-2xl text-center text-[clamp(2rem,7vw,2.45rem)] font-semibold leading-[1.12] tracking-[-0.05em] text-slate-900 sm:mb-14">
               Built for a simpler investment experience.
             </h2>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {featureCards.map(
-                ({ title, description, image, action, to }, index) => (
+                ({ title, description, image, action, to }) => (
                   <article
                     key={title}
-                    className={`interactive-lift group flex min-h-[410px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0d1728]/80 shadow-xl shadow-black/10 transition-[opacity,transform,border-color,box-shadow] duration-500 hover:border-cyan-300/40 hover:shadow-2xl hover:shadow-cyan-500/10 sm:min-h-[450px] ${featuresVisible ? "translate-y-0 opacity-100" : "translate-y-5 opacity-0"}`}
+                    className={`interactive-lift group flex min-h-[350px] flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-md shadow-blue-950/[0.06] transition-[translate,opacity,border-color,box-shadow] duration-500 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/10 sm:min-h-[380px] ${featuresVisible ? "translate-y-0 opacity-100" : "translate-y-5 opacity-0"}`}
                   >
-                    <div className="mx-2 mt-2 flex h-[128px] items-center justify-center rounded-t-md bg-[#0d1728] transition duration-300 group-hover:bg-gradient-to-r group-hover:from-sky-600 group-hover:to-cyan-400 sm:h-[140px]">
+                    <div className="mx-2 mt-2 flex h-[128px] items-center justify-center rounded-t-md bg-white transition duration-300 group-hover:bg-gradient-to-r group-hover:from-sky-600 group-hover:to-cyan-400 sm:h-[140px]">
                       <img
                         className="h-[128px] w-[128px] rounded-full object-cover transition duration-300 group-hover:scale-105"
                         src={image}
@@ -250,16 +247,16 @@ export default function HomePage() {
                       />
                     </div>
                     <div className="flex flex-1 flex-col justify-center px-4 pb-6 pt-10 text-center">
-                      <h3 className="mb-4 text-lg font-semibold leading-tight text-white transition duration-300 sm:mb-5">
+                      <h3 className="mb-4 text-lg font-semibold leading-tight text-slate-900 transition duration-300 sm:mb-5">
                         {title}
                       </h3>
-                      <p className="text-xs leading-6 text-slate-300 sm:text-[13px] sm:leading-7">
+                      <p className="text-xs leading-6 text-slate-700 sm:text-[13px] sm:leading-7">
                         {description}
                       </p>
                     </div>
                     <Link
                       to={to}
-                      className="mx-3 mb-3 flex min-h-[58px] items-center justify-center gap-2 rounded-md bg-[#24252a] px-3 text-xs font-extrabold uppercase tracking-[0.04em] text-white transition duration-300 hover:-translate-y-0.5 group-hover:bg-gradient-to-r group-hover:from-sky-500 group-hover:to-cyan-400 sm:mx-4 sm:mb-4 sm:min-h-[66px] sm:gap-3 sm:px-4 sm:text-sm"
+                      className="mx-3 mb-3 flex min-h-12 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 text-xs font-extrabold uppercase tracking-[0.04em] text-white transition duration-300 hover:-translate-y-0.5 hover:bg-blue-700 sm:mx-4 sm:mb-4 sm:gap-3 sm:px-4 sm:text-sm"
                     >
                       {action} <ArrowUpRight size={23} />
                     </Link>
@@ -272,23 +269,23 @@ export default function HomePage() {
 
         <section
           ref={guideRef}
-          className={`bg-[#202125] px-4 py-16 transition-[transform,opacity] duration-700 ease-out motion-reduce:transition-none sm:py-[92px] ${guideVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}
+          className={`bg-blue-50 px-4 py-16 transition-[translate,opacity] duration-700 ease-out sm:py-[92px] ${guideVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}
         >
-          <div className="mx-auto w-[min(1160px,calc(100%-2rem))] text-center sm:w-[min(1160px,calc(100%-3rem))] lg:w-[min(1160px,calc(100%-5rem))]">
-            <div className="mb-6 flex items-center justify-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">
+          <div className="mx-auto w-[min(1160px,calc(100%_-_2rem))] text-center sm:w-[min(1160px,calc(100%_-_3rem))] lg:w-[min(1160px,calc(100%_-_5rem))]">
+            <div className="mb-6 flex items-center justify-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-800">
               <span className="block h-2.5 w-2.5 bg-sky-400" /> Member&apos;s
               Guide
             </div>
-            <h2 className="mx-auto mb-10 max-w-[560px] text-[clamp(2rem,7vw,2.45rem)] font-bold leading-[1.15] tracking-[-0.05em] text-white sm:mb-14">
+            <h2 className="mx-auto mb-10 max-w-[560px] text-[clamp(2rem,7vw,2.45rem)] font-bold leading-[1.15] tracking-[-0.05em] text-slate-900 sm:mb-14">
               A Few Simple Steps
               <br />
               To Get Started
             </h2>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-              {guideSteps.map(({ label, image }, index) => (
+              {guideSteps.map(({ label, image }) => (
                 <article
                   key={label}
-                  className={`flex h-[217px] flex-col items-center justify-center rounded-md bg-[#393a3c] px-5 transition hover:-translate-y-1 hover:bg-[#414246] ${guideVisible ? "translate-y-0 opacity-100" : "translate-y-5 opacity-0"}`}
+                  className={`flex h-[217px] flex-col items-center justify-center rounded-2xl border border-blue-100 bg-white px-5 shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:bg-blue-50 ${guideVisible ? "translate-y-0 opacity-100" : "translate-y-5 opacity-0"}`}
                 >
                   <img
                     className="mb-7 h-[58px] w-[58px] object-contain"
@@ -299,20 +296,20 @@ export default function HomePage() {
                     loading="lazy"
                     decoding="async"
                   />
-                  <p className="max-w-[150px] text-sm font-medium leading-5 text-white">
+                  <p className="max-w-[150px] text-sm font-medium leading-5 text-slate-900">
                     {label}
                   </p>
                 </article>
               ))}
             </div>
-            <p className="mx-auto mt-10 max-w-[560px] text-xs font-medium leading-6 text-white sm:mt-14">
+            <p className="mx-auto mt-10 max-w-[560px] text-xs font-medium leading-6 text-slate-900 sm:mt-14">
               Review the plans, create your account, and stay in control.
               <br />
               It&apos;s simple and straightforward.
             </p>
             <Link
               to="/signup"
-              className="mt-8 inline-flex h-[40px] min-w-[155px] items-center justify-center gap-4 rounded-md bg-yellow-300 px-6 text-[11px] font-extrabold uppercase text-slate-900 transition hover:-translate-y-0.5"
+              className="mt-8 inline-flex h-11 min-w-[155px] items-center justify-center gap-4 rounded-lg bg-blue-600 px-6 text-[11px] font-extrabold uppercase text-white transition hover:-translate-y-0.5 hover:bg-blue-700"
             >
               Sign me up <ArrowUpRight size={15} />
             </Link>
@@ -321,13 +318,13 @@ export default function HomePage() {
 
         <section
           ref={testimonialRef}
-          className={`px-0 py-16 transition-[transform,opacity] duration-700 ease-out motion-reduce:transition-none sm:py-[82px] ${testimonialVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}
+          className={`px-0 py-16 transition-[translate,opacity] duration-700 ease-out sm:py-[82px] ${testimonialVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}
         >
-          <div className="mx-auto w-[min(1160px,calc(100%-2rem))] text-center sm:w-[min(1160px,calc(100%-3rem))] lg:w-[min(1160px,calc(100%-5rem))]">
-            <div className="mb-6 flex items-center justify-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">
+          <div className="mx-auto w-[min(1160px,calc(100%_-_2rem))] text-center sm:w-[min(1160px,calc(100%_-_3rem))] lg:w-[min(1160px,calc(100%_-_5rem))]">
+            <div className="mb-6 flex items-center justify-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-800">
               <span className="block h-0.5 w-4 bg-slate-300" /> Testimonial
             </div>
-            <h2 className="mx-auto mb-10 max-w-[700px] text-[clamp(1.8rem,6vw,2.45rem)] font-bold leading-[1.15] tracking-[-0.04em] text-white sm:mb-16">
+            <h2 className="mx-auto mb-10 max-w-[700px] text-[clamp(1.8rem,6vw,2.45rem)] font-bold leading-[1.15] tracking-[-0.04em] text-slate-900 sm:mb-16">
               Our Members Investments &amp; Profits Experience
             </h2>
             <div
@@ -345,7 +342,7 @@ export default function HomePage() {
               }}
             >
               <div
-                className="flex items-stretch motion-safe:transition-transform motion-safe:duration-700 motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]"
+                className="flex items-stretch transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
                 style={{
                   transform: `translate3d(-${testimonialIndex * 100}%, 0, 0)`,
                 }}
@@ -360,10 +357,10 @@ export default function HomePage() {
                       <div className="h-[58px] text-6xl leading-none text-yellow-300 sm:h-[70px] sm:text-7xl">
                         “
                       </div>
-                      <blockquote className="text-center text-sm leading-7 text-white sm:text-lg sm:leading-8 md:text-xl">
+                      <blockquote className="text-center text-sm leading-7 text-slate-800 sm:text-lg sm:leading-8 md:text-xl">
                         “{item.quote}”
                       </blockquote>
-                      <cite className="mt-8 block text-[10px] font-extrabold uppercase tracking-[0.28em] not-italic text-white">
+                      <cite className="mt-8 block text-[10px] font-extrabold uppercase tracking-[0.28em] not-italic text-blue-800">
                         {item.author}
                       </cite>
                     </div>
@@ -394,17 +391,17 @@ export default function HomePage() {
 
         <section
           ref={finalCtaRef}
-          className={`bg-[#202125] px-4 py-16 transition-[transform,opacity] duration-700 ease-out motion-reduce:transition-none sm:py-[94px] ${finalCtaVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}
+          className={`bg-blue-50 px-4 py-16 transition-[translate,opacity] duration-700 ease-out sm:py-[94px] ${finalCtaVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}
         >
-          <div className="mx-auto flex w-[min(1160px,calc(100%-2rem))] flex-col items-center text-center sm:w-[min(1160px,calc(100%-3rem))] lg:w-[min(1160px,calc(100%-5rem))]">
-            <p className="max-w-[740px] text-xl font-medium leading-8 text-white sm:text-2xl sm:leading-10">
+          <div className="mx-auto flex w-[min(1160px,calc(100%_-_2rem))] flex-col items-center text-center sm:w-[min(1160px,calc(100%_-_3rem))] lg:w-[min(1160px,calc(100%_-_5rem))]">
+            <p className="max-w-[740px] text-xl font-medium leading-8 text-slate-900 sm:text-2xl sm:leading-10">
               Begin your journey with our crypto management platform today.
               <br />
               It's simple and straightforward.
             </p>
             <Link
               to="/signup"
-              className="mt-10 inline-flex h-16 w-full max-w-[310px] items-center justify-center gap-4 rounded-md bg-yellow-300 px-6 text-base font-extrabold uppercase text-slate-900 transition hover:-translate-y-1 sm:mt-14 sm:h-[78px] sm:gap-6 sm:px-8 sm:text-xl"
+              className="mt-10 inline-flex h-14 w-full max-w-[310px] items-center justify-center gap-4 rounded-lg bg-blue-600 px-6 text-base font-extrabold uppercase text-white transition hover:-translate-y-1 hover:bg-blue-700 sm:mt-14 sm:h-16 sm:gap-6 sm:px-8 sm:text-xl"
             >
               Sign me up <ArrowUpRight size={24} />
             </Link>

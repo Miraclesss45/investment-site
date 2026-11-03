@@ -2,7 +2,8 @@ import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import crypto from "node:crypto";
-import { parseFirebaseServiceAccount } from "../server/firebase-service-account.js";
+import { loadFirebaseServiceAccount } from "../server/firebase-service-account.js";
+import { enforceRateLimit, getClientAddress } from "../server/rate-limit.js";
 
 function sendJson(res, statusCode, body) {
   res.setHeader("Content-Type", "application/json");
@@ -12,9 +13,7 @@ function sendJson(res, statusCode, body) {
 
 function getFirebaseAdmin() {
   if (getApps().length) return getApp();
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!serviceAccount) throw new Error("Firebase service account is not configured.");
-  return initializeApp({ credential: cert(parseFirebaseServiceAccount(serviceAccount)) });
+  return initializeApp({ credential: cert(loadFirebaseServiceAccount()) });
 }
 
 async function logProvisioning(db, requestId, stage, uid, email, username, status, error = null, required = false) {
@@ -70,6 +69,18 @@ export default async function handler(req, res) {
   try {
     app = getFirebaseAdmin();
     db = getFirestore(app);
+    await enforceRateLimit(db, {
+      scope: "account-create-ip",
+      identity: getClientAddress(req),
+      limit: 10,
+      windowMs: 15 * 60 * 1000,
+    });
+    await enforceRateLimit(db, {
+      scope: "account-create-email",
+      identity: email,
+      limit: 5,
+      windowMs: 60 * 60 * 1000,
+    });
     await logProvisioning(db, requestId, "start", "", email, username, "pending", null, true);
     createdUser = await getAuth(app).createUser({
       email,
@@ -90,6 +101,11 @@ export default async function handler(req, res) {
       const userSnapshot = await transaction.get(userRef);
       const usernameSnapshot = await transaction.get(usernameRef);
       const referrerSnapshot = referrerRef ? await transaction.get(referrerRef) : null;
+      const referrerUid = String(referrerSnapshot?.data()?.uid || "");
+      const referrerProfileRef = referrerUid ? db.doc(`users/${referrerUid}`) : null;
+      const referrerProfileSnapshot = referrerProfileRef
+        ? await transaction.get(referrerProfileRef)
+        : null;
       const reservedUid = String(usernameSnapshot.data()?.uid || "");
       const reservedUserRef = reservedUid && reservedUid !== createdUser.uid
         ? db.doc(`users/${reservedUid}`)
@@ -107,7 +123,11 @@ export default async function handler(req, res) {
         error.code = "username-already-in-use";
         throw error;
       }
-      if (referralUsername && (!referrerSnapshot?.exists || referrerSnapshot.data().uid === createdUser.uid)) {
+      if (referralUsername && (
+        !referrerSnapshot?.exists
+        || !referrerProfileSnapshot?.exists
+        || referrerUid === createdUser.uid
+      )) {
         const error = new Error("The referral username is invalid.");
         error.code = "invalid-referral";
         throw error;
@@ -121,15 +141,27 @@ export default async function handler(req, res) {
         phone: String(values.phone || ""),
         country: String(values.country || ""),
         bitcoinWallet: String(values.bitcoinWallet || "").trim(),
-        bnbWallet: String(values.bnbWallet || "").trim(),
         ethereumWallet: String(values.ethereumWallet || "").trim(),
         litecoinWallet: String(values.litecoinWallet || "").trim(),
         referredBy: referralUsername,
         promotionalCredit: 0,
+        adminBalanceAdjustment: 0,
         termsAccepted: true,
         role: "member",
         createdAt: FieldValue.serverTimestamp(),
       });
+      if (referrerUid) {
+        transaction.set(db.doc(`users/${referrerUid}/referralRewards/${createdUser.uid}`), {
+          referrerId: referrerUid,
+          referredUserId: createdUser.uid,
+          referredUsername: username,
+          amount: 5,
+          recipientRole: "referrer",
+          status: "pending",
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
       if (usernameSnapshot.exists && reservedUid !== createdUser.uid) {
         transaction.delete(usernameRef);
       }
@@ -139,6 +171,9 @@ export default async function handler(req, res) {
 
     return sendJson(res, 201, { uid: createdUser.uid, email });
   } catch (error) {
+    if (error?.code === "rate-limit-exceeded") {
+      return sendJson(res, 429, { error: error.message, code: error.code });
+    }
     const errorUid = createdUser?.uid || "";
     const errorStage = !createdUser ? "auth-creation-failed" : "profile-creation-failed";
     if (db) {

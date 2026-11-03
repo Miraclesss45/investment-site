@@ -4,7 +4,7 @@ function sendJson(res, statusCode, body) {
   return res.status(statusCode).json(body);
 }
 
-const SUPPORTED_COINGECKO_IDS = new Set(["bitcoin", "ethereum", "litecoin", "binancecoin"]);
+const SUPPORTED_COINGECKO_IDS = new Set(["bitcoin", "ethereum", "litecoin"]);
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
